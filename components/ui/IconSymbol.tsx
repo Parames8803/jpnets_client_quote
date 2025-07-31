@@ -1,7 +1,7 @@
 // Fallback for using MaterialIcons on Android and web.
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
+import { SymbolViewProps, SymbolWeight } from 'expo-symbols';
 import { ComponentProps } from 'react';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 
@@ -18,7 +18,23 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
-} as IconMapping;
+  'plus.circle.fill': 'add-circle',
+  'square.and.arrow.up.fill': 'file-upload',
+  'trash.fill': 'delete',
+  'pencil': 'edit',
+  'clock': 'history',
+  'clock.fill': 'access-time', // Added mapping for clock.fill
+  'checkmark.circle.fill': 'check-circle',
+  'arrow.clockwise': 'refresh',
+  'person.crop.circle.badge.plus': 'person-add', // Added mapping for person.crop.circle.badge.plus
+  'pencil.circle.fill': 'edit', // Added mapping for pencil.circle.fill
+  'person.circle.fill': 'person', // Added mapping for person.circle.fill
+  'person.3.fill': 'people', // Added mapping for person.3.fill
+  'checklist.unchecked': 'assignment', // Added mapping for checklist.unchecked
+  'doc.text.fill': 'description', // Added mapping for doc.text.fill
+  'checkmark.seal.fill': 'verified', // Added mapping for checkmark.seal.fill
+  'photo.fill.on.rectangle.fill': 'photo-library', // Added mapping for photo.fill.on.rectangle.fill
+} as const;
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
