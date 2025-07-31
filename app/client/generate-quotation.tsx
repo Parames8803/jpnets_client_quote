@@ -43,11 +43,12 @@ export default function GenerateQuotationScreen() {
           setClient(clientData);
         }
 
-        // Fetch rooms for the client
+        // Fetch rooms for the client that are 'Not Active'
         const { data: roomsData, error: roomsError } = await supabase
           .from('rooms')
           .select('*')
           .eq('client_id', client_id_str)
+          .eq('status', 'Not Active') // Only fetch rooms with 'Not Active' status
           .order('created_at', { ascending: false });
 
         if (roomsError) {
@@ -126,6 +127,17 @@ export default function GenerateQuotationScreen() {
         Alert.alert('Error', 'Quotation created, but failed to link rooms.');
         setLoading(false);
         return;
+      }
+
+      // 3. Update the status of selected rooms to 'In Quotation'
+      const { error: updateRoomsError } = await supabase
+        .from('rooms')
+        .update({ status: 'In Quotation' })
+        .in('id', selectedRoomIds);
+
+      if (updateRoomsError) {
+        console.error('Error updating room statuses:', updateRoomsError.message);
+        Alert.alert('Warning', 'Quotation created, but failed to update room statuses.');
       }
 
       Alert.alert('Success', 'Quotation generated successfully!');

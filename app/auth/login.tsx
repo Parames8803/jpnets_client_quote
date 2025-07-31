@@ -1,14 +1,16 @@
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { Alert, Dimensions, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Dimensions, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../utils/supabaseClient';
 
-const { width } = Dimensions.get('window'); // Get screen width for responsive design
+const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   const router = useRouter();
 
@@ -30,8 +32,6 @@ export default function LoginScreen() {
       Alert.alert('Validation Error', 'Please enter a valid email address.');
       return false;
     }
-    // You might want to adjust password length validation for login if it's strictly for registration
-    // For login, usually, you just check if the fields are filled.
     return true;
   };
 
@@ -45,124 +45,182 @@ export default function LoginScreen() {
     });
 
     if (error) {
-      Alert.alert(error.message);
+      Alert.alert('Error', error.message);
     } else {
-      Alert.alert('Login Successful', 'You have been successfully logged in!');
-      router.replace('/(tabs)'); // Navigate to home page
+      Alert.alert('Success', 'Welcome back!');
+      router.replace('/(tabs)');
     }
     setLoading(false);
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Welcome Back!</Text>
-
-        <View style={styles.inputGroup}>
-          <TextInput
-            style={styles.input}
-            onChangeText={(text) => setEmail(text)}
-            value={email}
-            placeholder="Email address"
-            placeholderTextColor="#999"
-            autoCapitalize={'none'}
-            keyboardType="email-address"
-          />
-        </View>
-        <View style={styles.inputGroup}>
-          <TextInput
-            style={styles.input}
-            onChangeText={(text) => setPassword(text)}
-            value={password}
-            secureTextEntry={true}
-            placeholder="Password"
-            placeholderTextColor="#999"
-            autoCapitalize={'none'}
-          />
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.welcomeText}>Welcome</Text>
+          <Text style={styles.subtitle}>Sign in to your account</Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.button}
-          disabled={loading}
-          onPress={signInWithEmail}
-        >
-          <Text style={styles.buttonText}>
-            {loading ? 'Logging In...' : 'Sign In'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.form}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput
+              style={[
+                styles.input,
+                emailFocused && styles.inputFocused,
+                email && styles.inputFilled
+              ]}
+              onChangeText={setEmail}
+              value={email}
+              placeholder="Enter your email"
+              placeholderTextColor="#A0A0A0"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
+            />
+          </View>
 
-        <TouchableOpacity onPress={() => router.push('/auth/register')}>
-          <Text style={styles.linkText}>Don't have an account? **Register here.**</Text>
-        </TouchableOpacity>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <TextInput
+              style={[
+                styles.input,
+                passwordFocused && styles.inputFocused,
+                password && styles.inputFilled
+              ]}
+              onChangeText={setPassword}
+              value={password}
+              secureTextEntry={true}
+              placeholder="Enter your password"
+              placeholderTextColor="#A0A0A0"
+              autoCapitalize="none"
+              onFocus={() => setPasswordFocused(true)}
+              onBlur={() => setPasswordFocused(false)}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+            disabled={loading}
+            onPress={signInWithEmail}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginButtonText}>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => router.push('/auth/register')}>
+              <Text style={styles.linkText}>Sign up</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff', // Set background to white
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 25,
-    width: width * 0.9, // 90% of screen width
-    maxWidth: 400, // Max width for larger screens
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 8,
+  header: {
+    marginTop: height * 0.12,
+    marginBottom: 48,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 30,
-    textAlign: 'center',
+  welcomeText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
-  inputGroup: {
-    marginBottom: 15,
-    width: '100%',
+  subtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '400',
+  },
+  form: {
+    flex: 1,
+  },
+  inputContainer: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    letterSpacing: -0.1,
   },
   input: {
-    height: 50,
-    borderColor: '#e0e0e0',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 15,
+    height: 56,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
     fontSize: 16,
-    color: '#333',
-    backgroundColor: '#f9f9f9',
+    color: '#1F2937',
+    backgroundColor: '#FAFAFA',
+    fontWeight: '400',
   },
-  button: {
-    backgroundColor: '#007AFF', // A modern blue
-    paddingVertical: 15,
-    borderRadius: 10,
+  inputFocused: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inputFilled: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D1D5DB',
+  },
+  loginButton: {
+    height: 56,
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 25,
-    width: '100%',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    marginTop: 16,
+    shadowColor: '#1F2937',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+  loginButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 32,
+  },
+  footerText: {
+    fontSize: 15,
+    color: '#6B7280',
+    fontWeight: '400',
   },
   linkText: {
-    color: '#666',
-    marginTop: 20,
     fontSize: 15,
-    textAlign: 'center',
+    color: '#3B82F6',
+    fontWeight: '600',
   },
 });

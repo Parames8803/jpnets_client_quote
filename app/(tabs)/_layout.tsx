@@ -2,35 +2,52 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
 
-import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { CustomHeader } from '@/components/ui/CustomHeader';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false, // Hide header for tabs, as it's handled by root layout
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
+          borderTopColor: isDark ? Colors.dark.border : Colors.light.border,
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home', // This will be the header title for the Home tab
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol name={focused ? 'house.fill' : 'house'} color={color} size={24} />
+          ),
+          headerShown: true,
+          header: () => <CustomHeader title="Home" showBackButton={false} />,
+        }}
+      />
+      <Tabs.Screen
+        name="clients"
+        options={{
+          title: 'Clients',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol name={focused ? 'person.3.fill' : 'person.3'} color={color} size={24} />
+          ),
+          headerShown: true,
+          header: () => <CustomHeader title="Your Clients" />,
+        }}
+      />
+      <Tabs.Screen
+        name="create-client"
+        options={{
+          href: null, // Hide this tab from the tab bar
         }}
       />
     </Tabs>

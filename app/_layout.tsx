@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { supabase } from '../utils/supabaseClient';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { CustomHeader } from '@/components/ui/CustomHeader';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -51,23 +52,53 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         {session && session.user ? (
-          <Stack.Screen
-            name="(tabs)"
-            options={{
-              headerShown: true, // Show header for authenticated users
-              headerTitle: 'Home', // Default title, can be overridden by nested screens
-              headerLeft: () => null, // Remove back button
-              headerRight: () => (
-                <TouchableOpacity onPress={signOut} style={{ marginRight: 15 }}>
-                  <Text style={{ color: colorScheme === 'dark' ? 'white' : 'black', fontSize: 16 }}>Logout</Text>
-                </TouchableOpacity>
-              ),
-            }}
-          />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         ) : (
-          <Stack.Screen name="auth/login" options={{ headerShown: false, headerLeft: () => null }} />
+          <Stack.Screen name="auth/login" options={{ headerShown: false }} />
         )}
-        <Stack.Screen name="+not-found" />
+        <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="create-room" 
+          options={{ 
+            headerShown: true, 
+            header: () => <CustomHeader title="Create New Room" /> 
+          }} 
+        />
+        <Stack.Screen 
+          name="edit-client" 
+          options={{ 
+            headerShown: true, 
+            header: () => <CustomHeader title="Edit Client" /> 
+          }} 
+        />
+        <Stack.Screen 
+          name="client/[id]" 
+          options={{ 
+            headerShown: true, 
+            header: () => <CustomHeader title="Client Details" /> 
+          }} 
+        />
+        <Stack.Screen 
+          name="client/generate-quotation" 
+          options={{ 
+            headerShown: true, 
+            header: () => <CustomHeader title="Generate Quotation" /> 
+          }} 
+        />
+        <Stack.Screen 
+          name="quotation/[id]" 
+          options={{ 
+            headerShown: true, 
+            header: () => <CustomHeader title="Quotation Details" /> 
+          }} 
+        />
+        <Stack.Screen 
+          name="room/[id]" 
+          options={{ 
+            headerShown: true, 
+            header: () => <CustomHeader title="Room Details" /> 
+          }} 
+        />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

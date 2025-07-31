@@ -17,6 +17,7 @@ const MAPPING = {
   'house.fill': 'home',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
+  'chevron.left': 'chevron-left', // Added mapping for chevron.left
   'chevron.right': 'chevron-right',
   'plus.circle.fill': 'add-circle',
   'square.and.arrow.up.fill': 'file-upload',
@@ -30,10 +31,22 @@ const MAPPING = {
   'pencil.circle.fill': 'edit', // Added mapping for pencil.circle.fill
   'person.circle.fill': 'person', // Added mapping for person.circle.fill
   'person.3.fill': 'people', // Added mapping for person.3.fill
+  'person.3': 'people-outline', // Added mapping for person.3
   'checklist.unchecked': 'assignment', // Added mapping for checklist.unchecked
   'doc.text.fill': 'description', // Added mapping for doc.text.fill
   'checkmark.seal.fill': 'verified', // Added mapping for checkmark.seal.fill
   'photo.fill.on.rectangle.fill': 'photo-library', // Added mapping for photo.fill.on.rectangle.fill
+  'location.fill': 'location-on', // Added mapping for location.fill
+  'envelope.fill': 'email', // Added mapping for envelope.fill
+  'exclamationmark.triangle': 'warning', // Added mapping for exclamationmark.triangle
+  'phone.fill': 'phone', // Added mapping for phone.fill
+  'house': 'house', // Added mapping for house
+  'doc.text': 'description', // Added mapping for doc.text
+  'chevron.down': 'expand-more', // Added mapping for chevron.down
+  'xmark': 'close', // Added mapping for xmark
+  'plus': 'add', // Added mapping for plus
+  'photo': 'photo', // Added mapping for photo
+  'cube.box': 'inventory', // Added mapping for cube.box
 } as const;
 
 /**

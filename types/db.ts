@@ -14,9 +14,10 @@ export interface Measurement {
   id: string; // uuid
   created_at: string; // timestamp with time zone
   room_id: string | null; // uuid, nullable (references rooms.id)
-  unit_type: string | null; // text, nullable
-  value: number | null; // numeric, nullable
-  label: string | null; // text, nullable
+  length_unit_type: string | null; // text, nullable
+  length_value: number | null; // numeric, nullable
+  width_unit_type: string | null; // text, nullable
+  width_value: number | null; // numeric, nullable
   converted_sq_ft: number | null; // numeric, nullable
 }
 
@@ -59,4 +60,5 @@ export interface Room {
   description: string | null; // text, nullable
   status: string | null; // text, nullable (default 'Not Active')
   ref_image_urls: string[] | null; // text[], nullable
+  total_sq_ft: string | null; // text, nullable
 }
