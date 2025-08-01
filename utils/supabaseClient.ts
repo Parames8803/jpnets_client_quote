@@ -1,8 +1,8 @@
 // utils/supabaseClient.ts
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import 'react-native-url-polyfill/auto'; // Must be at the very top
-import { Platform } from 'react-native'; // Import Platform
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage unconditionally
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native'; // Import Platform
+import 'react-native-url-polyfill/auto'; // Must be at the very top
 
 const storage = Platform.OS === 'web' ? window.localStorage : AsyncStorage;
 
@@ -23,3 +23,4 @@ if (Platform.OS === 'web' || Platform.OS === 'android' || Platform.OS === 'ios')
 }
 
 export { supabase };
+
