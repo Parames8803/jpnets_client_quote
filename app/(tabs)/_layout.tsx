@@ -1,11 +1,10 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
 
+import { CustomHeader } from '@/components/ui/CustomHeader';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { CustomHeader } from '@/components/ui/CustomHeader';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -30,7 +29,7 @@ export default function TabLayout() {
             <IconSymbol name={focused ? 'house.fill' : 'house'} color={color} size={24} />
           ),
           headerShown: true,
-          header: () => <CustomHeader title="Home" showBackButton={false} />,
+          header: () => <CustomHeader title="Home" showBackButton={false} showLogoutButton={true} />,
         }}
       />
       <Tabs.Screen
@@ -41,13 +40,7 @@ export default function TabLayout() {
             <IconSymbol name={focused ? 'person.3.fill' : 'person.3'} color={color} size={24} />
           ),
           headerShown: true,
-          header: () => <CustomHeader title="Your Clients" />,
-        }}
-      />
-      <Tabs.Screen
-        name="create-client"
-        options={{
-          href: null, // Hide this tab from the tab bar
+          header: () => <CustomHeader title="Your Clients" showLogoutButton={true} />,
         }}
       />
     </Tabs>

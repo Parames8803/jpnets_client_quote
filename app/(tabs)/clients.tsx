@@ -1,21 +1,22 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../utils/supabaseClient';
 
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { CustomHeader } from '@/components/ui/CustomHeader';
 
 import { Client } from '../../types/db';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export default function ClientsScreen() {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | undefined>(undefined);
   const [userId, setUserId] = useState<string | null>(null);
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [clients, setClients] = useState<Client[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -119,8 +120,8 @@ export default function ClientsScreen() {
 
   if (userEmail === undefined || userId === null) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading...</Text>
       </View>
     );
   }
@@ -135,46 +136,50 @@ export default function ClientsScreen() {
 
   const renderItem = ({ item }: { item: Client }) => (
     <TouchableOpacity
-      style={styles.clientCard}
+      style={[
+        styles.clientCard,
+        { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
+        { borderColor: isDark ? Colors.dark.border : Colors.light.border },
+      ]}
       onPress={() => router.push({ pathname: '/client/[id]', params: { id: item.id } })}
       activeOpacity={0.7}
     >
       <View style={styles.clientHeader}>
-        <View style={styles.clientAvatar}>
-          <Text style={styles.avatarText}>
+        <View style={[styles.clientAvatar, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}>
+          <Text style={[styles.avatarText, { color: isDark ? "black" : Colors.light.secondary }]}>
             {item.name.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase()}
           </Text>
         </View>
         <View style={styles.clientInfo}>
-          <Text style={styles.clientName}>{item.name}</Text>
-          <Text style={styles.clientEmail}>{item.email}</Text>
+          <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.name}</Text>
+          <Text style={[styles.clientEmail, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{item.email}</Text>
         </View>
         <View style={styles.clientActions}>
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={(e) => { 
-              e.stopPropagation(); 
-              router.push({ pathname: '/edit-client', params: { id: item.id } }); 
+            style={[styles.actionButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              router.push({ pathname: '/edit-client', params: { id: item.id } });
             }}
           >
-            <IconSymbol size={18} name="pencil" color="#6B7280" />
+            <IconSymbol size={18} name="pencil" color={isDark ? Colors.dark.primary : Colors.light.primary} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={(e) => { 
-              e.stopPropagation(); 
-              handleDeleteClient(item.id); 
+            style={[styles.actionButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleDeleteClient(item.id);
             }}
           >
-            <IconSymbol size={18} name="trash.fill" color="#EF4444" />
+            <IconSymbol size={18} name="trash.fill" color={isDark ? Colors.dark.error : Colors.light.error} />
           </TouchableOpacity>
         </View>
       </View>
-      
+
       <View style={styles.clientDetails}>
-        <Text style={styles.clientPhone}>{item.contact_number}</Text>
-        <Text style={styles.clientAddress} numberOfLines={2}>{item.address}</Text>
-        <Text style={styles.clientDate}>
+        <Text style={[styles.clientPhone, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.contact_number}</Text>
+        <Text style={[styles.clientAddress, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]} numberOfLines={2}>{item.address}</Text>
+        <Text style={[styles.clientDate, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
           Added {new Date(item.created_at).toLocaleDateString()}
         </Text>
       </View>
@@ -182,81 +187,78 @@ export default function ClientsScreen() {
   );
 
   return (
-    <>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView
-        style={styles.container}
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
+          <RefreshControl
+            refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#3B82F6"
+            tintColor={isDark ? Colors.dark.text : Colors.light.text}
           />
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <TouchableOpacity 
-            style={styles.primaryAction} 
-            onPress={handleCreateNewClient}
-            activeOpacity={0.8}
-          >
-            <IconSymbol size={20} name="plus.circle.fill" color="#FFFFFF" />
-            <Text style={styles.primaryActionText}>Add Client</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.secondaryAction} 
+          <TouchableOpacity
+            style={[styles.exportButton, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground, borderColor: isDark ? Colors.dark.border : Colors.light.border }]}
             onPress={handleExportClients}
             activeOpacity={0.8}
           >
-            <IconSymbol size={18} name="square.and.arrow.up.fill" color="#374151" />
-            <Text style={styles.secondaryActionText}>Export</Text>
+            <IconSymbol size={18} name="square.and.arrow.up.fill" color={isDark ? Colors.dark.text : Colors.light.text} />
+            <Text style={[styles.exportButtonText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Export</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.exportButton, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground, borderColor: isDark ? Colors.dark.border : Colors.light.border }]}
+            onPress={handleCreateNewClient}
+            activeOpacity={0.8}
+          >
+            <IconSymbol size={18} name="plus.circle.fill" color={isDark ? Colors.dark.text : Colors.light.text} />
+            <Text style={[styles.exportButtonText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Add Client</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Clients Section */}
         <View style={styles.clientsSection}>
-          <Text style={styles.sectionTitle}>Your Clients</Text>
-          
+          <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Your Clients</Text>
           {clients.length > 0 ? (
             <FlatList
               data={clients}
               renderItem={renderItem}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
           ) : (
             <View style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
-                <IconSymbol size={48} name="person.crop.circle.badge.plus" color="#D1D5DB" />
+              <View style={[styles.emptyIcon, { borderColor: isDark ? Colors.dark.border : Colors.light.border }]}>
+                <IconSymbol size={48} name="person.crop.circle.badge.plus" color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
               </View>
-              <Text style={styles.emptyTitle}>No clients yet</Text>
-              <Text style={styles.emptyMessage}>
+              <Text style={[styles.emptyTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>No clients yet</Text>
+              <Text style={[styles.emptyMessage, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
                 Start building your client base by adding your first client
               </Text>
-              <TouchableOpacity 
-                style={styles.emptyAction} 
+              <TouchableOpacity
+                style={[styles.emptyAction, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}
                 onPress={handleCreateNewClient}
               >
-                <Text style={styles.emptyActionText}>Add Your First Client</Text>
+                <Text style={[styles.emptyActionText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Add Your First Client</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
       </ScrollView>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: 32,
@@ -265,102 +267,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
   },
   loadingText: {
     fontSize: 16,
-    color: '#6B7280',
     fontWeight: '500',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  greeting: {
-    fontSize: 16,
-    color: '#6B7280',
-    fontWeight: '400',
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginTop: 4,
-    letterSpacing: -0.5,
-  },
-  profileButton: {
+  addClientButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F9FAFB',
     justifyContent: 'center',
     alignItems: 'center',
   },
   quickActions: {
     flexDirection: 'row',
     paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 20,
+    marginTop: 10,
     gap: 12,
   },
-  primaryAction: {
-    flex: 1,
+  exportButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1F2937',
-    height: 52,
-    borderRadius: 12,
-    gap: 8,
-  },
-  primaryActionText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
-    height: 52,
+    height: 48,
     borderRadius: 12,
     paddingHorizontal: 20,
-    gap: 6,
+    borderWidth: 1,
+    gap: 8,
   },
-  secondaryActionText: {
-    color: '#374151',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 24,
-    marginBottom: 32,
-    gap: 12,
-  },
-  statCard: {
-    width: (width - 60) / 2,
-    backgroundColor: '#F9FAFB',
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-    textAlign: 'center',
+  exportButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   clientsSection: {
     paddingHorizontal: 24,
@@ -368,16 +306,25 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1F2937',
     marginBottom: 20,
     letterSpacing: -0.3,
   },
   clientCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   clientHeader: {
     flexDirection: 'row',
@@ -388,15 +335,14 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   avatarText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    color: 'white',
   },
   clientInfo: {
     flex: 1,
@@ -404,12 +350,11 @@ const styles = StyleSheet.create({
   clientName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
     marginBottom: 2,
   },
   clientEmail: {
     fontSize: 14,
-    color: '#6B7280',
+    fontWeight: '400',
   },
   clientActions: {
     flexDirection: 'row',
@@ -419,42 +364,27 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F9FAFB',
     justifyContent: 'center',
     alignItems: 'center',
   },
   clientDetails: {
     gap: 4,
+    marginTop: 8,
   },
   clientPhone: {
     fontSize: 15,
-    color: '#374151',
     fontWeight: '500',
   },
   clientAddress: {
     fontSize: 14,
-    color: '#6B7280',
     lineHeight: 20,
   },
   clientDate: {
     fontSize: 12,
-    color: '#9CA3AF',
     marginTop: 8,
   },
   separator: {
     height: 16,
-  },
-  emptyMessage: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  emptyActionText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
   emptyState: {
     flex: 1,
@@ -464,22 +394,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyIcon: {
-    marginBottom: 20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   emptyTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1F2937',
     marginBottom: 8,
     textAlign: 'center',
   },
+  emptyMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
   emptyAction: {
-    backgroundColor: '#1F2937',
     height: 52,
     borderRadius: 12,
     paddingHorizontal: 24,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 16,
+  },
+  emptyActionText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

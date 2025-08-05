@@ -47,6 +47,10 @@ const MAPPING = {
   'plus': 'add', // Added mapping for plus
   'photo': 'photo', // Added mapping for photo
   'cube.box': 'inventory', // Added mapping for cube.box
+  'arrow.right.square': 'logout', // Added mapping for arrow.right.square
+  'person.fill': 'person', // Added mapping for person.fill
+  'list.clipboard.fill': 'assignment', // Added mapping for list.clipboard.fill
+  'pencil.and.outline': 'edit', // Added mapping for pencil.and.outline
 } as const;
 
 /**

@@ -4,11 +4,13 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { Colors } from '@/constants/Colors';
+
 // @ts-ignore
 let supabase: any;
 async function getSupabase() {
   if (!supabase) {
-    const { supabase: sb } = await import('../../utils/supabaseClient.ts');
+    const { supabase: sb } = await import('../utils/supabaseClient.ts');
     supabase = sb;
   }
   return supabase;
@@ -21,15 +23,17 @@ export default function CreateClientScreen() {
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
-  
+
   // Focus states for inputs
   const [nameFocused, setNameFocused] = useState(false);
   const [contactFocused, setContactFocused] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [addressFocused, setAddressFocused] = useState(false);
-  
+
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -132,32 +136,31 @@ export default function CreateClientScreen() {
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      <KeyboardAvoidingView 
-        style={styles.container} 
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Create New Client</Text>
-            <Text style={styles.subtitle}>Add a new client to your database</Text>
-          </View>
-
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Full Name</Text>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Full Name</Text>
               <TextInput
                 style={[
                   styles.input,
+                  {
+                    backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
+                    color: isDark ? Colors.dark.text : Colors.light.text,
+                    borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                  },
                   nameFocused && styles.inputFocused,
-                  name && styles.inputFilled
                 ]}
                 placeholder="Enter client's full name"
-                placeholderTextColor="#A0A0A0"
+                placeholderTextColor={isDark ? Colors.dark.placeholder : Colors.light.placeholder}
                 value={name}
                 onChangeText={setName}
                 onFocus={() => setNameFocused(true)}
@@ -167,15 +170,19 @@ export default function CreateClientScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Contact Number</Text>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Contact Number</Text>
               <TextInput
                 style={[
                   styles.input,
+                  {
+                    backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
+                    color: isDark ? Colors.dark.text : Colors.light.text,
+                    borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                  },
                   contactFocused && styles.inputFocused,
-                  contactNumber && styles.inputFilled
                 ]}
                 placeholder="Enter phone number"
-                placeholderTextColor="#A0A0A0"
+                placeholderTextColor={isDark ? Colors.dark.placeholder : Colors.light.placeholder}
                 value={contactNumber}
                 onChangeText={setContactNumber}
                 onFocus={() => setContactFocused(true)}
@@ -185,15 +192,19 @@ export default function CreateClientScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email Address</Text>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Email Address</Text>
               <TextInput
                 style={[
                   styles.input,
+                  {
+                    backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
+                    color: isDark ? Colors.dark.text : Colors.light.text,
+                    borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                  },
                   emailFocused && styles.inputFocused,
-                  email && styles.inputFilled
                 ]}
                 placeholder="Enter email address"
-                placeholderTextColor="#A0A0A0"
+                placeholderTextColor={isDark ? Colors.dark.placeholder : Colors.light.placeholder}
                 value={email}
                 onChangeText={setEmail}
                 onFocus={() => setEmailFocused(true)}
@@ -204,16 +215,20 @@ export default function CreateClientScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Address</Text>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Address</Text>
               <TextInput
                 style={[
                   styles.input,
                   styles.textArea,
+                  {
+                    backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
+                    color: isDark ? Colors.dark.text : Colors.light.text,
+                    borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                  },
                   addressFocused && styles.inputFocused,
-                  address && styles.inputFilled
                 ]}
                 placeholder="Enter full address"
-                placeholderTextColor="#A0A0A0"
+                placeholderTextColor={isDark ? Colors.dark.placeholder : Colors.light.placeholder}
                 value={address}
                 onChangeText={setAddress}
                 onFocus={() => setAddressFocused(true)}
@@ -222,36 +237,36 @@ export default function CreateClientScreen() {
                 numberOfLines={3}
                 textAlignVertical="top"
               />
-              
-              <TouchableOpacity 
-                style={styles.locationButton} 
+
+              <TouchableOpacity
+                style={[styles.locationButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}
                 onPress={handleFetchLocation}
                 disabled={locationLoading}
                 activeOpacity={0.8}
               >
-                <Text style={styles.locationButtonText}>
+                <Text style={[styles.locationButtonText, { color: isDark ? Colors.dark.primary : Colors.light.primary }]}>
                   {locationLoading ? 'Getting location...' : 'Use Current Location'}
                 </Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+              style={[styles.saveButton, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }, loading && styles.saveButtonDisabled]}
               onPress={handleSaveClient}
               disabled={loading}
               activeOpacity={0.8}
             >
-              <Text style={styles.saveButtonText}>
+              <Text style={[styles.saveButtonText, { color: isDark ? "black" : Colors.light.text }]}>
                 {loading ? 'Creating Client...' : 'Create Client'}
               </Text>
             </TouchableOpacity>
-
+            
             <TouchableOpacity
-              style={styles.cancelButton}
+              style={[styles.cancelButton, { borderColor: isDark ? Colors.dark.border : Colors.light.border }]}
               onPress={() => router.back()}
               activeOpacity={0.8}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={[styles.cancelButtonText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -263,30 +278,12 @@ export default function CreateClientScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 32,
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    fontWeight: '400',
   },
   form: {
     paddingHorizontal: 24,
@@ -297,19 +294,14 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
     marginBottom: 8,
-    letterSpacing: -0.1,
   },
   input: {
     height: 56,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#1F2937',
-    backgroundColor: '#FAFAFA',
     fontWeight: '400',
   },
   textArea: {
@@ -318,53 +310,43 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: '#3B82F6',
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  inputFilled: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D1D5DB',
+    // Using a shadow for a more professional, modern look on focus
+    ...Platform.select({
+      ios: {
+        shadowColor: '#3B82F6',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   locationButton: {
-    backgroundColor: '#F3F4F6',
     height: 44,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   locationButtonText: {
-    color: '#374151',
     fontSize: 15,
     fontWeight: '600',
   },
   saveButton: {
     height: 56,
-    backgroundColor: '#1F2937',
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 16,
     marginBottom: 12,
-    shadowColor: '#1F2937',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
   },
   saveButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-    shadowOpacity: 0,
-    elevation: 0,
+    opacity: 0.6,
   },
   saveButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.1,
@@ -376,10 +358,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
   },
   cancelButtonText: {
-    color: '#6B7280',
     fontSize: 16,
     fontWeight: '600',
   },

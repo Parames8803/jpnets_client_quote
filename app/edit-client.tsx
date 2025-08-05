@@ -1,4 +1,3 @@
-import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -18,6 +17,8 @@ import {
 } from 'react-native';
 import { supabase } from '../utils/supabaseClient';
 
+import { Colors } from '@/constants/Colors';
+
 import { Client } from '../types/db';
 
 export default function EditClientScreen() {
@@ -31,12 +32,17 @@ export default function EditClientScreen() {
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  
+  // Focus states for inputs
+  const [nameFocused, setNameFocused] = useState(false);
+  const [contactFocused, setContactFocused] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [addressFocused, setAddressFocused] = useState(false);
 
   const isDark = colorScheme === 'dark';
 
   useEffect(() => {
     const fetchClient = async () => {
-      // Request location permissions when the component mounts
       (async () => {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
@@ -129,11 +135,11 @@ export default function EditClientScreen() {
     }
   };
 
-  if (loading) {
+  if (loading || !client) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? '#1a1a1a' : '#f8fafc' }]}>
-        <ActivityIndicator size="large" color={isDark ? '#60a5fa' : '#3b82f6'} />
-        <Text style={[styles.loadingText, { color: isDark ? '#e2e8f0' : '#64748b' }]}>
+      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+        <ActivityIndicator size="large" color={isDark ? Colors.dark.primary : Colors.light.primary} />
+        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
           Loading client data...
         </Text>
       </View>
@@ -141,157 +147,143 @@ export default function EditClientScreen() {
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <StatusBar 
-        barStyle={isDark ? 'light-content' : 'dark-content'} 
-        backgroundColor={isDark ? '#1a1a1a' : '#f8fafc'} 
-      />
-      
-      <ScrollView 
-        style={[styles.scrollView, { backgroundColor: isDark ? '#1a1a1a' : '#f8fafc' }]}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Form Container */}
-        <View style={[styles.formContainer, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
-          {/* Name Input */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: isDark ? '#d1d5db' : '#374151' }]}>
-              Full Name *
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                { 
-                  backgroundColor: isDark ? '#4b5563' : '#f8fafc',
-                  color: isDark ? '#f1f5f9' : '#1e293b',
-                  borderColor: isDark ? '#6b7280' : '#e2e8f0'
-                }
-              ]}
-              placeholder="Enter full name"
-              placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
-              value={name}
-              onChangeText={setName}
-            />
-          </View>
-
-          {/* Contact Number Input */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: isDark ? '#d1d5db' : '#374151' }]}>
-              Contact Number
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                { 
-                  backgroundColor: isDark ? '#4b5563' : '#f8fafc',
-                  color: isDark ? '#f1f5f9' : '#1e293b',
-                  borderColor: isDark ? '#6b7280' : '#e2e8f0'
-                }
-              ]}
-              placeholder="Enter contact number"
-              placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
-              value={contactNumber}
-              onChangeText={setContactNumber}
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          {/* Email Input */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: isDark ? '#d1d5db' : '#374151' }]}>
-              Email Address
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                { 
-                  backgroundColor: isDark ? '#4b5563' : '#f8fafc',
-                  color: isDark ? '#f1f5f9' : '#1e293b',
-                  borderColor: isDark ? '#6b7280' : '#e2e8f0'
-                }
-              ]}
-              placeholder="Enter email address"
-              placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
-          {/* Address Input */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: isDark ? '#d1d5db' : '#374151' }]}>
-              Address
-            </Text>
-            <TextInput
-              style={[
-                styles.textArea,
-                { 
-                  backgroundColor: isDark ? '#4b5563' : '#f8fafc',
-                  color: isDark ? '#f1f5f9' : '#1e293b',
-                  borderColor: isDark ? '#6b7280' : '#e2e8f0'
-                }
-              ]}
-              placeholder="Enter address or use current location"
-              placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
-              value={address}
-              onChangeText={setAddress}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-          </View>
-
-          {/* Location Button */}
-          <TouchableOpacity 
-            style={[
-              styles.locationButton,
-              { backgroundColor: '#1F2937' }
-            ]}
-            onPress={handleGetLocation}
-            disabled={locationLoading}
-          >
-            {locationLoading ? (
-              <ActivityIndicator size="small" color={isDark ? '#60a5fa' : '#3b82f6'} />
-            ) : (
-              <IconSymbol 
-                size={20} 
-                name="location.fill" 
-                color={isDark ? '#60a5fa' : '#3b82f6'} 
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Full Name</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
+                    color: isDark ? Colors.dark.text : Colors.light.text,
+                    borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                  },
+                  nameFocused && styles.inputFocused,
+                ]}
+                placeholder="Enter client's full name"
+                placeholderTextColor={isDark ? Colors.dark.placeholder : Colors.light.placeholder}
+                value={name}
+                onChangeText={setName}
+                onFocus={() => setNameFocused(true)}
+                onBlur={() => setNameFocused(false)}
+                autoCapitalize="words"
               />
-            )}
-            <Text style={[styles.locationButtonText, { color: isDark ? '#60a5fa' : '#3b82f6' }]}>
-              {locationLoading ? 'Getting Location...' : 'Use Current Location'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            </View>
 
-        {/* Update Button */}
-          <TouchableOpacity 
-            style={[
-              styles.updateButton,
-              { backgroundColor: '#1F2937' },
-              loading && styles.buttonDisabled
-            ]}
-            onPress={handleUpdateClient}
-            disabled={loading}
-          >
-          {loading ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <>
-              <IconSymbol size={20} name="checkmark.circle.fill" color="#ffffff" />
-              <Text style={styles.updateButtonText}>Update Client</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Contact Number</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
+                    color: isDark ? Colors.dark.text : Colors.light.text,
+                    borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                  },
+                  contactFocused && styles.inputFocused,
+                ]}
+                placeholder="Enter phone number"
+                placeholderTextColor={isDark ? Colors.dark.placeholder : Colors.light.placeholder}
+                value={contactNumber}
+                onChangeText={setContactNumber}
+                onFocus={() => setContactFocused(true)}
+                onBlur={() => setContactFocused(false)}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Email Address</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
+                    color: isDark ? Colors.dark.text : Colors.light.text,
+                    borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                  },
+                  emailFocused && styles.inputFocused,
+                ]}
+                placeholder="Enter email address"
+                placeholderTextColor={isDark ? Colors.dark.placeholder : Colors.light.placeholder}
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Address</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.textArea,
+                  {
+                    backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
+                    color: isDark ? Colors.dark.text : Colors.light.text,
+                    borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                  },
+                  addressFocused && styles.inputFocused,
+                ]}
+                placeholder="Enter full address"
+                placeholderTextColor={isDark ? Colors.dark.placeholder : Colors.light.placeholder}
+                value={address}
+                onChangeText={setAddress}
+                onFocus={() => setAddressFocused(true)}
+                onBlur={() => setAddressFocused(false)}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={[styles.locationButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}
+                onPress={handleGetLocation}
+                disabled={locationLoading}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.locationButtonText, { color: isDark ? Colors.dark.primary : Colors.light.primary }]}>
+                  {locationLoading ? 'Getting location...' : 'Use Current Location'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }, loading && styles.saveButtonDisabled]}
+              onPress={handleUpdateClient}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.saveButtonText, { color: isDark ? "black" : Colors.light.text }]}>
+                {loading ? 'Updating Client...' : 'Update Client'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.cancelButton, { borderColor: isDark ? Colors.dark.border : Colors.light.border }]}
+              onPress={() => router.back()}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.cancelButtonText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </>
   );
 }
 
@@ -303,89 +295,92 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
   },
   loadingText: {
     fontSize: 16,
     fontWeight: '500',
   },
-  formContainer: {
-    marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+  form: {
+    paddingHorizontal: 24,
   },
-  inputGroup: {
-    marginBottom: 20,
+  inputContainer: {
+    marginBottom: 24,
   },
-  label: {
+  inputLabel: {
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
   },
   input: {
-    borderWidth: 1,
+    height: 56,
+    borderWidth: 1.5,
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
     fontSize: 16,
     fontWeight: '400',
   },
   textArea: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    fontWeight: '400',
-    minHeight: 80,
+    height: 88,
+    paddingTop: 16,
+  },
+  inputFocused: {
+    borderColor: Colors.light.primary, // This will be adjusted by a new color from Colors
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.light.primary, // This will be adjusted by a new color from Colors
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   locationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    height: 44,
+    borderRadius: 10,
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-    marginTop: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 1,
   },
   locationButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
-  updateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 20,
-    marginTop: 24,
-    paddingVertical: 16,
+  saveButton: {
+    height: 56,
     borderRadius: 12,
-    gap: 8,
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 12,
   },
-  updateButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  buttonDisabled: {
+  saveButtonDisabled: {
     opacity: 0.6,
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  cancelButton: {
+    height: 56,
+    backgroundColor: 'transparent',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

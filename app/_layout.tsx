@@ -3,12 +3,11 @@ import { useFonts } from 'expo-font';
 import { SplashScreen, Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Text, TouchableOpacity } from 'react-native'; // Import Text and TouchableOpacity
 import 'react-native-reanimated';
 import { supabase } from '../utils/supabaseClient';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { CustomHeader } from '@/components/ui/CustomHeader';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -60,43 +59,43 @@ export default function RootLayout() {
         <Stack.Screen 
           name="create-room" 
           options={{ 
-            headerShown: true, 
-            header: () => <CustomHeader title="Create New Room" /> 
+            header: (props) => <CustomHeader title="Create Room" {...props} showLogoutButton={true} />,
           }} 
         />
         <Stack.Screen 
           name="edit-client" 
           options={{ 
-            headerShown: true, 
-            header: () => <CustomHeader title="Edit Client" /> 
+            header: (props) => <CustomHeader title="Edit Client" {...props} showLogoutButton={true} />,
+          }} 
+        />
+        <Stack.Screen 
+          name="create-client" 
+          options={{ 
+            header: (props) => <CustomHeader title="Create Client" {...props} showLogoutButton={true} />,
           }} 
         />
         <Stack.Screen 
           name="client/[id]" 
           options={{ 
-            headerShown: true, 
-            header: () => <CustomHeader title="Client Details" /> 
+            header: (props) => <CustomHeader title="Client Details" {...props} showLogoutButton={true} />,
           }} 
         />
         <Stack.Screen 
           name="client/generate-quotation" 
           options={{ 
-            headerShown: true, 
-            header: () => <CustomHeader title="Generate Quotation" /> 
+            header: (props) => <CustomHeader title="Generate Quotation" {...props} showLogoutButton={true} />,
           }} 
         />
         <Stack.Screen 
           name="quotation/[id]" 
           options={{ 
-            headerShown: true, 
-            header: () => <CustomHeader title="Quotation Details" /> 
+            header: (props) => <CustomHeader title="Quotation" {...props} showLogoutButton={true} />,
           }} 
         />
         <Stack.Screen 
           name="room/[id]" 
           options={{ 
-            headerShown: true, 
-            header: () => <CustomHeader title="Room Details" /> 
+            header: (props) => <CustomHeader title="Room Details" {...props} showLogoutButton={true} />,
           }} 
         />
       </Stack>

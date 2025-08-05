@@ -1,22 +1,38 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { supabase } from '../../utils/supabaseClient';
 
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 import { Client } from '../../types/db';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
+
+// A placeholder for client data statistics.
+// In a real app, these would be fetched from the database.
+const clientStats = [
+  { id: '1', label: 'Total Clients', icon: 'person.fill', color: '#3B82F6', value: 0 },
+  { id: '2', label: 'Active Projects', icon: 'list.clipboard.fill', color: '#10B981', value: 25 },
+  { id: '3', label: 'Pending Quotes', icon: 'pencil.and.outline', color: '#F59E0B', value: 12 },
+  { id: '4', label: 'Completed', icon: 'checkmark.circle.fill', color: '#6366F1', value: 100 },
+];
 
 export default function HomeScreen() {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | undefined>(undefined);
   const [userId, setUserId] = useState<string | null>(null);
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [clients, setClients] = useState<Client[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Update the stats with the actual total number of clients
+  const updatedStats = clientStats.map(stat =>
+    stat.id === '1' ? { ...stat, value: clients.length } : stat
+  ) as typeof clientStats;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -83,23 +99,40 @@ export default function HomeScreen() {
 
   if (userEmail === undefined || userId === null) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading...</Text>
       </View>
     );
   }
 
+  const renderClientItem = ({ item }: { item: Client }) => (
+    <TouchableOpacity
+      style={[
+        styles.clientCard,
+        { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
+        { borderColor: isDark ? Colors.dark.border : Colors.light.border },
+      ]}
+      onPress={() => router.push(`/clients/${item.id}` as any)}
+    >
+      <View style={styles.clientDetails}>
+        <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.name}</Text>
+        <Text style={[styles.clientEmail, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{item.email}</Text>
+      </View>
+      <IconSymbol size={20} name="chevron.right" color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
+    </TouchableOpacity>
+  );
+
   return (
-    <>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? Colors.dark.background : Colors.light.background} />
       <ScrollView
-        style={styles.container}
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
+          <RefreshControl
+            refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#3B82F6"
+            tintColor={isDark ? Colors.dark.text : Colors.light.text}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -107,44 +140,67 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good morning</Text>
-            <Text style={styles.userName}>
+            <Text style={[styles.greeting, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>Good morning</Text>
+            <Text style={[styles.userName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
               {userEmail?.split('@')[0] || 'User'}
             </Text>
           </View>
-          <TouchableOpacity style={styles.profileButton}>
-            <IconSymbol size={24} name="person.circle.fill" color="#6B7280" />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={[styles.profileButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}>
+              <IconSymbol size={24} name="person.circle.fill" color={isDark ? Colors.dark.primary : Colors.light.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{clients.length}</Text>
-            <Text style={styles.statLabel}>Total Clients</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>25</Text>
-            <Text style={styles.statLabel}>Active Projects</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>12</Text>
-            <Text style={styles.statLabel}>Pending Quotes</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>100</Text>
-            <Text style={styles.statLabel}>Completed</Text>
-          </View>
+          {updatedStats.map((stat) => (
+            <View key={stat.id} style={[styles.statCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
+              <View style={[styles.statIconContainer, { backgroundColor: stat.color + '20' }]}>
+                <IconSymbol size={24} name={stat.icon as any} color={stat.color} />
+              </View>
+              <Text style={[styles.statNumber, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{stat.value}</Text>
+              <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{stat.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Client List */}
+        <View style={styles.clientListSection}>
+          <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>My Clients</Text>
+          {clients.length > 0 ? (
+            <FlatList
+              data={clients}
+              renderItem={renderClientItem}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              ItemSeparatorComponent={() => (
+                <View style={[styles.separator, { backgroundColor: isDark ? Colors.dark.border : Colors.light.border }]} />
+              )}
+            />
+          ) : (
+            <View style={styles.noClientsContainer}>
+              <Text style={[styles.noClientsText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>No clients found.</Text>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => router.push('/(tabs)/clients')}
+              >
+                <Text style={styles.addButtonText}>Add New Client</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: 32,
@@ -153,11 +209,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
   },
   loadingText: {
     fontSize: 16,
-    color: '#6B7280',
     fontWeight: '500',
   },
   header: {
@@ -170,21 +224,23 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: 16,
-    color: '#6B7280',
     fontWeight: '400',
   },
   userName: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1F2937',
     marginTop: 4,
     letterSpacing: -0.5,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   profileButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F9FAFB',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -197,21 +253,103 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: (width - 60) / 2,
-    backgroundColor: '#F9FAFB',
     padding: 20,
     borderRadius: 16,
+    // Add shadow for a raised, modern card effect
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 12,
   },
   statNumber: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#1F2937',
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 14,
-    color: '#6B7280',
     fontWeight: '500',
+    textAlign: 'left',
+  },
+  clientListSection: {
+    paddingHorizontal: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  clientCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
+  },
+  clientDetails: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  clientEmail: {
+    fontSize: 14,
+    fontWeight: '400',
+    marginTop: 4,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 8,
+  },
+  noClientsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 50,
+  },
+  noClientsText: {
+    fontSize: 16,
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  addButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
