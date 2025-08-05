@@ -1,11 +1,11 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
+import { Alert, Dimensions, FlatList, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../utils/supabaseClient';
 
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 import { Client } from '../../types/db';
 
@@ -112,7 +112,7 @@ export default function HomeScreen() {
         { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
         { borderColor: isDark ? Colors.dark.border : Colors.light.border },
       ]}
-      onPress={() => router.push(`/clients/${item.id}` as any)}
+      onPress={() => router.push(`/client/${item.id}` as any)}
     >
       <View style={styles.clientDetails}>
         <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.name}</Text>
