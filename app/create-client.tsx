@@ -82,7 +82,7 @@ export default function CreateClientScreen() {
 
       if (!user) {
         Alert.alert('Error', 'User not found. Please login again.');
-        router.replace('/auth/login');
+        router.replace('/(auth)/login');
         return;
       }
 

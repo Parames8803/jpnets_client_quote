@@ -5,7 +5,7 @@ import { supabase } from '../../utils/supabaseClient';
 
 const { width, height } = Dimensions.get('window');
 
-export default function LoginScreen() {
+export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,12 +15,16 @@ export default function LoginScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
         router.replace('/(tabs)');
       }
     });
-  }, []);
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [router]);
 
   const validateFields = () => {
     if (!email || !password) {
@@ -32,14 +36,21 @@ export default function LoginScreen() {
       Alert.alert('Validation Error', 'Please enter a valid email address.');
       return false;
     }
+    if (password.length < 6) {
+      Alert.alert('Validation Error', 'Password must be at least 6 characters long.');
+      return false;
+    }
     return true;
   };
 
-  async function signInWithEmail() {
+  async function signUpWithEmail() {
     if (!validateFields()) return;
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.signUp({
       email: email,
       password: password,
     });
@@ -47,8 +58,8 @@ export default function LoginScreen() {
     if (error) {
       Alert.alert('Error', error.message);
     } else {
-      Alert.alert('Success', 'Welcome back!');
-      router.replace('/(tabs)');
+      Alert.alert('Success', 'Account created! Please sign in to continue.');
+      router.replace('/(auth)/login');
     }
     setLoading(false);
   }
@@ -58,8 +69,8 @@ export default function LoginScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.welcomeText}>Welcome</Text>
-          <Text style={styles.subtitle}>Sign in to your account</Text>
+          <Text style={styles.welcomeText}>Create Account</Text>
+          <Text style={styles.subtitle}>Join us today and get started</Text>
         </View>
 
         <View style={styles.form}>
@@ -93,29 +104,30 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               value={password}
               secureTextEntry={true}
-              placeholder="Enter your password"
+              placeholder="Create a password (min 6 characters)"
               placeholderTextColor="#A0A0A0"
               autoCapitalize="none"
               onFocus={() => setPasswordFocused(true)}
               onBlur={() => setPasswordFocused(false)}
             />
+            <Text style={styles.helperText}>Must be at least 6 characters</Text>
           </View>
 
           <TouchableOpacity
-            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+            style={[styles.registerButton, loading && styles.registerButtonDisabled]}
             disabled={loading}
-            onPress={signInWithEmail}
+            onPress={signUpWithEmail}
             activeOpacity={0.8}
           >
-            <Text style={styles.loginButtonText}>
-              {loading ? 'Signing in...' : 'Sign In'}
+            <Text style={styles.registerButtonText}>
+              {loading ? 'Creating account...' : 'Create Account'}
             </Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => router.push('/auth/register')}>
-              <Text style={styles.linkText}>Sign up</Text>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+              <Text style={styles.linkText}>Sign in</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -183,7 +195,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderColor: '#D1D5DB',
   },
-  loginButton: {
+  helperText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  registerButton: {
     height: 56,
     backgroundColor: '#1F2937',
     borderRadius: 12,
@@ -196,12 +214,12 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  loginButtonDisabled: {
+  registerButtonDisabled: {
     backgroundColor: '#9CA3AF',
     shadowOpacity: 0,
     elevation: 0,
   },
-  loginButtonText: {
+  registerButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',

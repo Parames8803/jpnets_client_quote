@@ -89,7 +89,7 @@ export default function ClientsScreen() {
         setUserId(user.id);
         fetchClients(user.id);
       } else {
-        router.replace('/auth/login');
+        router.replace('/(auth)/login');
       }
     };
 
@@ -97,7 +97,7 @@ export default function ClientsScreen() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
-        router.replace('/auth/login');
+        router.replace('/(auth)/login');
       } else if (session.user) {
         setUserEmail(session.user.email);
         setUserId(session.user.id);

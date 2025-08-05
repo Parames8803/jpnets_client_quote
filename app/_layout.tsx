@@ -42,18 +42,13 @@ export default function RootLayout() {
 
   const router = useRouter();
 
-  async function signOut() {
-    await supabase.auth.signOut();
-    router.replace('/auth/login');
-  }
-
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         {session && session.user ? (
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         ) : (
-          <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         )}
         <Stack.Screen name="+not-found" options={{ headerShown: false }} />
         <Stack.Screen 
