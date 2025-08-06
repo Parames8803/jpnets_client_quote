@@ -53,6 +53,16 @@ const MAPPING = {
   'pencil.and.outline': 'edit', // Added mapping for pencil.and.outline
   'dollarsign.circle.fill': 'monetization-on',
   'calendar': 'event',
+  'doc.richtext': 'description',
+  'table': 'table-chart',
+  'cube.fill': 'inventory-2',
+  'cube': 'inventory',
+  'chart.bar.fill': 'bar-chart',
+  'person': 'person-outline',
+  'phone': 'phone',
+  'envelope': 'email',
+  'location': 'place',
+  'dollarsign': 'attach-money',
 } as const;
 
 /**
