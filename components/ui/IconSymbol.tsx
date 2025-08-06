@@ -52,6 +52,7 @@ const MAPPING = {
   'list.clipboard.fill': 'assignment', // Added mapping for list.clipboard.fill
   'pencil.and.outline': 'edit', // Added mapping for pencil.and.outline
   'dollarsign.circle.fill': 'monetization-on',
+  'calendar': 'event',
 } as const;
 
 /**

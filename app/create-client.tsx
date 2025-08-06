@@ -96,73 +96,95 @@ export default function CreateClientScreen() {
         return;
       }
 
-      const { data, error } = await (await sb)
-        .from('clients')
-        .insert([
-          {
-            user_id: originalUser.id, // Use originalUser.id for client creation
-            name: name.trim(),
-            contact_number: contactNumber.trim(),
-            email: email.trim(),
-            address: address.trim(),
-            latitude: latitude,
-            longitude: longitude,
+             // First create the client record with a temporary user_id (we'll update it later)
+       const { data: clientData, error: clientError } = await (await sb)
+         .from('clients')
+         .insert([
+           {
+             user_id: originalUser.id, // Temporary user_id, will be updated
+             created_by: originalUser.id, // Admin who created this client
+             name: name.trim(),
+             contact_number: contactNumber.trim(),
+             email: email.trim(),
+             address: address.trim(),
+             latitude: latitude,
+             longitude: longitude,
+           },
+         ])
+         .select()
+         .single();
+
+      if (clientError) {
+        Alert.alert('Error', 'Failed to create client: ' + clientError.message);
+        return;
+      }
+
+      // Create a new user in auth.users table
+      const { data: signUpData, error: signUpError } = await (await sb).auth.signUp({
+        email: email.trim(),
+        password: contactNumber.trim(), // Using contact number as password as per requirement
+        options: {
+          data: {
+            role: 'client', // Assign role 'client'
           },
-        ]);
+        },
+      });
 
-      if (error) {
-        Alert.alert('Error', error.message);
-      } else {
-        // Create a new user in auth.users table
-        const { data: signUpData, error: signUpError } = await (await sb).auth.signUp({
-          email: email.trim(),
-          password: contactNumber.trim(), // Using contact number as password as per requirement
-          options: {
-            data: {
-              role: 'client', // Assign role 'client'
-            },
-          },
-        });
+      if (signUpError) {
+        Alert.alert('User Creation Error', signUpError.message);
+        // Delete the client record since user creation failed
+        await (await sb).from('clients').delete().eq('id', clientData.id);
+        return;
+      }
 
-        if (signUpError) {
-          Alert.alert('User Creation Error', signUpError.message);
-          // Optionally, you might want to delete the client created if user creation fails
-          // await (await sb).from('clients').delete().eq('email', email.trim());
-        } else {
-          // After successful signup, the new user is automatically logged in.
-          // We need to sign out the newly created user and restore the original user's session.
-          const { error: signOutError } = await (await sb).auth.signOut();
-          if (signOutError) {
-            console.error("Error signing out new user:", signOutError);
-            Alert.alert('Sign Out Error', 'Failed to sign out newly created user.');
-            // Decide how to handle this. For now, proceed to restore original session.
-          }
+      // Update the client record with the new auth user's ID
+      if (signUpData.user) {
+        const { error: updateError } = await (await sb)
+          .from('clients')
+          .update({ user_id: signUpData.user.id })
+          .eq('id', clientData.id);
 
-          const { error: setSessionError } = await (await sb).auth.setSession({
-            access_token: currentSession.access_token,
-            refresh_token: currentSession.refresh_token,
-          });
-
-          if (setSessionError) {
-            console.error("Error restoring session:", setSessionError);
-            Alert.alert('Session Restore Error', 'Failed to restore original user session. Please re-login.');
-            router.replace('/(auth)/login');
-            return;
-          }
-
-          // Verify the session is restored to the original user
-          const { data: { user: restoredUser }, error: getRestoredUserError } = await (await sb).auth.getUser();
-          if (getRestoredUserError || !restoredUser || restoredUser.id !== originalUser.id) {
-            console.error("Session not restored to original user:", restoredUser);
-            Alert.alert('Session Verification Error', 'Original user session could not be verified. Please re-login.');
-            router.replace('/(auth)/login');
-            return;
-          }
-
-          Alert.alert('Success', 'Client and user created successfully!');
-          router.push('/(tabs)');
+        if (updateError) {
+          Alert.alert('Error', 'Failed to update client with new user ID: ' + updateError.message);
+          // Clean up: delete both the client and the auth user
+          await (await sb).from('clients').delete().eq('id', clientData.id);
+          // Note: We can't easily delete the auth user from here, but the client is cleaned up
+          return;
         }
       }
+
+      // After successful signup, the new user is automatically logged in.
+      // We need to sign out the newly created user and restore the original user's session.
+      const { error: signOutError } = await (await sb).auth.signOut();
+      if (signOutError) {
+        console.error("Error signing out new user:", signOutError);
+        Alert.alert('Sign Out Error', 'Failed to sign out newly created user.');
+        // Decide how to handle this. For now, proceed to restore original session.
+      }
+
+      const { error: setSessionError } = await (await sb).auth.setSession({
+        access_token: currentSession.access_token,
+        refresh_token: currentSession.refresh_token,
+      });
+
+      if (setSessionError) {
+        console.error("Error restoring session:", setSessionError);
+        Alert.alert('Session Restore Error', 'Failed to restore original user session. Please re-login.');
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      // Verify the session is restored to the original user
+      const { data: { user: restoredUser }, error: getRestoredUserError } = await (await sb).auth.getUser();
+      if (getRestoredUserError || !restoredUser || restoredUser.id !== originalUser.id) {
+        console.error("Session not restored to original user:", restoredUser);
+        Alert.alert('Session Verification Error', 'Original user session could not be verified. Please re-login.');
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      Alert.alert('Success', 'Client and user created successfully!');
+      router.push('/(tabs)');
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {

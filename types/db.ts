@@ -3,6 +3,7 @@ export interface Client {
   id: string; // uuid
   created_at: string; // timestamp with time zone
   user_id: string; // uuid (references auth.users.id)
+  created_by: string; // uuid (references auth.users.id - the admin who created this client)
   name: string; // text
   contact_number: string | null; // text, nullable
   email: string | null; // text, nullable

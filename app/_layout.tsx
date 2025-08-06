@@ -45,11 +45,14 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
-        {session && session.user ? (
+        {session && session.user && session.user.user_metadata && session.user.user_metadata.role == "admin" ? (
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        ) : session && session.user && session.user.user_metadata && session.user.user_metadata.role == "client" ? (
+          <Stack.Screen name="(clients)" options={{ headerShown: false }} />
         ) : (
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        )}
+        )
+        }
         <Stack.Screen name="+not-found" options={{ headerShown: false }} />
         <Stack.Screen 
           name="create-room" 

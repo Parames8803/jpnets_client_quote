@@ -1,7 +1,9 @@
-import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { supabase } from '../../utils/supabaseClient';
+import { Dimensions, Modal, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+// Assuming 'expo-router' and 'supabaseClient' are correctly configured in your project
+import { Session } from '@supabase/supabase-js'; // Import Session type
+import { useRouter } from 'expo-router';
+import { supabase } from '../../utils/supabaseClient'; // Adjust path if necessary
 
 const { width, height } = Dimensions.get('window');
 
@@ -12,68 +14,120 @@ export default function LoginScreen() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
+  // State for custom modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+
   const router = useRouter();
 
+  // Function to display custom modal messages
+  const showCustomModal = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  };
+
+  // Function to hide custom modal
+  const hideCustomModal = () => {
+    setModalVisible(false);
+    setModalTitle('');
+    setModalMessage('');
+  };
+
+  // Helper function to navigate based on user role
+  const navigateBasedOnRole = (session: Session | null) => {
+    if (session && session.user && session.user.user_metadata) {
+      const userRole = session.user.user_metadata.role;
+      if (userRole === 'admin') {
+        router.replace('/(tabs)'); // Navigate to admin layout
+      } else if (userRole === 'client') {
+        router.replace('/(clients)' as any); // Navigate to client layout
+      } else {
+        // Fallback for unknown roles or if role is missing
+        showCustomModal('Navigation Error', 'Unknown user role. Please contact support.');
+        router.replace('/(tabs)'); // Default fallback to admin layout
+      }
+    } else {
+      // If session or user metadata is unexpectedly missing, keep on login or show error
+      showCustomModal('Session Error', 'User session or role information not found. Please log in again.');
+      // Optionally, you might want to redirect to a generic home or keep them on login
+    }
+  };
+
   useEffect(() => {
+    // Listen for authentication state changes
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        router.replace('/(tabs)');
+        // If a session exists, navigate based on the user's role
+        navigateBasedOnRole(session);
       }
     });
 
+    // Cleanup the subscription on component unmount
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router]); // Depend on router to ensure it's available for navigation
 
+  // Validates email and password fields
   const validateFields = () => {
     if (!email || !password) {
-      Alert.alert('Validation Error', 'Email and password cannot be empty.');
+      showCustomModal('Validation Error', 'Email and password cannot be empty.');
       return false;
     }
     const emailRegex = /\S+@\S+\.\S+/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Validation Error', 'Please enter a valid email address.');
+      showCustomModal('Validation Error', 'Please enter a valid email address.');
       return false;
     }
     return true;
   };
 
+  // Handles email and password sign-in
   async function signInWithEmail() {
-    if (!validateFields()) return;
+    if (!validateFields()) return; // Perform validation before proceeding
 
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    setLoading(true); // Set loading state to true
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
     });
 
     if (error) {
-      Alert.alert('Error', error.message);
+      showCustomModal('Error', error.message); // Show error message using custom modal
     } else {
-      Alert.alert('Success', 'Welcome back!');
-      router.replace('/(tabs)');
+      showCustomModal('Success', 'Welcome back!'); // Show success message
+      // After successful login, get the current session to determine the user's role
+      const { data: { session } } = await supabase.auth.getSession();
+      navigateBasedOnRole(session); // Navigate based on role
     }
-    setLoading(false);
+    setLoading(false); // Set loading state to false
   }
 
   return (
     <>
+      {/* Status bar configuration */}
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+
+      {/* Main container */}
       <View style={styles.container}>
+        {/* Header section */}
         <View style={styles.header}>
           <Text style={styles.welcomeText}>Welcome</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
         </View>
 
+        {/* Login form */}
         <View style={styles.form}>
+          {/* Email input container */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput
               style={[
                 styles.input,
                 emailFocused && styles.inputFocused,
-                email && styles.inputFilled
+                email && styles.inputFilled // Apply filled style if email has content
               ]}
               onChangeText={setEmail}
               value={email}
@@ -86,13 +140,14 @@ export default function LoginScreen() {
             />
           </View>
 
+          {/* Password input container */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Password</Text>
             <TextInput
               style={[
                 styles.input,
                 passwordFocused && styles.inputFocused,
-                password && styles.inputFilled
+                password && styles.inputFilled // Apply filled style if password has content
               ]}
               onChangeText={setPassword}
               value={password}
@@ -105,9 +160,10 @@ export default function LoginScreen() {
             />
           </View>
 
+          {/* Sign In button */}
           <TouchableOpacity
             style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-            disabled={loading}
+            disabled={loading} // Disable button when loading
             onPress={signInWithEmail}
             activeOpacity={0.8}
           >
@@ -116,6 +172,7 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
 
+          {/* Footer section with sign up link */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
@@ -124,6 +181,24 @@ export default function LoginScreen() {
           </View>
         </View>
       </View>
+
+      {/* Custom Modal for alerts */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={hideCustomModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{modalTitle}</Text>
+            <Text style={styles.modalMessage}>{modalMessage}</Text>
+            <TouchableOpacity onPress={hideCustomModal} style={styles.modalButton}>
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -225,6 +300,49 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: 15,
     color: '#3B82F6',
+    fontWeight: '600',
+  },
+  // Styles for the custom modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
+  },
+  modalContainer: {
+    width: width * 0.8, // 80% of screen width
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

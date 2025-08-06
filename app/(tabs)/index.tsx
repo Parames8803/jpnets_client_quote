@@ -47,7 +47,7 @@ export default function HomeScreen() {
       const { data, error } = await supabase
         .from('clients')
         .select('*')
-        .eq('user_id', currentUserId)
+        .eq('created_by', currentUserId)
         .order('created_at', { ascending: false });
 
       if (error) {
