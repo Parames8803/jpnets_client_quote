@@ -53,6 +53,11 @@ export default function RegisterScreen() {
     } = await supabase.auth.signUp({
       email: email,
       password: password,
+      options: {
+        data: {
+          role: 'admin', // Set default role to "admin"
+        },
+      },
     });
 
     if (error) {

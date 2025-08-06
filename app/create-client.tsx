@@ -80,10 +80,18 @@ export default function CreateClientScreen() {
     setLoading(true);
     try {
       const sb = await getSupabase();
-      const { data: { user } } = await (await sb).auth.getUser();
-
-      if (!user) {
+      const { data: { user: originalUser }, error: getUserError } = await (await sb).auth.getUser();
+      if (getUserError || !originalUser) {
         Alert.alert('Error', 'User not found. Please login again.');
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      // Get current session before creating new user
+      const { data: { session: currentSession }, error: sessionError } = await (await sb).auth.getSession();
+      if (sessionError || !currentSession) {
+        console.error("Error getting current session or no current session:", sessionError);
+        Alert.alert('Error', 'Could not retrieve current session. Please login again.');
         router.replace('/(auth)/login');
         return;
       }
@@ -92,7 +100,7 @@ export default function CreateClientScreen() {
         .from('clients')
         .insert([
           {
-            user_id: user.id,
+            user_id: originalUser.id, // Use originalUser.id for client creation
             name: name.trim(),
             contact_number: contactNumber.trim(),
             email: email.trim(),
@@ -105,8 +113,55 @@ export default function CreateClientScreen() {
       if (error) {
         Alert.alert('Error', error.message);
       } else {
-        Alert.alert('Success', 'Client created successfully!');
-        router.push('/(tabs)');
+        // Create a new user in auth.users table
+        const { data: signUpData, error: signUpError } = await (await sb).auth.signUp({
+          email: email.trim(),
+          password: contactNumber.trim(), // Using contact number as password as per requirement
+          options: {
+            data: {
+              role: 'client', // Assign role 'client'
+            },
+          },
+        });
+
+        if (signUpError) {
+          Alert.alert('User Creation Error', signUpError.message);
+          // Optionally, you might want to delete the client created if user creation fails
+          // await (await sb).from('clients').delete().eq('email', email.trim());
+        } else {
+          // After successful signup, the new user is automatically logged in.
+          // We need to sign out the newly created user and restore the original user's session.
+          const { error: signOutError } = await (await sb).auth.signOut();
+          if (signOutError) {
+            console.error("Error signing out new user:", signOutError);
+            Alert.alert('Sign Out Error', 'Failed to sign out newly created user.');
+            // Decide how to handle this. For now, proceed to restore original session.
+          }
+
+          const { error: setSessionError } = await (await sb).auth.setSession({
+            access_token: currentSession.access_token,
+            refresh_token: currentSession.refresh_token,
+          });
+
+          if (setSessionError) {
+            console.error("Error restoring session:", setSessionError);
+            Alert.alert('Session Restore Error', 'Failed to restore original user session. Please re-login.');
+            router.replace('/(auth)/login');
+            return;
+          }
+
+          // Verify the session is restored to the original user
+          const { data: { user: restoredUser }, error: getRestoredUserError } = await (await sb).auth.getUser();
+          if (getRestoredUserError || !restoredUser || restoredUser.id !== originalUser.id) {
+            console.error("Session not restored to original user:", restoredUser);
+            Alert.alert('Session Verification Error', 'Original user session could not be verified. Please re-login.');
+            router.replace('/(auth)/login');
+            return;
+          }
+
+          Alert.alert('Success', 'Client and user created successfully!');
+          router.push('/(tabs)');
+        }
       }
     } catch (error: any) {
       Alert.alert('Error', error.message);
