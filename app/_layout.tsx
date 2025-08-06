@@ -88,6 +88,12 @@ export default function RootLayout() {
           }} 
         />
         <Stack.Screen 
+          name="quotation/preview" 
+          options={{ 
+            header: (props) => <CustomHeader title="Quotation Preview" {...props} showLogoutButton={true} />,
+          }} 
+        />
+        <Stack.Screen 
           name="room/[id]" 
           options={{ 
             header: (props) => <CustomHeader title="Room Details" {...props} showLogoutButton={true} />,

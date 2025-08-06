@@ -23,6 +23,14 @@ export const Colors = {
     error: '#FF3B30', // Light mode error color
     inputBackground: '#FAFAFA', // Light mode input background
     placeholder: '#A0A0A0', // Light mode placeholder text
+    success: '#D1FAE5', // Light mode success background
+    successText: '#065F46', // Light mode success text
+    warning: '#FEF3C7', // Light mode warning background
+    warningText: '#92400E', // Light mode warning text
+    info: '#FECACA', // Light mode info background
+    infoText: '#DC2626', // Light mode info text
+    secondaryBackground: '#F7FAFC', // Light mode secondary background
+    secondaryText: '#718096', // Light mode secondary text
   },
   dark: {
     text: '#ECEDEE',
@@ -40,6 +48,14 @@ export const Colors = {
     error: '#FF3B30', // Dark mode error color
     inputBackground: '#2a2a2a', // Dark mode input background
     placeholder: '#6b7280', // Dark mode placeholder text
+    success: '#065F46', // Dark mode success background
+    successText: '#34D399', // Dark mode success text
+    warning: '#92400E', // Dark mode warning background
+    warningText: '#FBBF24', // Dark mode warning text
+    info: '#7C2D12', // Dark mode info background
+    infoText: '#F87171', // Dark mode info text
+    secondaryBackground: '#4A5568', // Dark mode secondary background
+    secondaryText: '#A0AEC0', // Dark mode secondary text
   },
   red: '#FF3B30', // Added red color
 };

@@ -3,7 +3,7 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Client, Measurement, Product, Quotation, Room } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
 
@@ -62,6 +62,8 @@ export default function QuotationDetailsScreen() {
       // Define a type for the joined data structure
       type QuotationRoomJoin = {
         room_id: string;
+        price_per_sq_ft: number | null;
+        room_total_price: number | null;
         rooms: (Room & { measurements: Measurement[]; products: Product[]; }) | null;
       };
 
@@ -70,6 +72,8 @@ export default function QuotationDetailsScreen() {
         .from('quotation_rooms')
         .select(`
           room_id,
+          price_per_sq_ft,
+          room_total_price,
           rooms (
             *,
             measurements (*),
@@ -82,7 +86,16 @@ export default function QuotationDetailsScreen() {
         console.error('Error fetching quotation rooms:', quotationRoomsError.message);
         setRooms([]);
       } else {
-        const fetchedRooms = quotationRoomsData?.map(qr => qr.rooms).filter((room): room is Room & { measurements: Measurement[]; products: Product[]; } => room !== null) || [];
+        const fetchedRooms = quotationRoomsData?.map(qr => {
+          if (qr.rooms) {
+            return {
+              ...qr.rooms,
+              price_per_sq_ft: qr.price_per_sq_ft,
+              room_total_price: qr.room_total_price,
+            };
+          }
+          return null;
+        }).filter((room): room is Room & { measurements: Measurement[]; products: Product[]; price_per_sq_ft: number | null; room_total_price: number | null; } => room !== null) || [];
         setRooms(fetchedRooms);
       }
 
@@ -223,7 +236,6 @@ export default function QuotationDetailsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quotation Information</Text>
           <Text style={styles.label}>Quotation ID: <Text style={styles.text}>{quotation.id}</Text></Text>
-          <Text style={styles.label}>Assigned Employee Phone: <Text style={styles.text}>{quotation.assigned_employee_phone || 'N/A'}</Text></Text>
           <Text style={styles.label}>Total Price: <Text style={styles.text}>${quotation.total_price?.toFixed(2) || 'N/A'}</Text></Text>
           <Text style={styles.label}>Created At: <Text style={styles.text}>{new Date(quotation.created_at).toLocaleDateString()}</Text></Text>
           {quotation.pdf_url && <Text style={styles.label}>PDF: <Text style={styles.linkText}>{quotation.pdf_url}</Text></Text>}
@@ -238,13 +250,15 @@ export default function QuotationDetailsScreen() {
               <View key={room.id} style={styles.roomItem}>
                 <Text style={styles.roomItemTitle}>{room.room_type || 'Unnamed Room'}</Text>
                 <Text style={styles.roomItemDescription}>{room.description || 'No description'}</Text>
+                <Text style={styles.roomItemInfo}>Price per sq.ft: ${(room as any).price_per_sq_ft?.toFixed(2) ?? 'N/A'}</Text>
+                <Text style={styles.roomItemInfo}>Room Total: ${(room as any).room_total_price?.toFixed(2) ?? 'N/A'}</Text>
 
                 {/* Measurements for this room */}
                 {(room as any).measurements && (room as any).measurements.length > 0 && (
                   <View style={styles.subSection}>
                     <Text style={styles.subSectionTitle}>Measurements:</Text>
                     {(room as any).measurements.map((m: Measurement) => (
-                    <Text key={m.id} style={styles.subText}>
+                      <Text key={m.id} style={styles.subText}>
                         - {m.length_value || 'N/A'} {m.length_unit_type || ''} x {m.width_value || 'N/A'} {m.width_unit_type || ''} ({typeof m.converted_sq_ft === 'number' ? `${m.converted_sq_ft.toFixed(2)} sq.ft` : 'N/A'})
                       </Text>
                     ))}
@@ -256,9 +270,14 @@ export default function QuotationDetailsScreen() {
                   <View style={styles.subSection}>
                     <Text style={styles.subSectionTitle}>Products:</Text>
                     {(room as any).products.map((p: Product) => (
-                      <Text key={p.id} style={styles.subText}>
-                        - {p.name}: {p.quantity} {p.unit_type}
-                      </Text>
+                      <View key={p.id} style={styles.productItem}>
+                        <Text style={styles.subTextBold}>{p.name}</Text>
+                        <Text style={styles.subText}>- Category: {p.product_category} / {p.product_subcategory}</Text>
+                        <Text style={styles.subText}>- Quantity: {p.quantity} {p.unit_type}</Text>
+                        <Text style={styles.subText}>- Price: ${p.price?.toFixed(2)} (Default: ${p.default_price?.toFixed(2)})</Text>
+                        <Text style={styles.subText}>- Wages: ${p.wages?.toFixed(2)} (Default: ${p.default_wages?.toFixed(2)})</Text>
+                        {p.description && <Text style={styles.subText}>- Desc: {p.description}</Text>}
+                      </View>
                     ))}
                   </View>
                 )}
@@ -408,6 +427,12 @@ const styles = StyleSheet.create({
   roomItemDescription: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 5,
+  },
+  roomItemInfo: {
+    fontSize: 14,
+    color: '#888',
+    fontStyle: 'italic',
     marginBottom: 10,
   },
   subSection: {
@@ -426,6 +451,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#777',
     marginBottom: 2,
+  },
+  subTextBold: {
+    fontSize: 14,
+    color: '#555',
+    fontWeight: 'bold',
+  },
+  productItem: {
+    marginBottom: 10,
   },
   noDataText: {
     fontSize: 16,

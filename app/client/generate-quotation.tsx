@@ -3,7 +3,7 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Client, Room } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
 
@@ -15,7 +15,6 @@ export default function GenerateQuotationScreen() {
   const [client, setClient] = useState<Client | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
-  const [assignedEmployeePhone, setAssignedEmployeePhone] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -75,95 +74,51 @@ export default function GenerateQuotationScreen() {
     );
   };
 
-  const handleGenerateQuotation = async () => {
+  const handleGenerateQuotation = () => {
     if (selectedRoomIds.length === 0) {
       Alert.alert('Selection Required', 'Please select at least one room to generate a quotation.');
       return;
     }
-    if (!assignedEmployeePhone) {
-      Alert.alert('Input Required', 'Please enter the assigned employee\'s phone number.');
-      return;
-    }
-    if (!client) {
-      Alert.alert('Error', 'Client data not loaded.');
-      return;
-    }
 
-    setLoading(true);
-    try {
-      // 1. Create a new quotation entry
-      const { data: quotationData, error: quotationError } = await supabase
-        .from('quotations')
-        .insert({
-          client_id: client.id,
-          assigned_employee_phone: assignedEmployeePhone,
-          total_price: 0, // Placeholder, will be calculated or updated later
-        })
-        .select()
-        .single();
-
-      if (quotationError) {
-        Alert.alert('Error creating quotation', quotationError.message);
-        setLoading(false);
-        return;
-      }
-
-      const newQuotationId = quotationData.id;
-
-      // 2. Link selected rooms to the quotation in quotation_rooms table
-      const quotationRoomsToInsert = selectedRoomIds.map((roomId) => ({
-        quotation_id: newQuotationId,
-        room_id: roomId,
-        price_per_sq_ft: 0, // Placeholder
-        room_total_price: 0, // Placeholder
-      }));
-
-      const { error: quotationRoomsError } = await supabase
-        .from('quotation_rooms')
-        .insert(quotationRoomsToInsert);
-
-      if (quotationRoomsError) {
-        console.error('Error linking rooms to quotation:', quotationRoomsError.message);
-        Alert.alert('Error', 'Quotation created, but failed to link rooms.');
-        setLoading(false);
-        return;
-      }
-
-      // 3. Update the status of selected rooms to 'In Quotation'
-      const { error: updateRoomsError } = await supabase
-        .from('rooms')
-        .update({ status: 'In Quotation' })
-        .in('id', selectedRoomIds);
-
-      if (updateRoomsError) {
-        console.error('Error updating room statuses:', updateRoomsError.message);
-        Alert.alert('Warning', 'Quotation created, but failed to update room statuses.');
-      }
-
-      Alert.alert('Success', 'Quotation generated successfully!');
-      router.replace({ pathname: '/quotation/[id]', params: { id: newQuotationId } });
-
-    } catch (error: any) {
-      Alert.alert('An unexpected error occurred', error.message);
-    } finally {
-      setLoading(false);
-    }
+    router.push({
+      pathname: '/quotation/preview',
+      params: {
+        clientId: clientId as string,
+        selectedRoomIds: JSON.stringify(selectedRoomIds),
+      },
+    });
   };
 
   const renderRoomItem = ({ item }: { item: Room }) => {
     const isSelected = selectedRoomIds.includes(item.id);
     return (
       <TouchableOpacity
-        style={[styles.roomItem, isSelected && styles.selectedRoomItem]}
+        style={[
+          styles.roomItem,
+          { backgroundColor: isSelected ? Colors.light.tint : '#f9f9f9' },
+          isSelected && styles.selectedRoomItem,
+        ]}
         onPress={() => toggleRoomSelection(item.id)}
       >
-        <Text style={styles.roomTitle}>{item.room_type || 'N/A'}</Text>
-        <Text style={styles.roomDescription}>{item.description || 'No description'}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.roomTitle, { color: isSelected ? '#fff' : '#444' }]}>
+            {item.room_type || 'N/A'}
+          </Text>
+          <Text style={[styles.roomDescription, { color: isSelected ? '#f0f0f0' : '#666' }]}>
+            {item.description || 'No description'}
+          </Text>
+          <Text style={[styles.roomInfo, { color: isSelected ? '#f0f0f0' : '#888' }]}>
+            Status: {item.status}
+          </Text>
+          <Text style={[styles.roomInfo, { color: isSelected ? '#f0f0f0' : '#888' }]}>
+            Total Sq Ft: {item.total_sq_ft || 'N/A'}
+          </Text>
+        </View>
         {isSelected && (
           <IconSymbol
             size={24}
             name="checkmark.circle.fill"
-            color={Colors[colorScheme ?? 'light'].tint}
+            color="#fff"
             style={styles.selectedIcon}
           />
         )}
@@ -199,19 +154,11 @@ export default function GenerateQuotationScreen() {
         )}
       </View>
 
-      {/* Section 2: Assigned Employee & Generate Button */}
+      {/* Section 2: Generate Button */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quotation Details</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Assigned Employee Phone Number"
-          value={assignedEmployeePhone}
-          onChangeText={setAssignedEmployeePhone}
-          keyboardType="phone-pad"
-        />
         <TouchableOpacity style={styles.generateButton} onPress={handleGenerateQuotation}>
           <IconSymbol size={22} name="doc.text.fill" color="#fff" />
-          <Text style={styles.generateButtonText}>Generate Quotation</Text>
+          <Text style={styles.generateButtonText}>Preview Quotation</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -291,12 +238,15 @@ const styles = StyleSheet.create({
   roomTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#444',
   },
   roomDescription: {
     fontSize: 14,
-    color: '#666',
     marginTop: 5,
+  },
+  roomInfo: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 3,
   },
   selectedIcon: {
     position: 'absolute',

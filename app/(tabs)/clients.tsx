@@ -146,7 +146,7 @@ export default function ClientsScreen() {
     >
       <View style={styles.clientHeader}>
         <View style={[styles.clientAvatar, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}>
-          <Text style={[styles.avatarText, { color: isDark ? "black" : Colors.light.secondary }]}>
+          <Text style={[styles.avatarText, { color: isDark ? "black" : "white" }]}>
             {item.name.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase()}
           </Text>
         </View>
@@ -221,7 +221,6 @@ export default function ClientsScreen() {
         </View>
 
         <View style={styles.clientsSection}>
-          <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Your Clients</Text>
           {clients.length > 0 ? (
             <FlatList
               data={clients}
@@ -243,7 +242,7 @@ export default function ClientsScreen() {
                 style={[styles.emptyAction, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}
                 onPress={handleCreateNewClient}
               >
-                <Text style={[styles.emptyActionText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Add Your First Client</Text>
+                <Text style={[styles.emptyActionText, { color: isDark ? "black" : "white" }]}>Add Your First Client</Text>
               </TouchableOpacity>
             </View>
           )}

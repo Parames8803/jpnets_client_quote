@@ -1,21 +1,27 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
+  Linking,
+  Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { Client, Quotation, Room } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
+
+const { width } = Dimensions.get('window');
 
 export default function ClientDetailsScreen() {
   const router = useRouter();
@@ -108,6 +114,24 @@ export default function ClientDetailsScreen() {
     router.push({ pathname: '/edit-client', params: { id: client?.id } });
   };
 
+  const handleOpenMap = () => {
+    if (client && client.latitude !== null && client.longitude !== null) {
+      const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
+      const latLng = `${client.latitude},${client.longitude}`;
+      const label = 'Client Location';
+      const url = Platform.select({
+        ios: `${scheme}${label}@${latLng}`,
+        android: `${scheme}${latLng}(${label})`
+      });
+
+      if (url) {
+        Linking.openURL(url).catch(err => console.error('An error occurred', err));
+      }
+    } else {
+      Alert.alert('No Location', 'Latitude and Longitude not available.');
+    }
+  };
+
   const handleDeleteRoom = async (roomId: string) => {
     Alert.alert(
       'Delete Room',
@@ -144,11 +168,100 @@ export default function ClientDetailsScreen() {
     );
   };
 
+  const handleDeleteQuotation = async (quotationId: string) => {
+    Alert.alert(
+      'Delete Quotation',
+      'Are you sure you want to delete this quotation? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          onPress: async () => {
+                      setLoading(true);
+                      try {
+                        // Get room IDs associated with this quotation
+                        const { data: quotationRooms, error: fetchQrError } = await supabase
+                          .from('quotation_rooms')
+                          .select('room_id')
+                          .eq('quotation_id', quotationId);
+          
+                        if (fetchQrError) {
+                          console.error('Error fetching associated rooms for deletion:', fetchQrError.message);
+                          Alert.alert('Error', 'Failed to fetch associated rooms.');
+                          setLoading(false);
+                          return;
+                        }
+          
+                        const roomIdsToUpdate = quotationRooms?.map(qr => qr.room_id) || [];
+          
+                        // Delete entries from quotation_rooms table
+                        const { error: deleteQrError } = await supabase
+                          .from('quotation_rooms')
+                          .delete()
+                          .eq('quotation_id', quotationId);
+          
+                        if (deleteQrError) {
+                          console.error('Error deleting quotation rooms:', deleteQrError.message);
+                          Alert.alert('Error', 'Failed to delete associated rooms from quotation.');
+                          setLoading(false);
+                          return;
+                        }
+          
+                        // Delete the quotation itself
+                        const { error: deleteQuotationError } = await supabase
+                          .from('quotations')
+                          .delete()
+                          .eq('id', quotationId);
+          
+                        if (deleteQuotationError) {
+                          console.error('Error deleting quotation:', deleteQuotationError.message);
+                          Alert.alert('Error', 'Failed to delete quotation.');
+                          setLoading(false);
+                          return;
+                        }
+          
+                        // Update status of associated rooms back to 'Not Active'
+                        if (roomIdsToUpdate.length > 0) {
+                          const { error: updateRoomsError } = await supabase
+                            .from('rooms')
+                            .update({ status: 'Not Active' })
+                            .in('id', roomIdsToUpdate);
+          
+                          if (updateRoomsError) {
+                            console.error('Error updating room statuses after quotation deletion:', updateRoomsError.message);
+                            Alert.alert('Warning', 'Quotation deleted, but failed to revert room statuses.');
+                          }
+                        }
+          
+                        Alert.alert('Success', 'Quotation and associated rooms deleted successfully!');
+                        if (client?.id) {
+                          router.replace({ pathname: '/client/[id]', params: { id: client.id } }); // Navigate back to client details
+                        } else {
+                          router.replace('/clients'); // Navigate to generic clients list if client ID is not available
+                        }
+                      } catch (error: any) {
+                        Alert.alert('An unexpected error occurred', error.message);
+                      } finally {
+                        setLoading(false);
+                      }
+                    },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   const renderRoomItem = ({ item }: { item: Room }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
         styles.listItem,
-        { backgroundColor: isDark ? '#374151' : '#ffffff' }
+        {
+          backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          borderColor: isDark ? Colors.dark.border : Colors.light.border,
+        },
       ]}
       activeOpacity={0.7}
       onPress={() => router.push({ pathname: '/room/[id]', params: { id: item.id } })}
@@ -160,114 +273,141 @@ export default function ClientDetailsScreen() {
           </Text>
         </View>
         <TouchableOpacity onPress={() => handleDeleteRoom(item.id)} style={styles.deleteButton}>
-          <IconSymbol size={16} name="trash.fill" color="#ef4444" />
+          <IconSymbol size={18} name="trash.fill" color={Colors.red} />
         </TouchableOpacity>
       </View>
-      <Text style={[styles.listItemTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
+      <Text style={[styles.listItemTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
         {item.room_type || 'Untitled Room'}
       </Text>
-      <Text style={[styles.listItemDescription, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
+      <Text style={[styles.listItemDescription, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
         {item.description || 'No description available'}
       </Text>
-      <Text style={[styles.listItemDate, { color: isDark ? '#9ca3af' : '#9ca3af' }]}>
-        Created {new Date(item.created_at).toLocaleDateString()}
-      </Text>
+      <View style={styles.listItemFooter}>
+        <Text style={[styles.listItemDate, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+          Created {new Date(item.created_at).toLocaleDateString()}
+        </Text>
+        <IconSymbol
+          size={16}
+          name="chevron.right"
+          color={isDark ? Colors.dark.secondary : Colors.light.secondary}
+        />
+      </View>
     </TouchableOpacity>
   );
 
   const renderQuotationItem = ({ item }: { item: Quotation }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
         styles.listItem,
-        { backgroundColor: isDark ? '#374151' : '#ffffff' }
+        {
+          backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          borderColor: isDark ? Colors.dark.border : Colors.light.border,
+        },
       ]}
       activeOpacity={0.7}
       onPress={() => router.push({ pathname: '/quotation/[id]', params: { id: item.id } })}
     >
       <View style={styles.listItemHeader}>
-        <View style={[styles.priceBadge, { backgroundColor: isDark ? '#065f46' : '#d1fae5' }]}>
-          <Text style={[styles.priceText, { color: isDark ? '#10b981' : '#065f46' }]}>
-            ${item.total_price?.toFixed(2) || '0.00'}
-          </Text>
-        </View>
-        <IconSymbol 
-          size={16} 
-          name="chevron.right" 
-          color={isDark ? '#9ca3af' : '#6b7280'} 
-        />
+      <View style={[styles.priceBadge, { backgroundColor: isDark ? Colors.dark.success : Colors.light.success }]}>
+        <Text style={[styles.priceText, { color: isDark ? Colors.dark.successText : Colors.light.successText }]}>
+          ${item.total_price?.toFixed(2) || '0.00'}
+        </Text>
       </View>
-      <Text style={[styles.listItemTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
+        <TouchableOpacity onPress={() => handleDeleteQuotation(item.id)} style={styles.deleteButton}>
+          <IconSymbol size={18} name="trash.fill" color={Colors.red} />
+        </TouchableOpacity>
+      </View>
+      <Text style={[styles.listItemTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
         Quotation #{item.id.substring(0, 8).toUpperCase()}
       </Text>
-      <Text style={[styles.listItemDate, { color: isDark ? '#9ca3af' : '#9ca3af' }]}>
-        Generated {new Date(item.created_at).toLocaleDateString()}
-      </Text>
+      <View style={styles.listItemFooter}>
+        <Text style={[styles.listItemDate, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+          Generated {new Date(item.created_at).toLocaleDateString()}
+        </Text>
+        <View style={[styles.quotationStatus, { backgroundColor: isDark ? Colors.dark.info : Colors.light.info }]}>
+          <Text style={[styles.quotationStatusText, { color: isDark ? Colors.dark.infoText : Colors.light.infoText }]}>
+            Active
+          </Text>
+        </View>
+      </View>
     </TouchableOpacity>
   );
 
   const getStatusBadgeStyle = (status: string) => {
+    const colors = isDark ? Colors.dark : Colors.light;
     switch (status?.toLowerCase()) {
       case 'completed':
-        return { backgroundColor: isDark ? '#065f46' : '#d1fae5' };
+        return { backgroundColor: colors.success };
       case 'in progress':
-        return { backgroundColor: isDark ? '#92400e' : '#fef3c7' };
+        return { backgroundColor: colors.warning };
       case 'not active':
-        return { backgroundColor: isDark ? '#374151' : '#f3f4f6' };
+        return { backgroundColor: colors.secondaryBackground };
       case 'in quotation':
-        return { backgroundColor: isDark ? '#7c2d12' : '#fecaca' }; // New status for rooms in a quotation
+        return { backgroundColor: colors.info };
       default:
-        return { backgroundColor: isDark ? '#374151' : '#f3f4f6' };
+        return { backgroundColor: colors.secondaryBackground };
     }
   };
 
   const getStatusTextColor = (status: string) => {
+    const colors = isDark ? Colors.dark : Colors.light;
     switch (status?.toLowerCase()) {
       case 'completed':
-        return isDark ? '#10b981' : '#065f46';
+        return colors.successText;
       case 'in progress':
-        return isDark ? '#f59e0b' : '#92400e';
+        return colors.warningText;
       case 'not active':
-        return isDark ? '#9ca3af' : '#6b7280';
+        return colors.secondaryText;
       case 'in quotation':
-        return isDark ? '#ef4444' : '#dc2626'; // Text color for new status
+        return colors.infoText;
       default:
-        return isDark ? '#9ca3af' : '#6b7280';
+        return colors.secondaryText;
     }
   };
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? '#1f2937' : '#f9fafb' }]}>
-        <ActivityIndicator size="large" color={isDark ? '#60a5fa' : '#3b82f6'} />
-        <Text style={[styles.loadingText, { color: isDark ? '#e5e7eb' : '#6b7280' }]}>
-          Loading client details...
-        </Text>
+      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+        <View style={[styles.loadingCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
+          <ActivityIndicator size="large" color={isDark ? Colors.dark.primary : Colors.light.primary} />
+          <Text style={[styles.loadingText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+            Loading client details...
+          </Text>
+        </View>
       </View>
     );
   }
 
   if (!client) {
     return (
-      <View style={[styles.errorContainer, { backgroundColor: isDark ? '#1f2937' : '#f9fafb' }]}>
-        <IconSymbol size={48} name="exclamationmark.triangle" color={isDark ? '#ef4444' : '#dc2626'} />
-        <Text style={[styles.errorText, { color: isDark ? '#e5e7eb' : '#6b7280' }]}>
-          Client not found
-        </Text>
-        <TouchableOpacity 
-          style={[styles.retryButton, { backgroundColor: isDark ? '#3b82f6' : '#2563eb' }]}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.retryButtonText}>Go Back</Text>
-        </TouchableOpacity>
+      <View style={[styles.errorContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+        <View style={[styles.errorCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
+          <IconSymbol size={64} name="exclamationmark.triangle" color={Colors.red} />
+          <Text style={[styles.errorTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            Client Not Found
+          </Text>
+          <Text style={[styles.errorText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+            The client you're looking for doesn't exist or has been removed.
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}
+            onPress={() => router.back()}
+          >
+            <IconSymbol size={20} name="chevron.left" color={isDark ? Colors.dark.text : Colors.light.text} />
+            <Text style={[styles.retryButtonText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
+  const totalValue = quotations.reduce((sum, q) => sum + (q.total_price || 0), 0);
+
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#1f2937' : '#f9fafb' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
       <StatusBar 
         barStyle={isDark ? 'light-content' : 'dark-content'} 
-        backgroundColor={isDark ? '#1f2937' : '#f9fafb'} 
+        backgroundColor={isDark ? Colors.dark.background : Colors.light.secondaryBackground} 
       />
       
       <ScrollView 
@@ -277,113 +417,190 @@ export default function ClientDetailsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[isDark ? '#60a5fa' : '#3b82f6']}
-            tintColor={isDark ? '#60a5fa' : '#3b82f6'}
+            colors={[isDark ? Colors.dark.primary : Colors.light.primary]}
+            tintColor={isDark ? Colors.dark.primary : Colors.light.primary}
           />
         }
       >
-        {/* Client Info Card */}
-        <View style={[styles.clientCard, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
-          <View style={styles.clientHeader}>
-            <View style={[styles.avatarPlaceholder, { backgroundColor: isDark ? '#4b5563' : '#f3f4f6' }]}>
-              <Text style={[styles.avatarText, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
-                {client.name.charAt(0).toUpperCase()}
-              </Text>
+        {/* Header with gradient background */}
+          {/* Client Info Card */}
+          <View style={[
+                  styles.clientCard,
+                  { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
+                  { borderColor: isDark ? Colors.dark.border : Colors.light.border },
+                ]}>
+            <View style={styles.clientHeader}>
+              <View style={[
+                styles.avatarPlaceholder, 
+                { 
+                  backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary,
+                  shadowColor: isDark ? Colors.dark.primary : Colors.light.primary,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 8,
+                }
+              ]}>
+                <Text style={styles.avatarText}>
+                  {client.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.clientInfo}>
+                <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                  {client.name}
+                </Text>
+                <Text style={[styles.clientId, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
+                  ID: {client.id.substring(0, 8).toUpperCase()}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={[styles.editButton, { backgroundColor: isDark ? Colors.dark.secondaryBackground : Colors.light.buttonBackground }]}
+                onPress={handleEditClient}
+              >
+                <IconSymbol size={18} name="pencil" color={isDark ? Colors.dark.text : Colors.light.text} />
+              </TouchableOpacity>
             </View>
-            <View style={styles.clientInfo}>
-              <Text style={[styles.clientName, { color: isDark ? '#f9fafb' : '#111827' }]}>
-                {client.name}
-              </Text>
-              <Text style={[styles.clientId, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
-                ID: {client.id.substring(0, 8).toUpperCase()}
-              </Text>
+            
+            <View style={styles.contactDetails}>
+              {client.contact_number && (
+                <View style={styles.contactItem}>
+                  <View style={[styles.contactIcon, { backgroundColor: isDark ? Colors.dark.info : Colors.light.info }]}>
+                    <IconSymbol size={16} name="phone.fill" color={isDark ? Colors.dark.infoText : Colors.light.infoText} />
+                  </View>
+                  <Text style={[styles.contactText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                    {client.contact_number}
+                  </Text>
+                </View>
+              )}
+              
+              {client.email && (
+                <View style={styles.contactItem}>
+                  <View style={[styles.contactIcon, { backgroundColor: isDark ? Colors.dark.info : Colors.light.info }]}>
+                    <IconSymbol size={16} name="envelope.fill" color={isDark ? Colors.dark.infoText : Colors.light.infoText} />
+                  </View>
+                  <Text style={[styles.contactText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                    {client.email}
+                  </Text>
+                </View>
+              )}
+              
+              {client.address && (
+                <View style={styles.contactItem}>
+                  <View style={[styles.contactIcon, { backgroundColor: isDark ? Colors.dark.info : Colors.light.info }]}>
+                    <IconSymbol size={16} name="location.fill" color={isDark ? Colors.dark.infoText : Colors.light.infoText} />
+                  </View>
+                  <Text style={[styles.contactText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                    {client.address}
+                  </Text>
+                </View>
+              )}
+              
+              {client.latitude != null && client.longitude != null && (
+                <TouchableOpacity style={styles.contactItem} onPress={handleOpenMap} activeOpacity={0.7}>
+                  <View style={[styles.contactIcon, { backgroundColor: isDark ? Colors.dark.success : Colors.light.success }]}>
+                    <IconSymbol size={16} name="location.fill" color={isDark ? Colors.dark.successText : Colors.light.successText} />
+                  </View>
+                  <View>
+                    <Text style={[styles.contactText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                      Lat: {client.latitude.toFixed(4)}, Lon: {client.longitude.toFixed(4)}
+                    </Text>
+                    <Text style={[styles.coordinatesHint, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
+                      Tap to open in maps
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
+
+        {/* Stats Cards with enhanced design */}
+        <View style={styles.statsContainer}>
+          <View style={[
+                  styles.statCard,
+                  { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
+                  { borderColor: isDark ? Colors.dark.border : Colors.light.border },
+                ]}>
+            <View style={[styles.statIcon, { backgroundColor: isDark ? Colors.dark.info : Colors.light.info }]}>
+              <IconSymbol size={24} name="house.fill" color={isDark ? Colors.dark.infoText : Colors.light.infoText} />
+            </View>
+            <Text style={[styles.statNumber, { color: isDark ? Colors.dark.infoText : Colors.light.infoText }]}>
+              {rooms.length}
+            </Text>
+            <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
+              Rooms
+            </Text>
+          </View>
           
-          <View style={styles.contactDetails}>
-            {client.contact_number && (
-              <View style={styles.contactItem}>
-                <IconSymbol size={16} name="phone.fill" color={isDark ? '#60a5fa' : '#3b82f6'} />
-                <Text style={[styles.contactText, { color: isDark ? '#d1d5db' : '#4b5563' }]}>
-                  {client.contact_number}
-                </Text>
-              </View>
-            )}
-            
-            {client.email && (
-              <View style={styles.contactItem}>
-                <IconSymbol size={16} name="envelope.fill" color={isDark ? '#60a5fa' : '#3b82f6'} />
-                <Text style={[styles.contactText, { color: isDark ? '#d1d5db' : '#4b5563' }]}>
-                  {client.email}
-                </Text>
-              </View>
-            )}
-            
-            {client.address && (
-              <View style={styles.contactItem}>
-                <IconSymbol size={16} name="location.fill" color={isDark ? '#60a5fa' : '#3b82f6'} />
-                <Text style={[styles.contactText, { color: isDark ? '#d1d5db' : '#4b5563' }]}>
-                  {client.address}
-                </Text>
-              </View>
-            )}
+          <View style={[
+                  styles.statCard,
+                  { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
+                  { borderColor: isDark ? Colors.dark.border : Colors.light.border },
+                ]}>
+            <View style={[styles.statIcon, { backgroundColor: isDark ? Colors.dark.success : Colors.light.success }]}>
+              <IconSymbol size={24} name="doc.text.fill" color={isDark ? Colors.dark.successText : Colors.light.successText} />
+            </View>
+            <Text style={[styles.statNumber, { color: isDark ? Colors.dark.successText : Colors.light.successText }]}>
+              {quotations.length}
+            </Text>
+            <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
+              Quotations
+            </Text>
+          </View>
+
+          <View style={[
+                  styles.statCard,
+                  { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
+                  { borderColor: isDark ? Colors.dark.border : Colors.light.border },
+                ]}>
+            <View style={[styles.statIcon, { backgroundColor: isDark ? Colors.dark.warning : Colors.light.warning }]}>
+              <IconSymbol size={24} name="dollarsign.circle.fill" color={isDark ? Colors.dark.warningText : Colors.light.warningText} />
+            </View>
+            <Text style={[styles.statNumber, { color: isDark ? Colors.dark.warningText : Colors.light.warningText }]}>
+              ${totalValue.toFixed(0)}
+            </Text>
+            <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
+              Total Value
+            </Text>
           </View>
         </View>
 
-        {/* Action Buttons */}
+        {/* Action Buttons with enhanced styling */}
         <View style={styles.actionButtons}>
           <TouchableOpacity 
-            style={[styles.primaryButton, { backgroundColor: isDark ? '#3b82f6' : '#2563eb' }]}
+            style={[styles.primaryButton, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}
             onPress={handleCreateRoom}
           >
-            <IconSymbol size={20} name="plus.circle.fill" color="#ffffff" />
+            <IconSymbol size={20} name="plus.circle.fill" color={isDark ? Colors.dark.text : Colors.light.background} />
             <Text style={styles.primaryButtonText}>Create Room</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={[styles.secondaryButton, { backgroundColor: isDark ? '#374151' : '#f3f4f6' }]}
-            onPress={handleGenerateQuotation}
-          >
+          <TouchableOpacity
+                      style={[styles.secondaryButton, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground, borderColor: isDark ? Colors.dark.border : Colors.light.border }]}
+                      onPress={handleGenerateQuotation}
+                      activeOpacity={0.8}
+                    >
             <IconSymbol 
               size={20} 
-              name="doc.text.fill" 
-              color={isDark ? '#e5e7eb' : '#374151'} 
+              name="doc.text.fill"
+              color={isDark ? Colors.dark.text : Colors.light.text} 
             />
-            <Text style={[styles.secondaryButtonText, { color: isDark ? '#e5e7eb' : '#374151' }]}>
+            <Text style={[styles.secondaryButtonText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
               Generate Quote
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={[styles.statCard, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
-            <Text style={[styles.statNumber, { color: isDark ? '#60a5fa' : '#3b82f6' }]}>
-              {rooms.length}
-            </Text>
-            <Text style={[styles.statLabel, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
-              Rooms
-            </Text>
-          </View>
-          
-          <View style={[styles.statCard, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
-            <Text style={[styles.statNumber, { color: isDark ? '#10b981' : '#059669' }]}>
-              {quotations.length}
-            </Text>
-            <Text style={[styles.statLabel, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
-              Quotations
-            </Text>
-          </View>
-        </View>
-
         {/* Rooms Section */}
-        <View style={[styles.section, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
+        <View style={[styles.section, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.background }]}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
-              Rooms
-            </Text>
-            <View style={[styles.countBadge, { backgroundColor: isDark ? '#4b5563' : '#f3f4f6' }]}>
-              <Text style={[styles.countText, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
+            <View style={styles.sectionTitleContainer}>
+              <IconSymbol size={20} name="house.fill" color={isDark ? Colors.dark.infoText : Colors.light.infoText} />
+              <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Rooms
+              </Text>
+            </View>
+            <View style={[styles.countBadge, { backgroundColor: isDark ? Colors.dark.secondaryBackground : Colors.light.buttonBackground }]}>
+              <Text style={[styles.countText, { color: isDark ? Colors.dark.text : Colors.light.secondaryText }]}>
                 {rooms.length}
               </Text>
             </View>
@@ -399,11 +616,13 @@ export default function ClientDetailsScreen() {
             />
           ) : (
             <View style={styles.emptyState}>
-              <IconSymbol size={48} name="house" color={isDark ? '#6b7280' : '#9ca3af'} />
-              <Text style={[styles.emptyText, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
+              <View style={[styles.emptyIcon, { backgroundColor: isDark ? Colors.dark.secondaryBackground : Colors.light.secondaryBackground }]}>
+                <IconSymbol size={32} name="house" color={isDark ? Colors.light.secondaryText : Colors.dark.secondaryText} />
+              </View>
+              <Text style={[styles.emptyText, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
                 No rooms created yet
               </Text>
-              <Text style={[styles.emptySubtext, { color: isDark ? '#6b7280' : '#9ca3af' }]}>
+              <Text style={[styles.emptySubtext, { color: isDark ? Colors.light.secondaryText : Colors.dark.secondaryText }]}>
                 Create your first room to get started
               </Text>
             </View>
@@ -411,13 +630,16 @@ export default function ClientDetailsScreen() {
         </View>
 
         {/* Quotations Section */}
-        <View style={[styles.section, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
+        <View style={[styles.section, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.background }]}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
-              Quotations
-            </Text>
-            <View style={[styles.countBadge, { backgroundColor: isDark ? '#4b5563' : '#f3f4f6' }]}>
-              <Text style={[styles.countText, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
+            <View style={styles.sectionTitleContainer}>
+              <IconSymbol size={20} name="doc.text.fill" color={isDark ? Colors.dark.successText : Colors.light.successText} />
+              <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Quotations
+              </Text>
+            </View>
+            <View style={[styles.countBadge, { backgroundColor: isDark ? Colors.dark.secondaryBackground : Colors.light.buttonBackground }]}>
+              <Text style={[styles.countText, { color: isDark ? Colors.dark.text : Colors.light.secondaryText }]}>
                 {quotations.length}
               </Text>
             </View>
@@ -433,11 +655,13 @@ export default function ClientDetailsScreen() {
             />
           ) : (
             <View style={styles.emptyState}>
-              <IconSymbol size={48} name="doc.text" color={isDark ? '#6b7280' : '#9ca3af'} />
-              <Text style={[styles.emptyText, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
+              <View style={[styles.emptyIcon, { backgroundColor: isDark ? Colors.dark.secondaryBackground : Colors.light.secondaryBackground }]}>
+                <IconSymbol size={32} name="doc.text" color={isDark ? Colors.light.secondaryText : Colors.dark.secondaryText} />
+              </View>
+              <Text style={[styles.emptyText, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
                 No quotations generated yet
               </Text>
-              <Text style={[styles.emptySubtext, { color: isDark ? '#6b7280' : '#9ca3af' }]}>
+              <Text style={[styles.emptySubtext, { color: isDark ? Colors.light.secondaryText : Colors.dark.secondaryText }]}>
                 Generate your first quotation
               </Text>
             </View>
@@ -459,87 +683,178 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
+    paddingHorizontal: 20,
+  },
+  loadingCard: {
+    alignItems: 'center',
+    padding: 40,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    width: width * 0.8,
   },
   loadingText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 32,
+    paddingHorizontal: 20,
   },
-  errorText: {
-    fontSize: 18,
-    fontWeight: '600',
+  errorCard: {
+    alignItems: 'center',
+    padding: 40,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    width: width * 0.9,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 16,
     textAlign: 'center',
   },
-  retryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
     marginTop: 8,
+    lineHeight: 24,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 14,
+    marginTop: 24,
+    gap: 8,
+    shadowColor: '#3182CE',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   retryButtonText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  clientCard: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 16,
-    padding: 20,
+  headerSection: {
+    marginBottom: 8,
+    paddingTop: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
+  clientCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    padding: 24,
+  },
   clientHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
   },
   avatarText: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   clientInfo: {
     flex: 1,
   },
   clientName: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
     marginBottom: 4,
   },
   clientId: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  editButton: {
+    padding: 12,
+    borderRadius: 12,
   },
   contactDetails: {
-    gap: 12,
+    gap: 16,
   },
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
+  contactIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   contactText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     flex: 1,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  statIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  statNumber: {
+    fontSize: 28,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -552,14 +867,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 16,
     gap: 8,
-    shadowColor: '#3b82f6',
+    shadowColor: '#3182CE',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   primaryButtonText: {
     color: '#ffffff',
@@ -571,64 +886,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 16,
     gap: 8,
+    borderWidth: 1,
   },
   secondaryButtonText: {
     fontSize: 16,
     fontWeight: '700',
   },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   section: {
     marginHorizontal: 20,
     marginBottom: 20,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowRadius: 12,
     elevation: 4,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   countBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
   },
   countText: {
@@ -636,9 +931,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listItem: {
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 12,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -649,55 +945,83 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   deleteButton: {
     padding: 8,
+    borderRadius: 8,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'capitalize',
   },
   priceBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   priceText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
   },
   listItemTitle: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   listItemDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 8,
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  listItemFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   listItemDate: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  quotationStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  quotationStatusText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
-    gap: 12,
+    paddingVertical: 48,
+    gap: 16,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  coordinatesHint: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });

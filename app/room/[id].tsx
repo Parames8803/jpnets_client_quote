@@ -209,6 +209,15 @@ export default function RoomDetailsScreen() {
               {new Date(room.created_at).toLocaleDateString()}
             </Text>
           </View>
+
+          {room.total_sq_ft && (
+            <View style={styles.detailItem}>
+              <Text style={[styles.label, { color: isDark ? '#d1d5db' : '#374151' }]}>Total Sq Ft:</Text>
+              <Text style={[styles.value, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                {room.total_sq_ft} sq.ft
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Measurements Section */}
@@ -268,9 +277,25 @@ export default function RoomDetailsScreen() {
                   <Text style={[styles.listItemTitle, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
                     {p.name}
                   </Text>
+                  {(p.product_category || p.product_subcategory) && (
+                    <Text style={[styles.listItemValue, { color: isDark ? '#d1d5db' : '#6b7280', fontStyle: 'italic', marginBottom: 4 }]}>
+                      {p.product_category}{p.product_subcategory ? ` / ${p.product_subcategory}` : ''}
+                    </Text>
+                  )}
                   <Text style={[styles.listItemValue, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
-                    {p.quantity} {p.unit_type}
+                    Quantity: {p.quantity} {p.unit_type}
                   </Text>
+                  <Text style={[styles.listItemValue, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
+                    Price: ${p.price?.toFixed(2)} (Default: ${p.default_price?.toFixed(2) ?? 'N/A'})
+                  </Text>
+                  <Text style={[styles.listItemValue, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
+                    Wages: ${p.wages?.toFixed(2)} (Default: ${p.default_wages?.toFixed(2) ?? 'N/A'})
+                  </Text>
+                  {p.description && (
+                    <Text style={[styles.listItemDescription, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
+                      {p.description}
+                    </Text>
+                  )}
                 </View>
               </View>
             ))
@@ -288,7 +313,7 @@ export default function RoomDetailsScreen() {
         <View style={[styles.section, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
-              Reference Images
+              Room Images
             </Text>
             <View style={[styles.countBadge, { backgroundColor: isDark ? '#4b5563' : '#f3f4f6' }]}>
               <Text style={[styles.countText, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
@@ -464,6 +489,11 @@ const styles = StyleSheet.create({
   listItemValue: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  listItemDescription: {
+    fontSize: 14,
+    fontWeight: '400',
+    marginTop: 4,
   },
   imageGrid: {
     flexDirection: 'row',

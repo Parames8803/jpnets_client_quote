@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Dimensions, FlatList, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../utils/supabaseClient';
 
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -163,32 +163,6 @@ export default function HomeScreen() {
               <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{stat.label}</Text>
             </View>
           ))}
-        </View>
-
-        {/* Client List */}
-        <View style={styles.clientListSection}>
-          <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>My Clients</Text>
-          {clients.length > 0 ? (
-            <FlatList
-              data={clients}
-              renderItem={renderClientItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-              ItemSeparatorComponent={() => (
-                <View style={[styles.separator, { backgroundColor: isDark ? Colors.dark.border : Colors.light.border }]} />
-              )}
-            />
-          ) : (
-            <View style={styles.noClientsContainer}>
-              <Text style={[styles.noClientsText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>No clients found.</Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => router.push('/(tabs)/clients')}
-              >
-                <Text style={styles.addButtonText}>Add New Client</Text>
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
       </ScrollView>
     </View>

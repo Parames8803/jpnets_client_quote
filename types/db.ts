@@ -7,6 +7,8 @@ export interface Client {
   contact_number: string | null; // text, nullable
   email: string | null; // text, nullable
   address: string | null; // text, nullable
+  latitude: number | null; // numeric, nullable
+  longitude: number | null; // numeric, nullable
 }
 
 // Interface for the 'measurements' table
@@ -26,9 +28,16 @@ export interface Product {
   id: string; // uuid
   created_at: string; // timestamp with time zone
   room_id: string | null; // uuid, nullable (references rooms.id)
-  name: string | null; // text, nullable
+  name: string | null; // text, nullable (e.g., {room_type} {product_category} {product_subcategory})
+  product_category: string | null; // text, nullable
+  product_subcategory: string | null; // text, nullable
   quantity: number | null; // numeric, nullable
   unit_type: string | null; // text, nullable
+  price: number | null; // numeric, nullable
+  default_price: number | null; // numeric, nullable
+  wages: number | null; // numeric, nullable
+  default_wages: number | null; // numeric, nullable
+  description: string | null; // text, nullable
 }
 
 // Interface for the 'quotation_rooms' table (junction table)
@@ -45,7 +54,6 @@ export interface Quotation {
   id: string; // uuid
   created_at: string; // timestamp with time zone
   client_id: string | null; // uuid, nullable (references clients.id)
-  assigned_employee_phone: string | null; // text, nullable
   total_price: number | null; // numeric, nullable
   pdf_url: string | null; // text, nullable
   excel_url: string | null; // text, nullable

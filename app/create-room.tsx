@@ -3,20 +3,20 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { 
-  Alert, 
-  Image, 
-  Platform, 
-  ScrollView, 
-  StyleSheet, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  View,
+import {
   ActivityIndicator,
-  StatusBar,
+  Alert,
+  Image,
   KeyboardAvoidingView,
-  Modal
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,12 +24,94 @@ import { supabase } from '../utils/supabaseClient';
 
 const SUPABASE_IMAGE_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_IMAGE_BUCKET || 'file-storage';
 
+import { ProductDimensionModal } from '@/components/ProductDimensionModal'; // Import the new component
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Measurement, Product } from '../types/db';
+import { Product } from '../types/db';
 
 const STATUS_OPTIONS = ['Not Active', 'Active', 'In Progress', 'Completed'];
+
+interface ProductType {
+  name: string;
+  default_price: number;
+  units?: string[];
+  wages: number;
+  sub_products?: ProductType[];
+}
+
+const ROOM_TYPES: { name: string; products: ProductType[] }[] = [
+  {
+    name: 'Living Room',
+    products: [
+      { name: 'Sofa', default_price: 500, units: ['pcs', 'm'], wages: 50 },
+      { name: 'Coffee Table', default_price: 150, units: ['pcs'], wages: 20 },
+      { name: 'TV Stand', default_price: 200, units: ['pcs'], wages: 25 },
+    ],
+  },
+  {
+    name: 'Kitchen',
+    products: [
+      { name: 'Counter Top Bottom', default_price: 100, units: ['sq.ft', 'm²'], wages: 15,sub_products: [
+          {
+            name: 'Front Door',
+            default_price: 0,
+            wages: 0,
+            sub_products: [
+              { name: 'Single Sheet', default_price: 50, wages: 10 },
+              { name: 'Double Sheet', default_price: 75, wages: 15 },
+            ],
+          },
+          {
+            name: 'Inner Shelve',
+            default_price: 0,
+            wages: 0,
+            sub_products: [
+              { name: 'Single Sheet', default_price: 25, wages: 5 },
+              { name: 'Double Sheet', default_price: 25, wages: 5 },
+            ],
+          },
+     ] },
+      { name: 'Cabinets', default_price: 300, units: ['sq.ft', 'm²'], wages: 40 },
+      { name: 'Sink', default_price: 120, units: ['pcs'], wages: 30 },
+    ],
+  },
+  {
+    name: 'Bedroom',
+    products: [
+      { name: 'Bed Frame', default_price: 400, units: ['pcs'], wages: 60 },
+      {
+        name: 'Wardrobe',
+        default_price: 350,
+        units: ['sq.ft', 'm²', 'pcs'],
+        wages: 70,
+        sub_products: [
+          {
+            name: 'Front Door',
+            default_price: 0,
+            wages: 0,
+            sub_products: [
+              { name: 'Single Sheet', default_price: 50, wages: 10 },
+              { name: 'Double Sheet', default_price: 75, wages: 15 },
+            ],
+          },
+          {
+            name: 'Inner Shelve',
+            default_price: 0,
+            wages: 0,
+            sub_products: [
+              { name: 'Single Sheet', default_price: 25, wages: 5 },
+              { name: 'Double Sheet', default_price: 25, wages: 5 },
+            ],
+          },
+          { name: 'Back Side Sheet', default_price: 25, wages: 5 },
+          { name: 'Aluminium Drawer', default_price: 25, wages: 5 },
+          { name: 'Saint Gobain Mirror', default_price: 25, wages: 5 },
+        ],
+      },
+      { name: 'Dresser', default_price: 250, units: ['pcs'], wages: 35 },
+    ],
+  },
+];
 
 export default function CreateRoomScreen() {
   const router = useRouter();
@@ -43,6 +125,12 @@ export default function CreateRoomScreen() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [currentUnitField, setCurrentUnitField] = useState<'length' | 'width' | null>(null);
+  const [showRoomTypeModal, setShowRoomTypeModal] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [showDimensionModal, setShowDimensionModal] = useState(false);
+  const [showProductUnitModal, setShowProductUnitModal] = useState(false);
+  const [showSubProductModal, setShowSubProductModal] = useState(false);
+  const [productUnits, setProductUnits] = useState<string[]>([]);
 
   // State for Room Dimensions (which will be saved as a Measurement entry)
   const [length, setLength] = useState('');
@@ -53,9 +141,10 @@ export default function CreateRoomScreen() {
 
   // State for Products
   const [products, setProducts] = useState<Omit<Product, 'id' | 'created_at' | 'room_id'>[]>([]);
-  const [newProductName, setNewProductName] = useState('');
+  const [selectedProducts, setSelectedProducts] = useState<ProductType[]>([]);
   const [newProductQuantity, setNewProductQuantity] = useState('');
   const [newProductUnitType, setNewProductUnitType] = useState('');
+  const [newProductDescription, setNewProductDescription] = useState('');
 
   // State for Images
   const [images, setImages] = useState<{ uri: string, name: string, type: string }[]>([]);
@@ -107,17 +196,31 @@ export default function CreateRoomScreen() {
   }, []);
 
   const addProduct = () => {
-    if (newProductName.trim() && newProductQuantity.trim()) {
-      setProducts(prev => [...prev, {
-        name: newProductName.trim(),
+    if (selectedProducts.length > 0 && newProductQuantity.trim()) {
+      const lastSelected = selectedProducts[selectedProducts.length - 1];
+      const finalProductName = `${roomType} ${selectedProducts.map(p => p.name).join(' ')}`;
+
+      const newProduct: Omit<Product, 'id' | 'created_at' | 'room_id'> = {
+        name: finalProductName,
+        product_category: selectedProducts[0].name,
+        product_subcategory: selectedProducts.slice(1).map(p => p.name).join(' / ') || null,
         quantity: parseFloat(newProductQuantity),
         unit_type: newProductUnitType.trim(),
-      }]);
-      setNewProductName('');
+        price: lastSelected.default_price, // Set price to default
+        default_price: lastSelected.default_price,
+        wages: lastSelected.wages, // Set wages to default
+        default_wages: lastSelected.wages,
+        description: newProductDescription,
+      };
+
+      setProducts(prev => [...prev, newProduct]);
+      setSelectedProducts([]);
       setNewProductQuantity('');
       setNewProductUnitType('');
+      setNewProductDescription('');
+      setProductUnits([]);
     } else {
-      Alert.alert('Input Required', 'Please enter both name and quantity for the product.');
+      Alert.alert('Input Required', 'Please select a product and enter a quantity.');
     }
   };
 
@@ -231,8 +334,15 @@ export default function CreateRoomScreen() {
           .insert({
             room_id: newRoomId,
             name: p.name,
+            product_category: p.product_category,
+            product_subcategory: p.product_subcategory,
             quantity: p.quantity,
             unit_type: p.unit_type,
+            price: p.price,
+            default_price: p.default_price,
+            wages: p.wages,
+            default_wages: p.default_wages,
+            description: p.description,
           });
         if (productError) {
           console.error('Error saving product:', productError.message);
@@ -282,6 +392,9 @@ export default function CreateRoomScreen() {
     >
       <View style={styles.modalOverlay}>
         <View style={[styles.modalContent, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
+          <TouchableOpacity onPress={() => setShowStatusModal(false)} style={styles.closeButton}>
+            <IconSymbol name="xmark" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+          </TouchableOpacity>
           <Text style={[styles.modalTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
             Select Status
           </Text>
@@ -323,6 +436,9 @@ export default function CreateRoomScreen() {
     >
       <View style={styles.modalOverlay}>
         <View style={[styles.modalContent, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
+          <TouchableOpacity onPress={() => setShowUnitModal(false)} style={styles.closeButton}>
+            <IconSymbol name="xmark" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+          </TouchableOpacity>
           <Text style={[styles.modalTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
             Select Unit
           </Text>
@@ -358,6 +474,182 @@ export default function CreateRoomScreen() {
     </Modal>
   );
 
+  const RoomTypeModal = () => (
+    <Modal
+      visible={showRoomTypeModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowRoomTypeModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
+          <TouchableOpacity onPress={() => setShowRoomTypeModal(false)} style={styles.closeButton}>
+            <IconSymbol name="xmark" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+          </TouchableOpacity>
+          <Text style={[styles.modalTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
+            Select Room Type
+          </Text>
+          {ROOM_TYPES.map((option) => (
+            <TouchableOpacity
+              key={option.name}
+              style={[
+                styles.statusOption,
+                roomType === option.name && styles.statusOptionSelected,
+                roomType === option.name && { backgroundColor: '#1F2937' }
+              ]}
+              onPress={() => {
+                setRoomType(option.name);
+                setSelectedProducts([]);
+                setShowRoomTypeModal(false);
+              }}
+            >
+              <Text style={[
+                styles.statusOptionText,
+                { color: isDark ? '#e5e7eb' : '#374151' },
+                roomType === option.name && { color: '#ffffff' }
+              ]}>
+                {option.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const ProductModal = () => {
+    const availableProducts = ROOM_TYPES.find(rt => rt.name === roomType)?.products || [];
+
+    return (
+      <Modal
+        visible={showProductModal}
+        transparent
+        animationType="fade"
+      onRequestClose={() => setShowProductModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
+            <TouchableOpacity onPress={() => setShowProductModal(false)} style={styles.closeButton}>
+              <IconSymbol name="xmark" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
+              Select Product
+            </Text>
+            {availableProducts.map((product) => (
+              <TouchableOpacity
+                key={product.name}
+                style={[
+                  styles.statusOption,
+                  selectedProducts[0]?.name === product.name && styles.statusOptionSelected,
+                  selectedProducts[0]?.name === product.name && { backgroundColor: '#1F2937' }
+                ]}
+              onPress={() => {
+                  setSelectedProducts([product]);
+                  setProductUnits(product.units || []);
+                  setNewProductUnitType('');
+                  setShowProductModal(false);
+                  if (product.sub_products && product.sub_products.length > 0) {
+                    setShowSubProductModal(true);
+                  }
+                }}
+              >
+                <Text style={[
+                  styles.statusOptionText,
+                  { color: isDark ? '#e5e7eb' : '#374151' },
+                  selectedProducts[0]?.name === product.name && { color: '#ffffff' }
+                ]}>
+                  {product.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  const ProductUnitModal = () => (
+    <Modal
+      visible={showProductUnitModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowProductUnitModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
+          <TouchableOpacity onPress={() => setShowProductUnitModal(false)} style={styles.closeButton}>
+            <IconSymbol name="xmark" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+          </TouchableOpacity>
+          <Text style={[styles.modalTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
+            Select Unit Type
+          </Text>
+          {productUnits.map((option) => (
+            <TouchableOpacity
+              key={option}
+              style={[
+                styles.statusOption,
+                newProductUnitType === option && styles.statusOptionSelected,
+                newProductUnitType === option && { backgroundColor: '#1F2937' }
+              ]}
+              onPress={() => {
+                setNewProductUnitType(option);
+                setShowProductUnitModal(false);
+                if (option.toLowerCase() === 'sq.ft' || option.toLowerCase() === 'm²') {
+                  setShowDimensionModal(true);
+                }
+              }}
+            >
+              <Text style={[
+                styles.statusOptionText,
+                { color: isDark ? '#e5e7eb' : '#374151' },
+                newProductUnitType === option && { color: '#ffffff' }
+              ]}>
+                {option}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const SubProductModal = ({ visible, onClose, products, onSelect }: { visible: boolean, onClose: () => void, products: ProductType[], onSelect: (product: ProductType) => void }) => {
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <IconSymbol name="xmark" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
+              Select Option
+            </Text>
+            {products.map((product) => (
+              <TouchableOpacity
+                key={product.name}
+                style={[styles.statusOption]}
+                onPress={() => onSelect(product)}
+              >
+                <Text style={[styles.statusOptionText, { color: isDark ? '#e5e7eb' : '#374151' }]}>
+                  {product.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  const handleSetProductQuantityFromDimensions = (quantity: string) => {
+    setNewProductQuantity(quantity);
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
@@ -367,7 +659,7 @@ export default function CreateRoomScreen() {
         barStyle={isDark ? 'light-content' : 'dark-content'} 
         backgroundColor={isDark ? '#1f2937' : '#f9fafb'} 
       />
-      
+
       <ScrollView 
         style={[styles.scrollView, { backgroundColor: isDark ? '#1f2937' : '#f9fafb' }]}
         showsVerticalScrollIndicator={false}
@@ -382,20 +674,21 @@ export default function CreateRoomScreen() {
             <Text style={[styles.label, { color: isDark ? '#d1d5db' : '#374151' }]}>
               Room Type *
             </Text>
-            <TextInput
+            <TouchableOpacity
               style={[
-                styles.input,
+                styles.statusSelector,
                 { 
                   backgroundColor: isDark ? '#4b5563' : '#f8fafc',
-                  color: isDark ? '#f1f5f9' : '#1e293b',
                   borderColor: isDark ? '#6b7280' : '#e2e8f0'
                 }
               ]}
-              placeholder="e.g., Living Room, Kitchen, Bedroom"
-              placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
-              value={roomType}
-              onChangeText={setRoomType}
-            />
+              onPress={() => setShowRoomTypeModal(true)}
+            >
+              <Text style={[styles.statusSelectorText, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                {roomType || 'Select Room Type'}
+              </Text>
+              <IconSymbol size={16} name="chevron.down" color={isDark ? '#9ca3af' : '#6b7280'} />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.inputGroup}>
@@ -560,8 +853,13 @@ export default function CreateRoomScreen() {
                   {p.name}
                 </Text>
                 <Text style={[styles.listItemValue, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
-                  {p.quantity} {p.unit_type}
+                  {p.quantity} {p.unit_type} - Price: ${p.price?.toFixed(2)} - Wages: ${p.wages?.toFixed(2)}
                 </Text>
+                {p.description && (
+                  <Text style={[styles.listItemDescription, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
+                    {p.description}
+                  </Text>
+                )}
               </View>
               <TouchableOpacity
                 style={styles.removeButton}
@@ -573,58 +871,88 @@ export default function CreateRoomScreen() {
           ))}
 
           <View style={styles.addForm}>
-            <TextInput
+            <TouchableOpacity
               style={[
-                styles.input,
-                { 
+                styles.statusSelector,
+                {
                   backgroundColor: isDark ? '#4b5563' : '#f8fafc',
-                  color: isDark ? '#f1f5f9' : '#1e293b',
-                  borderColor: isDark ? '#6b7280' : '#e2e8f0'
+                  borderColor: isDark ? '#6b7280' : '#e2e8f0',
+                  marginBottom: 16,
                 }
               ]}
-              placeholder="Product Name"
-              placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
-              value={newProductName}
-              onChangeText={setNewProductName}
-            />
-            <View style={styles.formRow}>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  { 
-                    backgroundColor: isDark ? '#4b5563' : '#f8fafc',
-                    color: isDark ? '#f1f5f9' : '#1e293b',
-                    borderColor: isDark ? '#6b7280' : '#e2e8f0'
-                  }
-                ]}
-                placeholder="Quantity"
-                placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
-                value={newProductQuantity}
-                onChangeText={setNewProductQuantity}
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={[
-                  styles.formInput,
-                  { 
-                    backgroundColor: isDark ? '#4b5563' : '#f8fafc',
-                    color: isDark ? '#f1f5f9' : '#1e293b',
-                    borderColor: isDark ? '#6b7280' : '#e2e8f0'
-                  }
-                ]}
-                placeholder="Unit"
-                placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
-                value={newProductUnitType}
-                onChangeText={setNewProductUnitType}
-              />
-            </View>
-            <TouchableOpacity 
-              style={[styles.addButton, { backgroundColor: '#1F2937' }]}
-              onPress={addProduct}
+              onPress={() => {
+                setSelectedProducts([]);
+                setShowProductModal(true);
+              }}
+              disabled={!roomType}
             >
-              <IconSymbol size={20} name="plus" color="#ffffff" />
-              <Text style={styles.addButtonText}>Add Product</Text>
+              <Text style={[styles.statusSelectorText, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                {selectedProducts.length > 0 ? selectedProducts.map(p => p.name).join(' / ') : 'Select a Product'}
+              </Text>
+              <IconSymbol size={16} name="chevron.down" color={isDark ? '#9ca3af' : '#6b7280'} />
             </TouchableOpacity>
+
+            {selectedProducts.length > 0 && (
+              <>
+                <View style={styles.formRow}>
+                  <TextInput
+                    style={[
+                      styles.formInput,
+                      { 
+                        backgroundColor: isDark ? '#4b5563' : '#f8fafc',
+                        color: isDark ? '#f1f5f9' : '#1e293b',
+                        borderColor: isDark ? '#6b7280' : '#e2e8f0'
+                      }
+                    ]}
+                    placeholder="Quantity"
+                    placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
+                    value={newProductQuantity}
+                    onChangeText={setNewProductQuantity}
+                    keyboardType="numeric"
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.formInput, // Reusing formInput style for consistency
+                      { 
+                        backgroundColor: isDark ? '#4b5563' : '#f8fafc',
+                        borderColor: isDark ? '#6b7280' : '#e2e8f0',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }
+                    ]}
+                    onPress={() => setShowProductUnitModal(true)}
+                  >
+                    <Text style={[styles.statusSelectorText, { color: isDark ? '#f1f5f9' : '#1e293b' }]}>
+                      {newProductUnitType || 'Select Unit'}
+                    </Text>
+                    <IconSymbol size={16} name="chevron.down" color={isDark ? '#9ca3af' : '#6b7280'} />
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    {
+                      backgroundColor: isDark ? '#4b5563' : '#f8fafc',
+                      color: isDark ? '#f1f5f9' : '#1e293b',
+                      borderColor: isDark ? '#6b7280' : '#e2e8f0',
+                      marginBottom: 16,
+                    }
+                  ]}
+                  placeholder="Product Description"
+                  placeholderTextColor={isDark ? '#9ca3af' : '#94a3b8'}
+                  value={newProductDescription}
+                  onChangeText={setNewProductDescription}
+                />
+                <TouchableOpacity 
+                  style={[styles.addButton, { backgroundColor: '#1F2937' }]}
+                  onPress={addProduct}
+                >
+                  <IconSymbol size={20} name="plus" color="#ffffff" />
+                  <Text style={styles.addButtonText}>Add Product</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
 
@@ -632,7 +960,7 @@ export default function CreateRoomScreen() {
         <View style={[styles.section, { backgroundColor: isDark ? '#374151' : '#ffffff' }]}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>
-              Reference Images
+              Room Images
             </Text>
             <View style={[styles.countBadge, { backgroundColor: isDark ? '#4b5563' : '#f3f4f6' }]}>
               <Text style={[styles.countText, { color: isDark ? '#d1d5db' : '#6b7280' }]}>
@@ -687,6 +1015,28 @@ export default function CreateRoomScreen() {
 
       <StatusModal />
       <UnitModal />
+      <RoomTypeModal />
+      <ProductModal />
+      <ProductUnitModal />
+      {selectedProducts.length > 0 && selectedProducts[selectedProducts.length - 1].sub_products && (
+        <SubProductModal
+          visible={showSubProductModal}
+          onClose={() => setShowSubProductModal(false)}
+          products={selectedProducts[selectedProducts.length - 1].sub_products!}
+          onSelect={(product) => {
+            const newSelectedProducts = [...selectedProducts, product];
+            setSelectedProducts(newSelectedProducts);
+            if (!product.sub_products) {
+              setShowSubProductModal(false);
+            }
+          }}
+        />
+      )}
+      <ProductDimensionModal
+        visible={showDimensionModal}
+        onClose={() => setShowDimensionModal(false)}
+        onSetQuantity={handleSetProductQuantityFromDimensions}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -791,6 +1141,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
+  listItemDescription: {
+    fontSize: 14,
+    fontWeight: '400',
+    marginTop: 4,
+  },
   removeButton: {
     padding: 10,
   },
@@ -887,6 +1242,12 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '85%',
     maxHeight: '70%',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 24,
+    right: 24,
+    zIndex: 1,
   },
   modalTitle: {
     fontSize: 22,
