@@ -1,4 +1,4 @@
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { IconSymbol, IconSymbolName } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -463,7 +463,7 @@ export default function QuotationDetailsScreen() {
 
 // Info Item Component
 const InfoItem = ({ icon, label, value, colors }: { 
-  icon: string; 
+  icon: IconSymbolName; 
   label: string; 
   value: string; 
   colors: any; 
