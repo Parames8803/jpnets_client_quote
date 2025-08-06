@@ -235,6 +235,30 @@ export default function CreateRoomScreen() {
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true, // Allow multiple images
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const newImages = result.assets.map(asset => {
+        const uri = asset.uri;
+        const filename = uri.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename || '');
+        const type = match ? `image/${match[1]}` : `image`;
+        return { uri, name: filename || `image-${uuidv4()}`, type };
+      });
+      setImages(prev => [...prev, ...newImages]);
+    }
+  };
+
+  const takePicture = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Camera permission is needed to take photos.');
+      return;
+    }
+
+    let result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -249,6 +273,28 @@ export default function CreateRoomScreen() {
 
       setImages(prev => [...prev, { uri, name: filename || `image-${uuidv4()}`, type }]);
     }
+  };
+
+  const selectImage = () => {
+    Alert.alert(
+      'Select Image Source',
+      'Choose an option to add an image.',
+      [
+        {
+          text: 'Take Photo...',
+          onPress: takePicture,
+        },
+        {
+          text: 'Choose from Library...',
+          onPress: pickImage,
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const uploadImage = async (imageUri: string, room_id: string, imageType: string) => {
@@ -983,13 +1029,15 @@ export default function CreateRoomScreen() {
             ))}
           </View>
 
-          <TouchableOpacity 
-            style={[styles.addButton, { backgroundColor: '#1F2937' }]}
-            onPress={pickImage}
-          >
-            <IconSymbol size={20} name="photo" color="#ffffff" />
-            <Text style={styles.addButtonText}>Add Image</Text>
-          </TouchableOpacity>
+          <View style={styles.imageActions}>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: '#1F2937', flex: 1 }]}
+              onPress={selectImage}
+            >
+              <IconSymbol size={20} name="plus.circle.fill" color="#ffffff" />
+              <Text style={styles.addButtonText}>Add Image</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Save Button */}
@@ -1181,6 +1229,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  imageActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
   },
   imageGrid: {
     flexDirection: 'row',

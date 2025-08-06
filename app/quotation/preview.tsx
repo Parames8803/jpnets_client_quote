@@ -107,11 +107,20 @@ export default function QuotationPreviewScreen() {
       if (quotationError) throw quotationError;
       const newQuotationId = quotationData.id;
 
-      // 2. Link Rooms
-      const quotationRooms = selectedRoomIds.map((roomId: string) => ({
-        quotation_id: newQuotationId,
-        room_id: roomId,
-      }));
+      // 2. Link Rooms and calculate room totals
+      const quotationRooms = selectedRoomIds.map((roomId: string) => {
+        const roomProducts = products.filter((p) => p.room_id === roomId);
+        const roomTotalPrice = roomProducts.reduce(
+          (acc, p) => acc + (p.price || 0),
+          0
+        );
+        return {
+          quotation_id: newQuotationId,
+          room_id: roomId,
+          room_total_price: roomTotalPrice,
+        };
+      });
+
       const { error: roomsError } = await supabase.from('quotation_rooms').insert(quotationRooms);
       if (roomsError) throw roomsError;
 

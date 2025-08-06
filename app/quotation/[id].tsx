@@ -14,6 +14,7 @@ export default function QuotationDetailsScreen() {
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [allProducts, setAllProducts] = useState<(Product & { room_type?: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -62,7 +63,6 @@ export default function QuotationDetailsScreen() {
       // Define a type for the joined data structure
       type QuotationRoomJoin = {
         room_id: string;
-        price_per_sq_ft: number | null;
         room_total_price: number | null;
         rooms: (Room & { measurements: Measurement[]; products: Product[]; }) | null;
       };
@@ -72,7 +72,6 @@ export default function QuotationDetailsScreen() {
         .from('quotation_rooms')
         .select(`
           room_id,
-          price_per_sq_ft,
           room_total_price,
           rooms (
             *,
@@ -90,13 +89,17 @@ export default function QuotationDetailsScreen() {
           if (qr.rooms) {
             return {
               ...qr.rooms,
-              price_per_sq_ft: qr.price_per_sq_ft,
               room_total_price: qr.room_total_price,
             };
           }
           return null;
-        }).filter((room): room is Room & { measurements: Measurement[]; products: Product[]; price_per_sq_ft: number | null; room_total_price: number | null; } => room !== null) || [];
+        }).filter((room): room is Room & { measurements: Measurement[]; products: Product[]; room_total_price: number | null; } => room !== null) || [];
         setRooms(fetchedRooms);
+
+        const products = fetchedRooms.flatMap(room =>
+          room.products ? room.products.map(p => ({ ...p, room_type: room.room_type ?? undefined })) : []
+        );
+        setAllProducts(products);
       }
 
     } catch (error: any) {
@@ -242,73 +245,33 @@ export default function QuotationDetailsScreen() {
           {quotation.excel_url && <Text style={styles.label}>Excel: <Text style={styles.linkText}>{quotation.excel_url}</Text></Text>}
         </View>
 
-        {/* Room Details */}
+        {/* Products List */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Room Details ({rooms.length})</Text>
-          {rooms.length > 0 ? (
-            rooms.map((room, index) => (
-              <View key={room.id} style={styles.roomItem}>
-                <Text style={styles.roomItemTitle}>{room.room_type || 'Unnamed Room'}</Text>
-                <Text style={styles.roomItemDescription}>{room.description || 'No description'}</Text>
-                <Text style={styles.roomItemInfo}>Price per sq.ft: ${(room as any).price_per_sq_ft?.toFixed(2) ?? 'N/A'}</Text>
-                <Text style={styles.roomItemInfo}>Room Total: ${(room as any).room_total_price?.toFixed(2) ?? 'N/A'}</Text>
-
-                {/* Measurements for this room */}
-                {(room as any).measurements && (room as any).measurements.length > 0 && (
-                  <View style={styles.subSection}>
-                    <Text style={styles.subSectionTitle}>Measurements:</Text>
-                    {(room as any).measurements.map((m: Measurement) => (
-                      <Text key={m.id} style={styles.subText}>
-                        - {m.length_value || 'N/A'} {m.length_unit_type || ''} x {m.width_value || 'N/A'} {m.width_unit_type || ''} ({typeof m.converted_sq_ft === 'number' ? `${m.converted_sq_ft.toFixed(2)} sq.ft` : 'N/A'})
-                      </Text>
-                    ))}
-                  </View>
-                )}
-
-                {/* Products for this room */}
-                {(room as any).products && (room as any).products.length > 0 && (
-                  <View style={styles.subSection}>
-                    <Text style={styles.subSectionTitle}>Products:</Text>
-                    {(room as any).products.map((p: Product) => (
-                      <View key={p.id} style={styles.productItem}>
-                        <Text style={styles.subTextBold}>{p.name}</Text>
-                        <Text style={styles.subText}>- Category: {p.product_category} / {p.product_subcategory}</Text>
-                        <Text style={styles.subText}>- Quantity: {p.quantity} {p.unit_type}</Text>
-                        <Text style={styles.subText}>- Price: ${p.price?.toFixed(2)} (Default: ${p.default_price?.toFixed(2)})</Text>
-                        <Text style={styles.subText}>- Wages: ${p.wages?.toFixed(2)} (Default: ${p.default_wages?.toFixed(2)})</Text>
-                        {p.description && <Text style={styles.subText}>- Desc: {p.description}</Text>}
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {/* Reference Images */}
-                {room.ref_image_urls && room.ref_image_urls.length > 0 && (
-                  <View style={styles.subSection}>
-                    <Text style={styles.subSectionTitle}>Reference Images:</Text>
-                    <View style={styles.imageGrid}>
-                      {room.ref_image_urls.map((url, imgIndex) => {
-                        const publicUrl = supabase.storage.from('file-storage').getPublicUrl(url).data.publicUrl;
-                        return (
-                          <TouchableOpacity
-                            key={imgIndex}
-                            onPress={() => {
-                              setSelectedImage(publicUrl);
-                              setModalVisible(true);
-                            }}
-                            style={styles.imageThumbnailContainer}
-                          >
-                            <Image source={{ uri: publicUrl }} style={styles.imageThumbnail} />
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                )}
+          <Text style={styles.sectionTitle}>Products ({allProducts.length})</Text>
+          {allProducts.length > 0 ? (
+            allProducts.map((product) => (
+              <View key={product.id} style={styles.productRow}>
+                <View style={styles.productInfoContainer}>
+                  <Text style={styles.productName}>{product.name}</Text>
+                  <Text style={styles.productDetailsText}>
+                    Room: {product.room_type || 'N/A'}
+                  </Text>
+                  <Text style={styles.productDetailsText}>
+                    Quantity: {product.quantity} {product.unit_type}
+                  </Text>
+                  <Text style={styles.productDetailsText}>
+                    Price: ${product.price?.toFixed(2)} | Wages: ${product.wages?.toFixed(2)}
+                  </Text>
+                  {product.description && (
+                    <Text style={styles.productDescription}>
+                      Description: {product.description}
+                    </Text>
+                  )}
+                </View>
               </View>
             ))
           ) : (
-            <Text style={styles.noDataText}>No rooms associated with this quotation.</Text>
+            <Text style={styles.noDataText}>No products associated with this quotation.</Text>
           )}
         </View>
 
@@ -459,6 +422,36 @@ const styles = StyleSheet.create({
   },
   productItem: {
     marginBottom: 10,
+  },
+  productRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  productInfoContainer: {
+    flex: 1,
+  },
+  productName: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#444',
+  },
+  productDetailsText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 3,
+  },
+  productDescription: {
+    fontSize: 13,
+    color: '#777',
+    fontStyle: 'italic',
+    marginTop: 5,
   },
   noDataText: {
     fontSize: 16,

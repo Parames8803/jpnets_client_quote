@@ -45,7 +45,6 @@ export interface QuotationRoom {
   created_at: string; // timestamp with time zone
   quotation_id: string; // uuid (references quotations.id)
   room_id: string; // uuid (references rooms.id)
-  price_per_sq_ft: number | null; // numeric, nullable
   room_total_price: number | null; // numeric, nullable
 }
 
