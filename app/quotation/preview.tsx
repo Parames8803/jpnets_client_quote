@@ -105,7 +105,7 @@ export default function QuotationPreviewScreen() {
       // 1. Create Quotation
       const { data: quotationData, error: quotationError } = await supabase
         .from('quotations')
-        .insert({ client_id: clientId, total_price: calculateTotal() })
+        .insert({ client_id: clientId, total_price: calculateTotal(), status: 'Not Active' }) // Set default status
         .select()
         .single();
 

@@ -20,20 +20,26 @@ import {
 } from 'react-native';
 import { Client, Quotation, Room } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
+import { Modal, TextInput } from 'react-native'; // Import Modal and TextInput
 
 const { width } = Dimensions.get('window');
+
+const QUOTATION_STATUSES = ['Not Active', 'Active', 'Closed'];
 
 export default function ClientDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [client, setClient] = useState<Client | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
+  const [selectedQuotationForStatus, setSelectedQuotationForStatus] = useState<Quotation | null>(null);
+  const [newQuotationStatus, setNewQuotationStatus] = useState<string>('');
 
-  const isDark = colorScheme === 'dark';
 
   const fetchClientData = async (clientId: string, isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -254,6 +260,37 @@ export default function ClientDetailsScreen() {
     );
   };
 
+  const handleUpdateQuotationStatus = async () => {
+    if (!selectedQuotationForStatus || !newQuotationStatus) {
+      Alert.alert('Error', 'Please select a quotation and a status.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('quotations')
+        .update({ status: newQuotationStatus })
+        .eq('id', selectedQuotationForStatus.id);
+
+      if (error) {
+        Alert.alert('Error updating quotation status', error.message);
+      } else {
+        Alert.alert('Success', 'Quotation status updated successfully!');
+        setIsStatusModalVisible(false);
+        setSelectedQuotationForStatus(null);
+        setNewQuotationStatus('');
+        if (id) {
+          fetchClientData(id as string, true); // Refresh data
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('An unexpected error occurred', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderRoomItem = ({ item }: { item: Room }) => (
     <TouchableOpacity
       style={[
@@ -273,7 +310,7 @@ export default function ClientDetailsScreen() {
           </Text>
         </View>
         <TouchableOpacity onPress={() => handleDeleteRoom(item.id)} style={styles.deleteButton}>
-          <IconSymbol size={18} name="trash.fill" color={Colors.red} />
+          <IconSymbol size={18} name="trash.fill" color={Colors[colorScheme ?? 'light'].red} />
         </TouchableOpacity>
       </View>
       <Text style={[styles.listItemTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
@@ -313,9 +350,21 @@ export default function ClientDetailsScreen() {
           ${item.total_price?.toFixed(2) || '0.00'}
         </Text>
       </View>
-        <TouchableOpacity onPress={() => handleDeleteQuotation(item.id)} style={styles.deleteButton}>
-          <IconSymbol size={18} name="trash.fill" color={Colors.red} />
-        </TouchableOpacity>
+        <View style={styles.quotationActions}>
+          <TouchableOpacity 
+            onPress={() => {
+              setSelectedQuotationForStatus(item);
+              setNewQuotationStatus(item.status || 'Not Active');
+              setIsStatusModalVisible(true);
+            }} 
+            style={styles.editStatusButton}
+          >
+            <IconSymbol size={18} name="pencil" color={isDark ? Colors.dark.text : Colors.light.text} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDeleteQuotation(item.id)} style={styles.deleteButton}>
+            <IconSymbol size={18} name="trash.fill" color={Colors[colorScheme ?? 'light'].red} />
+          </TouchableOpacity>
+        </View>
       </View>
       <Text style={[styles.listItemTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
         Quotation #{item.id.substring(0, 8).toUpperCase()}
@@ -324,9 +373,9 @@ export default function ClientDetailsScreen() {
         <Text style={[styles.listItemDate, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
           Generated {new Date(item.created_at).toLocaleDateString()}
         </Text>
-        <View style={[styles.quotationStatus, { backgroundColor: isDark ? Colors.dark.info : Colors.light.info }]}>
-          <Text style={[styles.quotationStatusText, { color: isDark ? Colors.dark.infoText : Colors.light.infoText }]}>
-            Active
+        <View style={[styles.quotationStatus, getStatusBadgeStyle(item.status || '')]}>
+          <Text style={[styles.quotationStatusText, { color: getStatusTextColor(item.status || '') }]}>
+            {item.status || 'N/A'}
           </Text>
         </View>
       </View>
@@ -365,6 +414,46 @@ export default function ClientDetailsScreen() {
     }
   };
 
+  const getQuotationStatusBadgeStyle = (status: string) => {
+    const colors = isDark ? Colors.dark : Colors.light;
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return { backgroundColor: colors.success };
+      case 'closed':
+        return { backgroundColor: colors.red };
+      case 'not active':
+        return { backgroundColor: colors.secondaryBackground };
+      case 'assigned':
+        return { backgroundColor: colors.info };
+      case 'in progress':
+        return { backgroundColor: colors.warning };
+      case 'completed':
+        return { backgroundColor: colors.success };
+      default:
+        return { backgroundColor: colors.secondaryBackground };
+    }
+  };
+
+  const getQuotationStatusTextColor = (status: string) => {
+    const colors = isDark ? Colors.dark : Colors.light;
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return colors.successText;
+      case 'closed':
+        return colors.redText;
+      case 'not active':
+        return colors.secondaryText;
+      case 'assigned':
+        return colors.infoText;
+      case 'in progress':
+        return colors.warningText;
+      case 'completed':
+        return colors.successText;
+      default:
+        return colors.secondaryText;
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
@@ -382,7 +471,7 @@ export default function ClientDetailsScreen() {
     return (
       <View style={[styles.errorContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
         <View style={[styles.errorCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
-          <IconSymbol size={64} name="exclamationmark.triangle" color={Colors.red} />
+          <IconSymbol size={64} name="exclamationmark.triangle" color={Colors[colorScheme ?? 'light'].red} />
           <Text style={[styles.errorTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
             Client Not Found
           </Text>
@@ -668,6 +757,67 @@ export default function ClientDetailsScreen() {
           )}
         </View>
       </ScrollView>
+
+      {isStatusModalVisible && selectedQuotationForStatus && (
+        <Modal visible={isStatusModalVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                  Update Quotation Status
+                </Text>
+                <TouchableOpacity onPress={() => setIsStatusModalVisible(false)} style={styles.closeButton}>
+                  <IconSymbol name="xmark" size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={[styles.quotationIdInModal, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Quotation ID: {selectedQuotationForStatus.id.substring(0, 8).toUpperCase()}
+              </Text>
+              <Text style={[styles.currentStatusInModal, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
+                Current Status: {selectedQuotationForStatus.status || 'N/A'}
+              </Text>
+
+              <View style={styles.statusOptionsContainer}>
+                {QUOTATION_STATUSES.map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.statusOption,
+                      { borderColor: isDark ? Colors.dark.border : Colors.light.border },
+                      newQuotationStatus === status && { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary },
+                    ]}
+                    onPress={() => setNewQuotationStatus(status)}
+                  >
+                    <Text style={[
+                      styles.statusOptionText,
+                      newQuotationStatus === status ? { color: isDark ? Colors.dark.text : Colors.light.background } : { color: isDark ? Colors.dark.text : Colors.light.text },
+                    ]}>
+                      {status}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton, { borderColor: isDark ? Colors.dark.border : Colors.light.border }]}
+                  onPress={() => setIsStatusModalVisible(false)}
+                >
+                  <Text style={[styles.cancelButtonText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton, { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }]}
+                  onPress={handleUpdateQuotationStatus}
+                  disabled={loading}
+                >
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -989,6 +1139,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  quotationActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editStatusButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
   quotationStatus: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1002,6 +1160,86 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 48,
     gap: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: width * 0.9,
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  quotationIdInModal: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  currentStatusInModal: {
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  statusOptionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  statusOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  statusOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1.5,
+  },
+  saveButton: {
+    // backgroundColor set dynamically
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   emptyIcon: {
     width: 80,

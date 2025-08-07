@@ -49,6 +49,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         ) : session && session.user && session.user.user_metadata && session.user.user_metadata.role == "client" ? (
           <Stack.Screen name="(clients)" options={{ headerShown: false }} />
+        ) : session && session.user && session.user.user_metadata && session.user.user_metadata.role == "worker" ? (
+          <Stack.Screen name="(workers)" options={{ headerShown: false }} />
         ) : (
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         )

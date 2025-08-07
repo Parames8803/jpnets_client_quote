@@ -31,6 +31,8 @@ export const Colors = {
     infoText: '#DC2626', // Light mode info text
     secondaryBackground: '#F7FAFC', // Light mode secondary background
     secondaryText: '#718096', // Light mode secondary text
+    red: '#FF3B30', // Light mode red color
+    redText: '#FFFFFF', // Light mode red text color
   },
   dark: {
     text: '#ECEDEE',
@@ -56,6 +58,7 @@ export const Colors = {
     infoText: '#F87171', // Dark mode info text
     secondaryBackground: '#4A5568', // Dark mode secondary background
     secondaryText: '#A0AEC0', // Dark mode secondary text
+    red: '#FF3B30', // Dark mode red color
+    redText: '#FFFFFF', // Dark mode red text color
   },
-  red: '#FF3B30', // Added red color
 };

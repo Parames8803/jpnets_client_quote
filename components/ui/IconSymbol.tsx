@@ -63,6 +63,8 @@ const MAPPING = {
   'envelope': 'email',
   'location': 'place',
   'dollarsign': 'attach-money',
+  'arrow.triangle.2.circlepath': 'sync', // Added mapping for status update icon
+  'xmark.circle.fill': 'cancel', // Added mapping for close icon in modal
 } as const;
 
 /**

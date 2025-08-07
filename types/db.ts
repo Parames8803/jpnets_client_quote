@@ -57,6 +57,19 @@ export interface Quotation {
   total_price: number | null; // numeric, nullable
   pdf_url: string | null; // text, nullable
   excel_url: string | null; // text, nullable
+  assigned_worker_id: string | null; // uuid, nullable (references workers.id)
+  status: string | null; // text, nullable (e.g., 'Pending', 'Assigned', 'In Progress', 'Completed')
+  clients?: Client | null; // Joined client data
+  quotation_rooms?: Array<QuotationRoom & { rooms?: (Room & { products?: Product[] }) }> | null; // Nested rooms and products
+}
+
+// Interface for the 'workers' table
+export interface Worker {
+  id: string; // uuid
+  created_at: string; // timestamp with time zone
+  user_id: string; // uuid (references auth.users.id)
+  name: string; // text
+  email: string; // text
 }
 
 // Interface for the 'rooms' table

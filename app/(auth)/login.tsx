@@ -43,6 +43,8 @@ export default function LoginScreen() {
         router.replace('/(tabs)'); // Navigate to admin layout
       } else if (userRole === 'client') {
         router.replace('/(clients)' as any); // Navigate to client layout
+      } else if (userRole === 'worker') {
+        router.replace('/(workers)' as any); // Navigate to worker layout
       } else {
         // Fallback for unknown roles or if role is missing
         showCustomModal('Navigation Error', 'Unknown user role. Please contact support.');
