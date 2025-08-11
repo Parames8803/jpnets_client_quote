@@ -2,12 +2,12 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  FlatList,
+  LayoutAnimation,
   Modal,
   ScrollView,
   StyleSheet,
@@ -16,78 +16,212 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Product } from '../../types/db';
+import { Client, Product, Room } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
 
 type EditableProduct = Product & { originalId: string };
-
+type GroupedProduct = Room & { products: EditableProduct[]; subtotal: number };
 const { width } = Dimensions.get('window');
+
+// --- Edit Product Modal Component ---
+const EditProductModal = ({ visible, product, onClose, onSave, colors }: any) => {
+  const defaultProduct: EditableProduct = {
+    id: '',
+    created_at: '',
+    room_id: null,
+    name: null,
+    product_category: null,
+    product_subcategory: null,
+    quantity: null,
+    unit_type: null,
+    price: null,
+    default_price: null,
+    wages: null,
+    default_wages: null,
+    description: null,
+    originalId: '',
+  };
+  const [editedProduct, setEditedProduct] = useState<EditableProduct>(product || defaultProduct);
+
+  useEffect(() => {
+    setEditedProduct(product || defaultProduct);
+  }, [product]);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: colors.card.backgroundColor }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: colors.text.color }]}>Edit Item</Text>
+            <TouchableOpacity onPress={onClose}>
+              <IconSymbol name="xmark.circle.fill" size={24} color={colors.subtext.color} />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={[styles.modalProductLabel, { color: colors.primary.color }]}>{editedProduct.name ?? ''}</Text>
+          
+          <Text style={[styles.inputLabel, { color: colors.text.color }]}>Description</Text>
+          <TextInput
+            style={[styles.input, styles.textArea, { borderColor: colors.separator.backgroundColor, color: colors.text.color, backgroundColor: colors.background.backgroundColor }]}
+            value={editedProduct.description ?? ''}
+            onChangeText={(text) => setEditedProduct({ ...editedProduct, description: text })}
+            placeholder="Product description"
+            placeholderTextColor={colors.subtext.color}
+            multiline
+          />
+
+          <View style={styles.inputRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.inputLabel, { color: colors.text.color }]}>Price ($)</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.separator.backgroundColor, color: colors.text.color, backgroundColor: colors.background.backgroundColor }]}
+                value={String(editedProduct.price ?? '')}
+                onChangeText={(text) => setEditedProduct({ ...editedProduct, price: parseFloat(text) || 0 })}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.inputLabel, { color: colors.text.color }]}>Wages ($)</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.separator.backgroundColor, color: colors.text.color, backgroundColor: colors.background.backgroundColor }]}
+                value={String(editedProduct.wages ?? '')}
+                onChangeText={(text) => setEditedProduct({ ...editedProduct, wages: parseFloat(text) || 0 })}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.saveButton, { backgroundColor: colors.primary.color }]}
+            onPress={() => onSave(editedProduct)}
+          >
+            <Text style={styles.saveButtonText}>Save Changes</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// --- Room Card Component ---
+const RoomCard = ({ group, onEdit, colors }: { group: GroupedProduct, onEdit: (product: EditableProduct) => void, colors: any }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const toggleExpand = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsExpanded(!isExpanded);
+  };
+
+  return (
+    <View style={[styles.roomCard, colors.card]}>
+      <TouchableOpacity style={styles.roomHeader} onPress={toggleExpand}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.roomName, colors.text]}>{group.room_type}</Text>
+          <Text style={[styles.roomSubtotal, colors.primary]}>${group.subtotal.toFixed(2)}</Text>
+        </View>
+        <IconSymbol name={isExpanded ? 'chevron.up' : 'chevron.down'} size={20} color={colors.subtext.color} />
+      </TouchableOpacity>
+      {isExpanded && (
+        <View style={[styles.productList, { borderTopColor: colors.separator.backgroundColor }]}>
+          {group.products.map(product => (
+            <View key={product.id} style={[styles.productRow, { borderBottomColor: colors.separator.backgroundColor }]}>
+              <View style={styles.productInfo}>
+                <Text style={[styles.productName, colors.text]}>{product.name}</Text>
+                <Text style={[styles.productDetails, colors.subtext]}>{product.quantity} {product.unit_type}</Text>
+              </View>
+              <View style={styles.productActions}>
+                <Text style={[styles.productPrice, colors.text]}>${product.price?.toFixed(2)}</Text>
+                <TouchableOpacity style={styles.editButton} onPress={() => onEdit(product)}>
+                  <IconSymbol name="pencil" size={18} color={colors.primary.color} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
 
 export default function QuotationPreviewScreen() {
   const router = useRouter();
   const { clientId, selectedRoomIds: selectedRoomIdsString } = useLocalSearchParams();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-
+  
+  const [client, setClient] = useState<Client | null>(null);
   const [products, setProducts] = useState<EditableProduct[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<EditableProduct | null>(null);
 
-  const selectedRoomIds = JSON.parse(selectedRoomIdsString as string);
+  const selectedRoomIds: string[] = JSON.parse(selectedRoomIdsString as string);
+  
+  const isDark = colorScheme === 'dark';
+  const themedStyles = {
+    background: { backgroundColor: isDark ? '#111827' : '#f3f4f6' },
+    card: { backgroundColor: isDark ? '#1f2937' : '#ffffff' },
+    text: { color: isDark ? '#f9fafb' : '#111827' },
+    subtext: { color: isDark ? '#9ca3af' : '#6b7280' },
+    primary: { color: isDark ? '#38bdf8' : '#0ea5e9' },
+    separator: { backgroundColor: isDark ? '#374151' : '#e5e7eb' },
+  };
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      if (!selectedRoomIds || selectedRoomIds.length === 0) {
-        Alert.alert('Error', 'No rooms selected.');
+    const fetchQuotationData = async () => {
+      if (!selectedRoomIds || selectedRoomIds.length === 0 || !clientId) {
+        Alert.alert('Error', 'Missing required data.');
         setLoading(false);
         return;
       }
 
       try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .in('room_id', selectedRoomIds);
+        const [clientRes, roomsRes, productsRes] = await Promise.all([
+          supabase.from('clients').select('*').eq('id', clientId).single(),
+          supabase.from('rooms').select('*').in('id', selectedRoomIds),
+          supabase.from('products').select('*').in('room_id', selectedRoomIds),
+        ]);
 
-        if (error) {
-          Alert.alert('Error fetching products', error.message);
-          setProducts([]);
-        } else {
-          const editableProducts = data.map((p) => ({ ...p, originalId: p.id }));
-          setProducts(editableProducts);
-        }
+        if (clientRes.error) throw clientRes.error;
+        if (roomsRes.error) throw roomsRes.error;
+        if (productsRes.error) throw productsRes.error;
+        
+        setClient(clientRes.data);
+        setRooms(roomsRes.data);
+        setProducts(productsRes.data.map(p => ({ ...p, originalId: p.id })));
       } catch (error: any) {
-        Alert.alert('An unexpected error occurred', error.message);
+        Alert.alert('Error fetching data', error.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
-  }, [selectedRoomIdsString]);
+    fetchQuotationData();
+  }, [clientId, selectedRoomIdsString]);
+
+  const groupedProducts: GroupedProduct[] = useMemo(() => {
+    return rooms.map(room => {
+      const roomProducts = products.filter(p => p.room_id === room.id);
+      const subtotal = roomProducts.reduce((sum, p) => sum + (p.price || 0), 0);
+      return { ...room, products: roomProducts, subtotal };
+    });
+  }, [rooms, products]);
+
+  const grandTotal = useMemo(() => groupedProducts.reduce((sum, g) => sum + g.subtotal, 0), [groupedProducts]);
 
   const handleUpdateProduct = async (updatedProduct: EditableProduct) => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .update({
-          description: updatedProduct.description,
-          price: updatedProduct.price,
-          wages: updatedProduct.wages,
-        })
+        .update({ description: updatedProduct.description, price: updatedProduct.price, wages: updatedProduct.wages })
         .eq('id', updatedProduct.id)
         .select()
         .single();
 
-      if (error) {
-        throw error;
-      }
-
-      setProducts((prev) =>
-        prev.map((p) => (p.id === data.id ? { ...p, ...data } : p))
-      );
+      if (error) throw error;
+      setProducts(prev => prev.map(p => (p.id === data.id ? { ...p, ...data } : p)));
       setModalVisible(false);
       setEditingProduct(null);
     } catch (error: any) {
@@ -95,49 +229,26 @@ export default function QuotationPreviewScreen() {
     }
   };
 
-  const calculateTotal = () => {
-    return products.reduce((acc, p) => acc + (p.price || 0), 0);
-  };
-
   const handleSubmitQuotation = async () => {
     setIsSubmitting(true);
     try {
-      // 1. Create Quotation
       const { data: quotationData, error: quotationError } = await supabase
         .from('quotations')
-        .insert({ client_id: clientId, total_price: calculateTotal(), status: 'Not Active' }) // Set default status
-        .select()
-        .single();
-
+        .insert({ client_id: clientId, total_price: grandTotal, status: 'Not Active' })
+        .select().single();
       if (quotationError) throw quotationError;
+
       const newQuotationId = quotationData.id;
+      const quotationRooms = groupedProducts.map(g => ({
+        quotation_id: newQuotationId, room_id: g.id, room_total_price: g.subtotal,
+      }));
 
-      // 2. Link Rooms and calculate room totals
-      const quotationRooms = selectedRoomIds.map((roomId: string) => {
-        const roomProducts = products.filter((p) => p.room_id === roomId);
-        const roomTotalPrice = roomProducts.reduce(
-          (acc, p) => acc + (p.price || 0),
-          0
-        );
-        return {
-          quotation_id: newQuotationId,
-          room_id: roomId,
-          room_total_price: roomTotalPrice,
-        };
-      });
+      await supabase.from('quotation_rooms').insert(quotationRooms);
+      await supabase.from('rooms').update({ status: 'In Quotation' }).in('id', selectedRoomIds);
 
-      const { error: roomsError } = await supabase.from('quotation_rooms').insert(quotationRooms);
-      if (roomsError) throw roomsError;
-
-      // 3. Update Room Status
-      const { error: updateStatusError } = await supabase
-        .from('rooms')
-        .update({ status: 'In Quotation' })
-        .in('id', selectedRoomIds);
-      if (updateStatusError) throw updateStatusError;
-
-      Alert.alert('Success', 'Quotation submitted successfully!');
-      router.replace({ pathname: '/quotation/[id]', params: { id: newQuotationId } });
+      Alert.alert('Success', 'Quotation submitted!', [
+        { text: 'OK', onPress: () => router.replace({ pathname: '/quotation/[id]', params: { id: newQuotationId } }) }
+      ]);
     } catch (error: any) {
       Alert.alert('Submission Error', error.message);
     } finally {
@@ -145,460 +256,111 @@ export default function QuotationPreviewScreen() {
     }
   };
 
-  const renderProductItem = ({ item, index }: { item: EditableProduct; index: number }) => (
-    <View style={[styles.productCard, { backgroundColor: colors.background }]}>
-      <View style={styles.productHeader}>
-        <View style={[styles.indexBadge, { backgroundColor: colors.tint }]}>
-          <Text style={styles.indexText}>{index + 1}</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => {
-            setEditingProduct(item);
-            setModalVisible(true);
-          }}
-        >
-          <IconSymbol name="pencil" size={20} color={colors.tint} />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.productContent}>
-        <Text style={[styles.productName, { color: colors.text }]}>{item.name}</Text>
-        <Text style={[styles.productDescription, { color: colors.text + '80' }]}>
-          {item.description}
-        </Text>
-        <View style={styles.productMeta}>
-          <View style={styles.quantityContainer}>
-            <Text style={[styles.quantity, { color: colors.text }]}>
-              {item.quantity} {item.unit_type}
-            </Text>
-          </View>
-          <View style={[styles.priceContainer, { backgroundColor: colors.tint + '20' }]}>
-            <Text style={[styles.price, { color: colors.tint }]}>
-              ${item.price?.toFixed(2)}
-            </Text>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.tint} />
-        <Text style={[styles.loadingText, { color: colors.text }]}>
-          Loading products...
-        </Text>
+      <View style={[styles.centeredContainer, themedStyles.background]}>
+        <ActivityIndicator size="large" color={themedStyles.primary.color} />
+        <Text style={[styles.loadingText, themedStyles.subtext]}>Preparing your quotation...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
-      <View style={styles.headerContainer}>
-        <Text style={[styles.title, { color: colors.text }]}>Quotation Preview</Text>
-        <View style={[styles.dateContainer, { backgroundColor: colors.tint + '20' }]}>
-          <IconSymbol name="calendar" size={16} color={colors.tint} />
-          <Text style={[styles.dateText, { color: colors.tint }]}>
-            {new Date().toLocaleDateString()}
-          </Text>
+    <View style={[styles.container, themedStyles.background]}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, themedStyles.text]}>Quotation Details</Text>
+        <Text style={[styles.headerSubtitle, themedStyles.subtext]}>Client: {client?.name}</Text>
+        <View style={styles.statsRow}>
+          <Text style={themedStyles.subtext}>{groupedProducts.length} Rooms</Text>
+          <Text style={themedStyles.subtext}>•</Text>
+          <Text style={themedStyles.subtext}>{products.length} Items</Text>
         </View>
       </View>
+      
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {groupedProducts.map(group => (
+          <RoomCard
+            key={group.id}
+            group={group}
+            colors={themedStyles}
+            onEdit={(product) => {
+              setEditingProduct(product);
+              setModalVisible(true);
+            }}
+          />
+        ))}
+      </ScrollView>
 
-      <FlatList
-        data={products}
-        renderItem={renderProductItem}
-        keyExtractor={(item) => item.id}
-        scrollEnabled={false}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
-
-      <View style={[styles.totalCard, { backgroundColor: colors.background }]}>
+      <View style={[styles.footer, themedStyles.card, { borderTopColor: themedStyles.separator.backgroundColor }]}>
         <View style={styles.totalRow}>
-          <Text style={[styles.totalLabel, { color: colors.text }]}>Total Amount</Text>
-          <Text style={[styles.totalAmount, { color: colors.tint }]}>
-            ${calculateTotal().toFixed(2)}
-          </Text>
+          <Text style={[styles.totalLabel, themedStyles.text]}>Grand Total</Text>
+          <Text style={[styles.totalAmount, themedStyles.primary]}>${grandTotal.toFixed(2)}</Text>
         </View>
+        <TouchableOpacity
+          style={[styles.submitButton, { backgroundColor: themedStyles.primary.color, opacity: isSubmitting ? 0.7 : 1 }]}
+          onPress={handleSubmitQuotation}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.submitButtonText}>Finalize & Submit</Text>
+              <IconSymbol name="arrow.right" size={16} color="#fff" />
+            </>
+          )}
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[
-          styles.submitButton,
-          { backgroundColor: colors.tint },
-          isSubmitting && styles.submittingButton
-        ]}
-        onPress={handleSubmitQuotation}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
-        )}
-        <Text style={styles.submitButtonText}>
-          {isSubmitting ? 'Submitting...' : 'Submit Quotation'}
-        </Text>
-      </TouchableOpacity>
-
-      {editingProduct && (
+      {modalVisible && editingProduct && (
         <EditProductModal
           visible={modalVisible}
           product={editingProduct}
           onClose={() => setModalVisible(false)}
           onSave={handleUpdateProduct}
-          colors={colors}
+          colors={themedStyles}
         />
       )}
-    </ScrollView>
+    </View>
   );
 }
 
-const EditProductModal = ({ visible, product, onClose, onSave, colors }: any) => {
-  const [editedProduct, setEditedProduct] = useState(product);
-
-  useEffect(() => {
-    setEditedProduct(product);
-  }, [product]);
-
-  const handleSave = () => {
-    onSave(editedProduct);
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Edit Product
-            </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <IconSymbol name="xmark" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-          
-          <Text style={[styles.productNameInModal, { color: colors.tint }]}>
-            {product.name}
-          </Text>
-
-          <View style={styles.inputContainer}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.text + '30', color: colors.text }]}
-              value={editedProduct?.description}
-              onChangeText={(text) => setEditedProduct({ ...editedProduct, description: text })}
-              placeholder="Enter description"
-              placeholderTextColor={colors.text + '60'}
-              multiline
-            />
-          </View>
-
-          <View style={styles.inputRow}>
-            <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Price ($)</Text>
-              <TextInput
-                style={[styles.input, { borderColor: colors.text + '30', color: colors.text }]}
-                value={String(editedProduct?.price)}
-                onChangeText={(text) => setEditedProduct({ ...editedProduct, price: Number(text) })}
-                placeholder="0.00"
-                placeholderTextColor={colors.text + '60'}
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Wages ($)</Text>
-              <TextInput
-                style={[styles.input, { borderColor: colors.text + '30', color: colors.text }]}
-                value={String(editedProduct?.wages)}
-                onChangeText={(text) => setEditedProduct({ ...editedProduct, wages: Number(text) })}
-                placeholder="0.00"
-                placeholderTextColor={colors.text + '60'}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton, { borderColor: colors.text + '30' }]}
-              onPress={onClose}
-            >
-              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
-              onPress={handleSave}
-            >
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  headerContainer: {
-    padding: 20,
-    paddingBottom: 10,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  dateText: {
-    marginLeft: 6,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  listContainer: {
-    paddingHorizontal: 20,
-  },
-  productCard: {
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  productHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  indexBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  indexText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  editButton: {
-    padding: 8,
-    borderRadius: 8,
-  },
-  productContent: {
-    flex: 1,
-  },
-  productName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  productDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  productMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  quantityContainer: {
-    flex: 1,
-  },
-  quantity: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  priceContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  totalCard: {
-    margin: 20,
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  totalAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  submitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  submittingButton: {
-    backgroundColor: '#ccc',
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    width: width * 0.9,
-    maxWidth: 400,
-    borderRadius: 20,
-    padding: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingBottom: 10,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  productNameInModal: {
-    paddingHorizontal: 20,
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 20,
-  },
-  inputContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 10,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-    minHeight: 48,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    borderWidth: 1.5,
-  },
-  saveButton: {
-    // backgroundColor set dynamically
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  container: { flex: 1 },
+  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  loadingText: { marginTop: 15, fontSize: 16 },
+  header: { padding: 20, paddingTop: 50 },
+  headerTitle: { fontSize: 28, fontWeight: 'bold' },
+  headerSubtitle: { fontSize: 16, marginTop: 4 },
+  statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  scrollContainer: { paddingHorizontal: 20, paddingBottom: 180 },
+  roomCard: { borderRadius: 16, marginBottom: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 4 },
+  roomHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 15 },
+  roomName: { fontSize: 18, fontWeight: '600' },
+  roomSubtotal: { fontSize: 16, fontWeight: '500', marginTop: 2 },
+  productList: { marginTop: 10, borderTopWidth: 1 },
+  productRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1 },
+  productInfo: { flex: 1, marginRight: 10 },
+  productName: { fontSize: 16, fontWeight: '500' },
+  productDetails: { fontSize: 14, marginTop: 2 },
+  productActions: { flexDirection: 'row', alignItems: 'center' },
+  productPrice: { fontSize: 16 },
+  editButton: { padding: 8, marginLeft: 10 },
+  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: 30, borderTopWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 20 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  totalLabel: { fontSize: 18, fontWeight: '600' },
+  totalAmount: { fontSize: 24, fontWeight: 'bold' },
+  submitButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, gap: 8 },
+  submitButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  modalTitle: { fontSize: 22, fontWeight: 'bold' },
+  modalProductLabel: { fontSize: 16, fontWeight: '500', marginBottom: 20 },
+  inputLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8 },
+  input: { borderWidth: 1.5, borderRadius: 10, padding: 12, fontSize: 16, marginBottom: 15 },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
+  inputRow: { flexDirection: 'row', gap: 15 },
+  saveButton: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
+  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

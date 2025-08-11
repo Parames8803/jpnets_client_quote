@@ -19,7 +19,6 @@ import {
 import { supabase } from '../utils/supabaseClient';
 
 import { Colors } from '@/constants/Colors';
-
 import { Client } from '../types/db';
 
 export default function EditClientScreen() {
@@ -186,19 +185,9 @@ export default function EditClientScreen() {
     }
   };
 
-  const getFieldIcon = (field: string) => {
-    switch (field) {
-      case 'name': return '👤';
-      case 'phone': return '📱';
-      case 'email': return '✉️';
-      case 'address': return '📍';
-      default: return '';
-    }
-  };
-
   if (initialLoading || !client) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+      <View style={[styles.loadingScreen, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
         <View style={[styles.loadingCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
           <ActivityIndicator size="large" color={isDark ? Colors.dark.primary : Colors.light.primary} />
           <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
@@ -219,16 +208,6 @@ export default function EditClientScreen() {
         style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Header Section */}
-        {/* <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
-          <Text style={[styles.headerTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-            Edit Client
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: isDark ? Colors.dark.placeholder : Colors.light.placeholder }]}>
-            Update {client?.name}'s information
-          </Text>
-        </View> */}
-
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -237,13 +216,9 @@ export default function EditClientScreen() {
           <View style={styles.form}>
             {/* Name Field */}
             <View style={styles.inputContainer}>
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelIcon}>{getFieldIcon('name')}</Text>
-                <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                  Full Name
-                </Text>
-                <Text style={styles.required}>*</Text>
-              </View>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Full Name <Text style={styles.required}>*</Text>
+              </Text>
               <View style={[
                 styles.inputWrapper,
                 {
@@ -269,13 +244,9 @@ export default function EditClientScreen() {
 
             {/* Contact Field */}
             <View style={styles.inputContainer}>
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelIcon}>{getFieldIcon('phone')}</Text>
-                <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                  Contact Number
-                </Text>
-                <Text style={styles.required}>*</Text>
-              </View>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Contact Number <Text style={styles.required}>*</Text>
+              </Text>
               <View style={[
                 styles.inputWrapper,
                 {
@@ -301,13 +272,9 @@ export default function EditClientScreen() {
 
             {/* Email Field */}
             <View style={styles.inputContainer}>
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelIcon}>{getFieldIcon('email')}</Text>
-                <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                  Email Address
-                </Text>
-                <Text style={styles.required}>*</Text>
-              </View>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Email Address <Text style={styles.required}>*</Text>
+              </Text>
               <View style={[
                 styles.inputWrapper,
                 {
@@ -334,13 +301,9 @@ export default function EditClientScreen() {
 
             {/* Address Field */}
             <View style={styles.inputContainer}>
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelIcon}>{getFieldIcon('address')}</Text>
-                <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                  Address
-                </Text>
-                <Text style={styles.required}>*</Text>
-              </View>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Address <Text style={styles.required}>*</Text>
+              </Text>
               <View style={[
                 styles.inputWrapper,
                 styles.textAreaWrapper,
@@ -389,7 +352,7 @@ export default function EditClientScreen() {
                     </View>
                   ) : (
                     <Text style={[styles.locationButtonText, { color: isDark ? '#60A5FA' : '#3B82F6' }]}>
-                      📍 Update Current Location
+                      Update Current Location
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -401,7 +364,7 @@ export default function EditClientScreen() {
                     activeOpacity={0.8}
                   >
                     <Text style={[styles.coordinatesLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                      📌 Current Coordinates
+                      Current Coordinates
                     </Text>
                     <Text style={[styles.coordinatesText, { color: isDark ? '#22C55E' : '#16A34A' }]}>
                       Lat: {latitude.toFixed(4)}, Lon: {longitude.toFixed(4)}
@@ -430,7 +393,7 @@ export default function EditClientScreen() {
                 activeOpacity={0.8}
               >
                 {loading ? (
-                  <View style={styles.loadingButtonContainer}>
+                  <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color={isDark ? "black" : "white"} />
                     <Text style={[styles.saveButtonText, { color: isDark ? "black" : "white" }]}>
                       Updating Client...
@@ -438,7 +401,7 @@ export default function EditClientScreen() {
                   </View>
                 ) : (
                   <Text style={[styles.saveButtonText, { color: isDark ? "black" : "white" }]}>
-                    💾 Update Client
+                    Update Client
                   </Text>
                 )}
               </TouchableOpacity>
@@ -470,29 +433,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 22,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 40,
   },
-  loadingContainer: {
+  loadingScreen: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -525,25 +472,16 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 28,
   },
-  labelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  labelIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
+    marginBottom: 10,
   },
   required: {
     color: '#EF4444',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 4,
   },
   inputWrapper: {
     borderWidth: 2,
@@ -605,7 +543,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.2,
   },
-  loadingButtonContainer: {
+  loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

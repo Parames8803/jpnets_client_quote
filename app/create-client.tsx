@@ -2,7 +2,20 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 
 import { Colors } from '@/constants/Colors';
 
@@ -80,7 +93,7 @@ export default function CreateClientScreen() {
     setLoading(true);
     try {
       const sb = await getSupabase();
-      const { data: { user: originalUser }, error: getUserError } = await (await sb).auth.getUser();
+      const { data: { user: originalUser }, error: getUserError } = await sb.auth.getUser();
       if (getUserError || !originalUser) {
         Alert.alert('Error', 'User not found. Please login again.');
         router.replace('/(auth)/login');
@@ -88,7 +101,7 @@ export default function CreateClientScreen() {
       }
 
       // Get current session before creating new user
-      const { data: { session: currentSession }, error: sessionError } = await (await sb).auth.getSession();
+      const { data: { session: currentSession }, error: sessionError } = await sb.auth.getSession();
       if (sessionError || !currentSession) {
         console.error("Error getting current session or no current session:", sessionError);
         Alert.alert('Error', 'Could not retrieve current session. Please login again.');
@@ -96,23 +109,23 @@ export default function CreateClientScreen() {
         return;
       }
 
-             // First create the client record with a temporary user_id (we'll update it later)
-       const { data: clientData, error: clientError } = await (await sb)
-         .from('clients')
-         .insert([
-           {
-             user_id: originalUser.id, // Temporary user_id, will be updated
-             created_by: originalUser.id, // Admin who created this client
-             name: name.trim(),
-             contact_number: contactNumber.trim(),
-             email: email.trim(),
-             address: address.trim(),
-             latitude: latitude,
-             longitude: longitude,
-           },
-         ])
-         .select()
-         .single();
+      // First create the client record with the original user's ID
+      const { data: clientData, error: clientError } = await sb
+        .from('clients')
+        .insert([
+          {
+            user_id: originalUser.id, 
+            created_by: originalUser.id,
+            name: name.trim(),
+            contact_number: contactNumber.trim(),
+            email: email.trim(),
+            address: address.trim(),
+            latitude: latitude,
+            longitude: longitude,
+          },
+        ])
+        .select()
+        .single();
 
       if (clientError) {
         Alert.alert('Error', 'Failed to create client: ' + clientError.message);
@@ -120,49 +133,43 @@ export default function CreateClientScreen() {
       }
 
       // Create a new user in auth.users table
-      const { data: signUpData, error: signUpError } = await (await sb).auth.signUp({
+      const { data: signUpData, error: signUpError } = await sb.auth.signUp({
         email: email.trim(),
-        password: contactNumber.trim(), // Using contact number as password as per requirement
+        password: contactNumber.trim(), 
         options: {
           data: {
-            role: 'client', // Assign role 'client'
+            role: 'client',
           },
         },
       });
 
       if (signUpError) {
         Alert.alert('User Creation Error', signUpError.message);
-        // Delete the client record since user creation failed
-        await (await sb).from('clients').delete().eq('id', clientData.id);
+        await sb.from('clients').delete().eq('id', clientData.id);
         return;
       }
 
       // Update the client record with the new auth user's ID
       if (signUpData.user) {
-        const { error: updateError } = await (await sb)
+        const { error: updateError } = await sb
           .from('clients')
           .update({ user_id: signUpData.user.id })
           .eq('id', clientData.id);
 
         if (updateError) {
           Alert.alert('Error', 'Failed to update client with new user ID: ' + updateError.message);
-          // Clean up: delete both the client and the auth user
-          await (await sb).from('clients').delete().eq('id', clientData.id);
-          // Note: We can't easily delete the auth user from here, but the client is cleaned up
+          await sb.from('clients').delete().eq('id', clientData.id);
           return;
         }
       }
 
-      // After successful signup, the new user is automatically logged in.
-      // We need to sign out the newly created user and restore the original user's session.
-      const { error: signOutError } = await (await sb).auth.signOut();
+      const { error: signOutError } = await sb.auth.signOut();
       if (signOutError) {
         console.error("Error signing out new user:", signOutError);
         Alert.alert('Sign Out Error', 'Failed to sign out newly created user.');
-        // Decide how to handle this. For now, proceed to restore original session.
       }
 
-      const { error: setSessionError } = await (await sb).auth.setSession({
+      const { error: setSessionError } = await sb.auth.setSession({
         access_token: currentSession.access_token,
         refresh_token: currentSession.refresh_token,
       });
@@ -174,8 +181,7 @@ export default function CreateClientScreen() {
         return;
       }
 
-      // Verify the session is restored to the original user
-      const { data: { user: restoredUser }, error: getRestoredUserError } = await (await sb).auth.getUser();
+      const { data: { user: restoredUser }, error: getRestoredUserError } = await sb.auth.getUser();
       if (getRestoredUserError || !restoredUser || restoredUser.id !== originalUser.id) {
         console.error("Session not restored to original user:", restoredUser);
         Alert.alert('Session Verification Error', 'Original user session could not be verified. Please re-login.');
@@ -235,16 +241,6 @@ export default function CreateClientScreen() {
     }
   };
 
-  const getFieldIcon = (field: string) => {
-    switch (field) {
-      case 'name': return '👤';
-      case 'phone': return '📱';
-      case 'email': return '✉️';
-      case 'address': return '📍';
-      default: return '';
-    }
-  };
-
   return (
     <>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
@@ -252,31 +248,16 @@ export default function CreateClientScreen() {
         style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Header Section */}
-        {/* <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
-          <Text style={[styles.headerTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-            Create New Client
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: isDark ? Colors.dark.placeholder : Colors.light.placeholder }]}>
-            Fill in the details to add a new client
-          </Text>
-        </View> */}
-
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.form}>
-            {/* Name Field */}
             <View style={styles.inputContainer}>
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelIcon}>{getFieldIcon('name')}</Text>
-                <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                  Full Name
-                </Text>
-                <Text style={styles.required}>*</Text>
-              </View>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Full Name <Text style={styles.required}>*</Text>
+              </Text>
               <View style={[
                 styles.inputWrapper,
                 {
@@ -300,15 +281,10 @@ export default function CreateClientScreen() {
               </View>
             </View>
 
-            {/* Contact Field */}
             <View style={styles.inputContainer}>
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelIcon}>{getFieldIcon('phone')}</Text>
-                <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                  Contact Number
-                </Text>
-                <Text style={styles.required}>*</Text>
-              </View>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Contact Number <Text style={styles.required}>*</Text>
+              </Text>
               <View style={[
                 styles.inputWrapper,
                 {
@@ -332,15 +308,10 @@ export default function CreateClientScreen() {
               </View>
             </View>
 
-            {/* Email Field */}
             <View style={styles.inputContainer}>
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelIcon}>{getFieldIcon('email')}</Text>
-                <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                  Email Address
-                </Text>
-                <Text style={styles.required}>*</Text>
-              </View>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Email Address <Text style={styles.required}>*</Text>
+              </Text>
               <View style={[
                 styles.inputWrapper,
                 {
@@ -365,15 +336,10 @@ export default function CreateClientScreen() {
               </View>
             </View>
 
-            {/* Address Field */}
             <View style={styles.inputContainer}>
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelIcon}>{getFieldIcon('address')}</Text>
-                <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                  Address
-                </Text>
-                <Text style={styles.required}>*</Text>
-              </View>
+              <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Address <Text style={styles.required}>*</Text>
+              </Text>
               <View style={[
                 styles.inputWrapper,
                 styles.textAreaWrapper,
@@ -399,7 +365,6 @@ export default function CreateClientScreen() {
                 />
               </View>
 
-              {/* Location Section */}
               <View style={styles.locationSection}>
                 <TouchableOpacity
                   style={[
@@ -422,7 +387,7 @@ export default function CreateClientScreen() {
                     </View>
                   ) : (
                     <Text style={[styles.locationButtonText, { color: isDark ? '#60A5FA' : '#3B82F6' }]}>
-                      📍 Use Current Location
+                      Use Current Location
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -434,7 +399,7 @@ export default function CreateClientScreen() {
                     activeOpacity={0.8}
                   >
                     <Text style={[styles.coordinatesLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                      📌 Coordinates
+                      Coordinates
                     </Text>
                     <Text style={[styles.coordinatesText, { color: isDark ? '#22C55E' : '#16A34A' }]}>
                       Lat: {latitude.toFixed(4)}, Lon: {longitude.toFixed(4)}
@@ -447,7 +412,6 @@ export default function CreateClientScreen() {
               </View>
             </View>
 
-            {/* Action Buttons */}
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[
@@ -471,7 +435,7 @@ export default function CreateClientScreen() {
                   </View>
                 ) : (
                   <Text style={[styles.saveButtonText, { color: isDark ? "black" : "white" }]}>
-                    ✨ Create Client
+                    Create Client
                   </Text>
                 )}
               </TouchableOpacity>
@@ -503,22 +467,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 22,
-  },
   scrollView: {
     flex: 1,
   },
@@ -532,25 +480,16 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 28,
   },
-  labelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  labelIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
+    marginBottom: 10,
   },
   required: {
     color: '#EF4444',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 4,
   },
   inputWrapper: {
     borderWidth: 2,

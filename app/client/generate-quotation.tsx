@@ -1,9 +1,8 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Client, Room } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
 
@@ -11,6 +10,7 @@ export default function GenerateQuotationScreen() {
   const router = useRouter();
   const { clientId } = useLocalSearchParams();
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   const [client, setClient] = useState<Client | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -28,36 +28,27 @@ export default function GenerateQuotationScreen() {
       const client_id_str = Array.isArray(clientId) ? clientId[0] : clientId;
 
       try {
-        // Fetch client details
         const { data: clientData, error: clientError } = await supabase
           .from('clients')
           .select('*')
           .eq('id', client_id_str)
           .single();
 
-        if (clientError) {
-          Alert.alert('Error fetching client', clientError.message);
-          setClient(null);
-        } else {
-          setClient(clientData);
-        }
+        if (clientError) throw clientError;
+        setClient(clientData);
 
-        // Fetch rooms for the client that are 'Not Active'
         const { data: roomsData, error: roomsError } = await supabase
           .from('rooms')
           .select('*')
           .eq('client_id', client_id_str)
-          .eq('status', 'Not Active') // Only fetch rooms with 'Not Active' status
+          .eq('status', 'Not Active')
           .order('created_at', { ascending: false });
 
-        if (roomsError) {
-          Alert.alert('Error fetching rooms', roomsError.message);
-          setRooms([]);
-        } else {
-          setRooms(roomsData || []);
-        }
+        if (roomsError) throw roomsError;
+        setRooms(roomsData || []);
+
       } catch (error: any) {
-        Alert.alert('An unexpected error occurred', error.message);
+        Alert.alert('Error', error.message);
       } finally {
         setLoading(false);
       }
@@ -67,16 +58,16 @@ export default function GenerateQuotationScreen() {
   }, [clientId]);
 
   const toggleRoomSelection = (roomId: string) => {
-    setSelectedRoomIds((prevSelected) =>
-      prevSelected.includes(roomId)
-        ? prevSelected.filter((id) => id !== roomId)
-        : [...prevSelected, roomId]
+    setSelectedRoomIds((prev) =>
+      prev.includes(roomId)
+        ? prev.filter((id) => id !== roomId)
+        : [...prev, roomId]
     );
   };
 
   const handleGenerateQuotation = () => {
     if (selectedRoomIds.length === 0) {
-      Alert.alert('Selection Required', 'Please select at least one room to generate a quotation.');
+      Alert.alert('Selection Required', 'Please select at least one room.');
       return;
     }
 
@@ -89,195 +80,232 @@ export default function GenerateQuotationScreen() {
     });
   };
 
+  const themedStyles = {
+    background: { backgroundColor: isDark ? '#111827' : '#f3f4f6' },
+    card: { backgroundColor: isDark ? '#1f2937' : '#ffffff' },
+    text: { color: isDark ? '#f9fafb' : '#111827' },
+    subtext: { color: isDark ? '#9ca3af' : '#6b7280' },
+    primary: { color: isDark ? '#38bdf8' : '#0ea5e9' },
+    separator: { backgroundColor: isDark ? '#374151' : '#e5e7eb' },
+    selectedCard: { borderColor: isDark ? '#38bdf8' : '#0ea5e9' },
+  };
+
   const renderRoomItem = ({ item }: { item: Room }) => {
     const isSelected = selectedRoomIds.includes(item.id);
     return (
       <TouchableOpacity
-        style={[
-          styles.roomItem,
-          { backgroundColor: isSelected ? Colors.light.tint : '#f9f9f9' },
-          isSelected && styles.selectedRoomItem,
-        ]}
+        style={[styles.roomCard, themedStyles.card, isSelected && styles.selectedRoomCard, isSelected && themedStyles.selectedCard]}
         onPress={() => toggleRoomSelection(item.id)}
       >
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.roomTitle, { color: isSelected ? '#fff' : '#444' }]}>
-            {item.room_type || 'N/A'}
+        <View style={styles.roomDetails}>
+          <Text style={[styles.roomTitle, themedStyles.text]}>{item.room_type || 'N/A'}</Text>
+          <Text style={[styles.roomDescription, themedStyles.subtext]} numberOfLines={1}>
+            {item.description || 'No description available'}
           </Text>
-          <Text style={[styles.roomDescription, { color: isSelected ? '#f0f0f0' : '#666' }]}>
-            {item.description || 'No description'}
-          </Text>
-          <Text style={[styles.roomInfo, { color: isSelected ? '#f0f0f0' : '#888' }]}>
-            Status: {item.status}
-          </Text>
-          <Text style={[styles.roomInfo, { color: isSelected ? '#f0f0f0' : '#888' }]}>
-            Total Sq Ft: {item.total_sq_ft || 'N/A'}
-          </Text>
+          <View style={styles.roomStats}>
+            <Text style={[styles.roomStatText, themedStyles.subtext]}>Area: {item.total_sq_ft || 'N/A'} sq.ft</Text>
+            <Text style={[styles.roomStatText, themedStyles.subtext]}>Status: {item.status}</Text>
+          </View>
         </View>
-        {isSelected && (
-          <IconSymbol
-            size={24}
-            name="checkmark.circle.fill"
-            color="#fff"
-            style={styles.selectedIcon}
-          />
-        )}
+        <View style={[styles.checkbox, isSelected && { backgroundColor: themedStyles.primary.color, borderColor: themedStyles.primary.color }]}>
+          {isSelected && <IconSymbol name="checkmark" size={14} color="#fff" />}
+        </View>
       </TouchableOpacity>
     );
   };
-
+  
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading data...</Text>
+      <View style={[styles.centeredContainer, themedStyles.background]}>
+        <ActivityIndicator size="large" color={themedStyles.primary.color} />
+        <Text style={[styles.loadingText, themedStyles.subtext]}>Fetching available rooms...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Generate Quotation for {client?.name}</Text>
-
-      {/* Section 1: Select Rooms */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Select Rooms ({rooms.length})</Text>
-        {rooms.length > 0 ? (
-          <FlatList
-            data={rooms}
-            renderItem={renderRoomItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            contentContainerStyle={styles.listContent}
-          />
-        ) : (
-          <Text style={styles.noDataText}>No rooms found for this client.</Text>
-        )}
+    <View style={[styles.container, themedStyles.background]}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, themedStyles.text]}>Generate Quotation</Text>
+        <Text style={[styles.headerSubtitle, themedStyles.subtext]}>
+          For client: {client?.name || '...'}
+        </Text>
       </View>
 
-      {/* Section 2: Generate Button */}
-      <View style={styles.section}>
-        <TouchableOpacity style={styles.generateButton} onPress={handleGenerateQuotation}>
-          <IconSymbol size={22} name="doc.text.fill" color="#fff" />
-          <Text style={styles.generateButtonText}>Preview Quotation</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      {rooms.length > 0 ? (
+        <FlatList
+          data={rooms}
+          renderItem={renderRoomItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          ListHeaderComponent={
+            <Text style={[styles.listHeader, themedStyles.text]}>
+              Select one or more rooms to include in the quotation.
+            </Text>
+          }
+        />
+      ) : (
+        <View style={[styles.centeredContainer, { flex: 1 }]}>
+          <IconSymbol name="folder.badge.questionmark" size={60} color={themedStyles.subtext.color} style={{ marginBottom: 20 }} />
+          <Text style={[styles.emptyTitle, themedStyles.text]}>No Rooms Available</Text>
+          <Text style={[styles.emptyText, themedStyles.subtext]}>
+            There are no rooms with "Not Active" status to generate a quotation for.
+          </Text>
+        </View>
+      )}
+
+      {rooms.length > 0 && (
+        <View style={[styles.footer, themedStyles.card, { borderTopColor: themedStyles.separator.backgroundColor }]}>
+          <View style={styles.summary}>
+            <Text style={[styles.summaryText, themedStyles.text]}>Selected: </Text>
+            <Text style={[styles.summaryCount, themedStyles.primary]}>{selectedRoomIds.length} room(s)</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.generateButton, { backgroundColor: themedStyles.primary.color, opacity: selectedRoomIds.length === 0 ? 0.5 : 1 }]}
+            onPress={handleGenerateQuotation}
+            disabled={selectedRoomIds.length === 0}
+          >
+            <Text style={styles.generateButtonText}>Preview Quotation</Text>
+            <IconSymbol name="chevron.right" size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f7',
-    padding: 15,
   },
-  loadingContainer: {
+  centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f4f7',
+    padding: 20,
   },
   loadingText: {
-    fontSize: 18,
-    color: '#555',
+    marginTop: 15,
+    fontSize: 16,
   },
-  title: {
-    fontSize: 26,
+  header: {
+    padding: 20,
+    paddingTop: 50,
+  },
+  headerTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#333',
   },
-  section: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 15,
+  headerSubtitle: {
+    fontSize: 16,
+    marginTop: 4,
+  },
+  listContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 150, // Space for footer
+  },
+  listHeader: {
+    fontSize: 16,
     marginBottom: 20,
+  },
+  roomCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#555',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    paddingBottom: 10,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-    fontSize: 16,
-    backgroundColor: '#fdfdfd',
-  },
-  listContent: {
-    paddingBottom: 10,
-  },
-  roomItem: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#eee',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  selectedRoomItem: {
-    borderColor: Colors.light.tint,
+  selectedRoomCard: {
     borderWidth: 2,
+  },
+  roomDetails: {
+    flex: 1,
   },
   roomTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   roomDescription: {
     fontSize: 14,
-    marginTop: 5,
+    marginTop: 4,
   },
-  roomInfo: {
+  roomStats: {
+    flexDirection: 'row',
+    marginTop: 10,
+    gap: 15,
+  },
+  roomStatText: {
     fontSize: 12,
-    color: '#888',
-    marginTop: 3,
+    fontWeight: '500',
   },
-  selectedIcon: {
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 15,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 24,
+  },
+  footer: {
     position: 'absolute',
-    right: 10,
-    top: '50%',
-    transform: [{ translateY: -12 }], // Center vertically
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingBottom: 30, // Safe area
+    borderTopWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 20,
+  },
+  summary: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  summaryText: {
+    fontSize: 16,
+  },
+  summaryCount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
   generateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.light.tint,
-    padding: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 10,
-    marginTop: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5,
+    gap: 8,
   },
   generateButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  noDataText: {
     fontSize: 16,
-    color: '#888',
-    textAlign: 'center',
-    paddingVertical: 20,
+    fontWeight: 'bold',
   },
 });

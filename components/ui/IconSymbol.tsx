@@ -43,6 +43,7 @@ const MAPPING = {
   'house': 'house', // Added mapping for house
   'doc.text': 'description', // Added mapping for doc.text
   'chevron.down': 'expand-more', // Added mapping for chevron.down
+  'chevron.up': 'expand-less', // Added mapping for chevron.up
   'xmark': 'close', // Added mapping for xmark
   'plus': 'add', // Added mapping for plus
   'photo': 'photo', // Added mapping for photo
@@ -65,6 +66,10 @@ const MAPPING = {
   'dollarsign': 'attach-money',
   'arrow.triangle.2.circlepath': 'sync', // Added mapping for status update icon
   'xmark.circle.fill': 'cancel', // Added mapping for close icon in modal
+  'arrow.right': 'arrow-right-alt', // Added mapping for arrow.right
+  'folder.badge.questionmark': 'folder-open', // Added mapping for folder.badge.questionmark
+  'checkmark': 'check', // Added mapping for checkmark
+  // Temporary comment to force TypeScript re-evaluation
 } as const;
 
 /**
