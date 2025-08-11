@@ -22,11 +22,7 @@ export function CustomHeader({ title, showBackButton = true, rightContent, showL
   const isDark = colorScheme === 'dark';
 
   const handleBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      router.replace('/(tabs)');
-    }
+    router.back();
   };
 
   const handleLogout = async () => {

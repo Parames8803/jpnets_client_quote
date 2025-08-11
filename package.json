@@ -10,13 +10,20 @@
     "web": "expo start --web",
     "lint": "expo lint"
   },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "listUnknownPackages": false
+      }
+    }
+  },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-picker/picker": "^2.11.1",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/elements": "^2.3.8",
-    "@react-navigation/native": "^7.1.16",
+    "@react-navigation/native": "^7.1.6",
     "@react-navigation/stack": "^7.4.4",
     "@supabase/supabase-js": "^2.53.0",
     "base64-js": "^1.5.1",
@@ -32,7 +39,7 @@
     "expo-linking": "~7.1.7",
     "expo-location": "^18.1.6",
     "expo-router": "~5.1.4",
-    "expo-secure-store": "~14.2.3",
+    "expo-secure-store": "^14.2.3",
     "expo-splash-screen": "~0.30.10",
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",
@@ -43,7 +50,6 @@
     "react-native": "0.79.5",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-get-random-values": "^1.11.0",
-    "react-native-html-to-pdf": "^0.12.0",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
@@ -55,7 +61,6 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.0.10",
-    "@types/react-native": "^0.72.8",
     "@types/uuid": "^10.0.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
