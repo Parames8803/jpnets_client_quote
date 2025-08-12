@@ -1,7 +1,7 @@
 import { ProductDimensionModal } from '@/components/ProductDimensionModal';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Product } from '@/types/db';
+import { Product, ProductType, ROOM_TYPES } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import * as base64js from 'base64-js';
 import * as FileSystem from 'expo-file-system';
@@ -29,88 +29,6 @@ import { v4 as uuidv4 } from 'uuid';
 const SUPABASE_IMAGE_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_IMAGE_BUCKET || 'file-storage';
 const STATUS_OPTIONS = ['Not Active', 'Active', 'In Progress', 'Completed'];
 const UNIT_OPTIONS = ['ft', 'inches', 'cm', 'm'];
-
-interface ProductType {
-  name: string;
-  default_price: number;
-  units?: string[];
-  wages: number;
-  sub_products?: ProductType[];
-}
-
-const ROOM_TYPES: { name: string; products: ProductType[] }[] = [
-    {
-    name: 'Living Room',
-    products: [
-      { name: 'Sofa', default_price: 500, units: ['pcs', 'm'], wages: 50 },
-      { name: 'Coffee Table', default_price: 150, units: ['pcs'], wages: 20 },
-      { name: 'TV Stand', default_price: 200, units: ['pcs'], wages: 25 },
-    ],
-  },
-  {
-    name: 'Kitchen',
-    products: [
-      { name: 'Counter Top Bottom', default_price: 100, units: ['sq.ft', 'm²'], wages: 15,sub_products: [
-          {
-            name: 'Front Door',
-            default_price: 0,
-            wages: 0,
-            sub_products: [
-              { name: 'Single Sheet', default_price: 50, wages: 10 },
-              { name: 'Double Sheet', default_price: 75, wages: 15 },
-            ],
-          },
-          {
-            name: 'Inner Shelve',
-            default_price: 0,
-            wages: 0,
-            sub_products: [
-              { name: 'Single Sheet', default_price: 25, wages: 5 },
-              { name: 'Double Sheet', default_price: 25, wages: 5 },
-            ],
-          },
-     ] },
-      { name: 'Cabinets', default_price: 300, units: ['sq.ft', 'm²'], wages: 40 },
-      { name: 'Sink', default_price: 120, units: ['pcs'], wages: 30 },
-    ],
-  },
-  {
-    name: 'Bedroom',
-    products: [
-      { name: 'Bed Frame', default_price: 400, units: ['pcs'], wages: 60 },
-      {
-        name: 'Wardrobe',
-        default_price: 350,
-        units: ['sq.ft', 'm²', 'pcs'],
-        wages: 70,
-        sub_products: [
-          {
-            name: 'Front Door',
-            default_price: 0,
-            wages: 0,
-            sub_products: [
-              { name: 'Single Sheet', default_price: 50, wages: 10 },
-              { name: 'Double Sheet', default_price: 75, wages: 15 },
-            ],
-          },
-          {
-            name: 'Inner Shelve',
-            default_price: 0,
-            wages: 0,
-            sub_products: [
-              { name: 'Single Sheet', default_price: 25, wages: 5 },
-              { name: 'Double Sheet', default_price: 25, wages: 5 },
-            ],
-          },
-          { name: 'Back Side Sheet', default_price: 25, wages: 5 },
-          { name: 'Aluminium Drawer', default_price: 25, wages: 5 },
-          { name: 'Saint Gobain Mirror', default_price: 25, wages: 5 },
-        ],
-      },
-      { name: 'Dresser', default_price: 250, units: ['pcs'], wages: 35 },
-    ],
-  },
-];
 
 export default function EditRoomScreen() {
   const router = useRouter();

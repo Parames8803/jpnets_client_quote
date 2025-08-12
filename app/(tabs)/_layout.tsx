@@ -40,7 +40,7 @@ export default function TabLayout() {
             <IconSymbol name={focused ? 'person.3.fill' : 'person.3'} color={color} size={24} />
           ),
           headerShown: true,
-          header: () => <CustomHeader title="Your Clients" showLogoutButton={true} />,
+          header: () => <CustomHeader title="Clients" showLogoutButton={true} />,
         }}
       />
       <Tabs.Screen

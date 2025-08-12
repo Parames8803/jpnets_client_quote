@@ -87,6 +87,7 @@ const MAPPING = {
   'sofa.fill': 'chair', // Added mapping for sofa.fill
   'desktopcomputer': 'desktop-windows', // Added mapping for desktopcomputer
   'flag.checkered': 'flag', // Added mapping for flag.checkered
+  'map': 'map', // Added mapping for map
 } as const;
 
 /**

@@ -240,7 +240,7 @@ export default function RoomDetailsScreen() {
       
       {userRole !== 'client' && userRole !== 'worker' && (
         <TouchableOpacity 
-          style={[styles.fab, { backgroundColor: colors.tint }]} 
+          style={[styles.fab]} 
           onPress={() => router.push(`/room/add-product/${room.id}`)}
           activeOpacity={0.8}
         >
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   imageThumbnail: { width: 100, height: 100, borderRadius: 8, borderWidth: 1 },
   emptyState: { alignItems: 'center', paddingVertical: 40, gap: 12 },
   emptyStateText: { fontSize: 14, textAlign: 'center' },
-  fab: { position: 'absolute', bottom: 30, right: 30, width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 8 },
+  fab: { position: 'absolute', bottom: 30, right: 30, width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 8, backgroundColor: "#0ea5e9" },
   modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   modalCloseButton: { position: 'absolute', top: 60, right: 20, padding: 10, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)' },
   fullImage: { width: '100%', height: '80%', resizeMode: 'contain' },
