@@ -1,6 +1,8 @@
 import { ProductDimensionModal } from '@/components/ProductDimensionModal';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Product } from '@/types/db';
+import { supabase } from '@/utils/supabaseClient';
 import * as base64js from 'base64-js';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
@@ -23,8 +25,6 @@ import {
 } from 'react-native';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
-import { Product } from '../types/db';
-import { supabase } from '../utils/supabaseClient';
 
 const SUPABASE_IMAGE_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_IMAGE_BUCKET || 'file-storage';
 const STATUS_OPTIONS = ['Not Active', 'Active', 'In Progress', 'Completed'];
@@ -112,10 +112,10 @@ const ROOM_TYPES: { name: string; products: ProductType[] }[] = [
   },
 ];
 
-export default function CreateRoomScreen() {
+export default function EditRoomScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const { clientId } = useLocalSearchParams();
+  const { id: roomId } = useLocalSearchParams();
   const isDark = colorScheme === 'dark';
 
   const [roomType, setRoomType] = useState('');
@@ -129,9 +129,10 @@ export default function CreateRoomScreen() {
   const [totalSqFt, setTotalSqFt] = useState<number | null>(null);
   
   const [products, setProducts] = useState<Omit<Product, 'id' | 'created_at' | 'room_id'>[]>([]);
-  const [images, setImages] = useState<{ uri: string, name: string, type: string }[]>([]);
+  const [images, setImages] = useState<{ uri: string, name: string, type: string, isNew?: boolean }[]>([]);
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
   
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Set to true initially for loading existing data
   const [progress, setProgress] = useState(0);
 
   // Modal states
@@ -165,14 +166,79 @@ export default function CreateRoomScreen() {
       setTotalSqFt(null);
     }
     
-    const fields = [roomType, description, status, hasDimensions, products.length > 0, images.length > 0];
+    const fields = [roomType, description, status, hasDimensions, products.length > 0, images.length > 0 || existingImageUrls.length > 0];
     const completedFields = fields.filter(f => f).length;
     setProgress(completedFields / fields.length);
-  }, [roomType, description, status, length, width, lengthUnit, widthUnit, products, images]);
+  }, [roomType, description, status, length, width, lengthUnit, widthUnit, products, images, existingImageUrls]);
   
   useEffect(() => {
     ImagePicker.requestMediaLibraryPermissionsAsync();
   }, []);
+
+  // Load existing room data
+  useEffect(() => {
+    const fetchRoomData = async () => {
+      if (!roomId) {
+        Alert.alert('Error', 'Room ID is missing.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data: room, error: roomError } = await supabase
+          .from('rooms')
+          .select('*, measurements(*), products(*)')
+          .eq('id', roomId)
+          .single();
+
+        if (roomError) throw roomError;
+        if (!room) {
+          Alert.alert('Error', 'Room not found.');
+          setLoading(false);
+          return;
+        }
+
+        setRoomType(room.room_type);
+        setDescription(room.description || '');
+        setStatus(room.status);
+        setTotalSqFt(room.total_sq_ft);
+
+        if (room.measurements && room.measurements.length > 0) {
+          const measurement = room.measurements[0];
+          setLength(measurement.length_value?.toString() || '');
+          setLengthUnit(measurement.length_unit_type as 'ft' | 'inches' | 'cm' | 'm');
+          setWidth(measurement.width_value?.toString() || '');
+          setWidthUnit(measurement.width_unit_type as 'ft' | 'inches' | 'cm' | 'm');
+        }
+
+        if (room.products) {
+          setProducts(room.products.map((p: Product) => ({
+            name: p.name,
+            product_category: p.product_category,
+            product_subcategory: p.product_subcategory,
+            quantity: p.quantity,
+            unit_type: p.unit_type,
+            price: p.price,
+            default_price: p.default_price,
+            wages: p.wages,
+            default_wages: p.default_wages,
+            description: p.description,
+          })));
+        }
+
+        if (room.ref_image_urls) {
+          setExistingImageUrls(room.ref_image_urls);
+        }
+
+      } catch (error: any) {
+        Alert.alert('Error loading room data', error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRoomData();
+  }, [roomId]);
 
   const openModal = (type: typeof modalContent) => {
     if (type === 'product' && !roomType.trim()) {
@@ -233,6 +299,7 @@ export default function CreateRoomScreen() {
         uri: asset.uri,
         name: asset.uri.split('/').pop() || `img-${uuidv4()}`,
         type: `image/${asset.uri.split('.').pop() || 'jpeg'}`,
+        isNew: true,
       }));
       setImages(prev => [...prev, ...newImages]);
     }
@@ -243,55 +310,62 @@ export default function CreateRoomScreen() {
       Alert.alert('Validation Error', 'Room type is required');
       return;
     }
-    const client_id_str = Array.isArray(clientId) ? clientId[0] : clientId;
-    if (!client_id_str) {
-      Alert.alert('Error', 'Client ID is missing.');
+    const room_id_str = Array.isArray(roomId) ? roomId[0] : roomId;
+    if (!room_id_str) {
+      Alert.alert('Error', 'Room ID is missing.');
       return;
     }
 
     setLoading(true);
     try {
+      // Update room details
       const { data: roomData, error: roomError } = await supabase
-        .from('rooms').insert({
-          client_id: client_id_str,
+        .from('rooms').update({
           room_type: roomType.trim(),
           description: description.trim(),
           status: status,
           total_sq_ft: totalSqFt,
-        }).select().single();
+        }).eq('id', room_id_str).select().single();
       if (roomError) throw roomError;
 
-      const newRoomId = roomData.id;
+      // Update measurements
+      await supabase.from('measurements').upsert({
+        room_id: room_id_str,
+        length_unit_type: lengthUnit, length_value: parseFloat(length) || 0,
+        width_unit_type: widthUnit, width_value: parseFloat(width) || 0,
+        converted_sq_ft: totalSqFt,
+      }, { onConflict: 'room_id' });
 
-      await Promise.all([
-        supabase.from('measurements').insert({
-          room_id: newRoomId,
-          length_unit_type: lengthUnit, length_value: parseFloat(length) || 0,
-          width_unit_type: widthUnit, width_value: parseFloat(width) || 0,
-          converted_sq_ft: totalSqFt,
-        }),
-        supabase.from('products').insert(products.map(p => ({ ...p, room_id: newRoomId }))),
-        (async () => {
-          const uploadedPaths = (await Promise.all(images.map(async img => {
-            const base64 = await FileSystem.readAsStringAsync(img.uri, { encoding: FileSystem.EncodingType.Base64 });
-            const filePath = `room_images/${newRoomId}/${img.name}`;
-            const { data, error } = await supabase.storage
-              .from(SUPABASE_IMAGE_BUCKET)
-              .upload(filePath, base64js.toByteArray(base64), { contentType: img.type });
-            return error ? null : data?.path;
-          }))).filter(Boolean);
-          if (uploadedPaths.length > 0) {
-            await supabase.from('rooms').update({ ref_image_urls: uploadedPaths }).eq('id', newRoomId);
-          }
-        })()
-      ]);
+      // Handle products: delete existing and insert new ones
+      await supabase.from('products').delete().eq('room_id', room_id_str);
+      if (products.length > 0) {
+        await supabase.from('products').insert(products.map(p => ({ ...p, room_id: room_id_str })));
+      }
 
-      Alert.alert('Success', 'Room created successfully!', [{ text: 'OK', onPress: () => router.push({ pathname: '/client/[id]', params: { id: client_id_str } }) }]);
+      // Handle images: upload new ones and update ref_image_urls
+      const newImagesToUpload = images.filter(img => img.isNew);
+      const uploadedPaths = (await Promise.all(newImagesToUpload.map(async img => {
+        const base64 = await FileSystem.readAsStringAsync(img.uri, { encoding: FileSystem.EncodingType.Base64 });
+        const filePath = `room_images/${room_id_str}/${img.name}`;
+        const { data, error } = await supabase.storage
+          .from(SUPABASE_IMAGE_BUCKET)
+          .upload(filePath, base64js.toByteArray(base64), { contentType: img.type });
+        return error ? null : data?.path;
+      }))).filter(Boolean);
+
+      const allImageUrls = [...existingImageUrls, ...uploadedPaths];
+      await supabase.from('rooms').update({ ref_image_urls: allImageUrls }).eq('id', room_id_str);
+      
+      Alert.alert('Success', 'Room updated successfully!', [{ text: 'OK', onPress: () => router.push({ pathname: '/room/[id]', params: { id: room_id_str } }) }]);
     } catch (error: any) {
       Alert.alert('An unexpected error occurred', error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const removeExistingImage = (urlToRemove: string) => {
+    setExistingImageUrls(prev => prev.filter(url => url !== urlToRemove));
   };
   
   const SelectionModal = () => {
@@ -339,10 +413,10 @@ export default function CreateRoomScreen() {
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setModalVisible(false)}>
               <IconSymbol name="xmark.circle.fill" size={24} color={isDark ? '#fff' : '#000'} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#000' }]}>{title}</Text>
+            <Text style={[styles.modalTitle, themedStyles.text]}>{title}</Text>
             {options.map((option, index) => (
-              <TouchableOpacity key={index} style={styles.modalOption} onPress={() => onSelect(option)}>
-                <Text style={styles.modalOptionText}>{option.name}</Text>
+              <TouchableOpacity key={index} style={[styles.modalOption, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} onPress={() => onSelect(option)}>
+                <Text style={[styles.modalOptionText, themedStyles.text]}>{option.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -362,13 +436,23 @@ export default function CreateRoomScreen() {
       color: isDark ? '#f9fafb' : '#111827',
     },
     primary: { color: isDark ? '#38bdf8' : '#0ea5e9' },
+    border: { borderColor: isDark ? '#4b5563' : '#e5e7eb' },
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, themedStyles.background, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={themedStyles.primary.color} />
+        <Text style={[themedStyles.text, { marginTop: 10 }]}>Loading room data...</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={[styles.container, themedStyles.background]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, themedStyles.text]}>Create New Room</Text>
+        <Text style={[styles.headerTitle, themedStyles.text]}>Edit Room</Text>
         <View style={styles.progressBarContainer}>
           <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
         </View>
@@ -445,8 +529,16 @@ export default function CreateRoomScreen() {
         <View style={[styles.card, themedStyles.card]}>
             <Text style={[styles.cardTitle, themedStyles.text]}>Reference Images</Text>
             <View style={styles.imageGrid}>
+                {existingImageUrls.map((url, i) => (
+                    <View key={`existing-${i}`} style={styles.imageContainer}>
+                        <Image source={{uri: supabase.storage.from(SUPABASE_IMAGE_BUCKET).getPublicUrl(url).data.publicUrl}} style={styles.imagePreview} />
+                        <TouchableOpacity style={styles.removeImageButton} onPress={() => removeExistingImage(url)}>
+                            <IconSymbol name="xmark.circle.fill" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+                ))}
                 {images.map((img, i) => (
-                    <View key={i} style={styles.imageContainer}>
+                    <View key={`new-${i}`} style={styles.imageContainer}>
                         <Image source={{uri: img.uri}} style={styles.imagePreview} />
                         <TouchableOpacity style={styles.removeImageButton} onPress={() => setImages(prev => prev.filter((_, idx) => idx !== i))}>
                             <IconSymbol name="xmark.circle.fill" size={20} color="#fff" />
@@ -460,7 +552,7 @@ export default function CreateRoomScreen() {
         </View>
 
         <TouchableOpacity style={[styles.saveButton]} onPress={handleSaveRoom} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Create Room</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Changes</Text>}
         </TouchableOpacity>
         <TouchableOpacity style={[styles.cancelButton]} onPress={() => router.back()}>
           <Text style={[styles.cancelButtonText, themedStyles.subtext]}>Cancel</Text>
@@ -490,7 +582,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
   cardTitle: { fontSize: 20, fontWeight: '600', marginBottom: 15 },
   selector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 10, padding: 15, marginBottom: 10 },
-  input: { borderRadius: 10, padding: 15, marginBottom: 10, borderWidth: 1, color: 'white' },
+  input: { borderRadius: 10, padding: 15, marginBottom: 10, borderWidth: 1 },
   dimensionRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   unitButton: { position: 'absolute', right: 15, top: 15 },
   totalSqFt: { alignSelf: 'flex-end', fontSize: 16, fontWeight: '500' },

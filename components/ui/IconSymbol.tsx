@@ -69,7 +69,10 @@ const MAPPING = {
   'arrow.right': 'arrow-right-alt', // Added mapping for arrow.right
   'folder.badge.questionmark': 'folder-open', // Added mapping for folder.badge.questionmark
   'checkmark': 'check', // Added mapping for checkmark
-  // Temporary comment to force TypeScript re-evaluation
+  'ruler.fill': 'straighten', // Added mapping for ruler.fill
+  'ruler': 'straighten', // Added mapping for ruler
+  'photo.on.rectangle': 'photo-library', // Added mapping for photo.on.rectangle
+  'exclamationmark.triangle.fill': 'warning', // Added mapping for exclamationmark.triangle.fill
 } as const;
 
 /**
