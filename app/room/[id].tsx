@@ -1,6 +1,9 @@
 import { IconSymbol, IconSymbolName } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
+import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Measurement, Product, Room } from '@/types/db';
+import { supabase } from '@/utils/supabaseClient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -15,8 +18,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { Measurement, Product, Room } from '@/types/db';
-import { supabase } from '@/utils/supabaseClient';
 
 // --- Custom Hook for Data Fetching and Logic ---
 
@@ -168,6 +169,7 @@ export default function RoomDetailsScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   
   const { data, loading, error, refetch } = useRoomDetails(id);
+  const { userRole } = useAuth(); // Get user role
   const [activeTab, setActiveTab] = useState<Tab>('details');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -219,9 +221,11 @@ export default function RoomDetailsScreen() {
           <Text style={[styles.headerTitle, { color: colors.text }]}>{room.room_type}</Text>
           <StatusBadge status={room.status} colors={colors} />
         </View>
-        <TouchableOpacity onPress={() => router.push(`/room/edit/${room.id}`)} style={styles.headerButton}>
-          <IconSymbol name="pencil" size={22} color={colors.tint} />
-        </TouchableOpacity>
+        {userRole !== 'client' && userRole !== 'worker' && (
+          <TouchableOpacity onPress={() => router.push(`/room/edit/${room.id}`)} style={styles.headerButton}>
+            <IconSymbol name="pencil" size={22} color={colors.tint} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
@@ -234,13 +238,15 @@ export default function RoomDetailsScreen() {
         {renderTabContent()}
       </RefreshControl>
       
-      <TouchableOpacity 
-        style={[styles.fab, { backgroundColor: colors.tint }]} 
-        onPress={() => router.push(`/room/add-product/${room.id}`)}
-        activeOpacity={0.8}
-      >
-        <IconSymbol name="plus" size={24} color="#FFF" />
-      </TouchableOpacity>
+      {userRole !== 'client' && userRole !== 'worker' && (
+        <TouchableOpacity 
+          style={[styles.fab, { backgroundColor: colors.tint }]} 
+          onPress={() => router.push(`/room/add-product/${room.id}`)}
+          activeOpacity={0.8}
+        >
+          <IconSymbol name="plus" size={24} color="#FFF" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

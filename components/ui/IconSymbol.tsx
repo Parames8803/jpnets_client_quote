@@ -73,6 +73,20 @@ const MAPPING = {
   'ruler': 'straighten', // Added mapping for ruler
   'photo.on.rectangle': 'photo-library', // Added mapping for photo.on.rectangle
   'exclamationmark.triangle.fill': 'warning', // Added mapping for exclamationmark.triangle.fill
+  'ellipsis.horizontal': 'more-horiz', // Added mapping for ellipsis.horizontal
+  'person.badge.plus': 'person-add', // Added mapping for person.badge.plus
+  'lock': 'lock', // Added mapping for lock
+  'bell': 'notifications', // Added mapping for bell
+  'checkmark.circle': 'check-circle-outline', // Added mapping for checkmark.circle
+  'person.circle': 'account-circle', // Added mapping for person.circle
+  'person.2': 'people-alt', // Added mapping for person.2
+  'arrow.right.circle': 'arrow-circle-right', // Added mapping for arrow.right.circle
+  'fork.knife': 'restaurant', // Added mapping for fork.knife
+  'bed.double.fill': 'bed', // Added mapping for bed.double.fill
+  'drop.fill': 'water-drop', // Added mapping for drop.fill
+  'sofa.fill': 'chair', // Added mapping for sofa.fill
+  'desktopcomputer': 'desktop-windows', // Added mapping for desktopcomputer
+  'flag.checkered': 'flag', // Added mapping for flag.checkered
 } as const;
 
 /**

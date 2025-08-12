@@ -1,10 +1,20 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Dimensions, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  RefreshControl,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { supabase } from '../../utils/supabaseClient';
 
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 import { Client, Room } from '../../types/db';
@@ -20,6 +30,7 @@ export default function HomeScreen() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [clientProfile, setClientProfile] = useState<Client | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -31,7 +42,8 @@ export default function HomeScreen() {
 
   const fetchRooms = async (currentUserId: string) => {
     try {
-      // First, fetch the client data for the current user
+      setLoading(true);
+      
       const { data: clientDataArray, error: clientError } = await supabase
         .from('clients')
         .select('*')
@@ -56,9 +68,8 @@ export default function HomeScreen() {
       }
 
       const clientData = clientDataArray[0];
-      setClientProfile(clientData); // Set the client profile state
+      setClientProfile(clientData);
 
-      // Now fetch rooms using the client's ID
       const { data, error } = await supabase
         .from('rooms')
         .select('*')
@@ -72,6 +83,8 @@ export default function HomeScreen() {
       }
     } catch (error: any) {
       Alert.alert('Error', 'An unexpected error occurred while fetching rooms: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -114,167 +127,198 @@ export default function HomeScreen() {
 
   if (userEmail === undefined || userId === null) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: isDark ? '#000' : '#FFF' }]}>
+        <ActivityIndicator size="large" color={isDark ? '#FFF' : '#000'} />
+        <Text style={[styles.loadingText, { color: isDark ? '#FFF' : '#000' }]}>
+          Loading...
+        </Text>
       </View>
     );
   }
 
-  const getStatusBadgeStyle = (status: string) => {
+  const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Active':
-        return { backgroundColor: '#10B981', color: '#FFFFFF' };
-      case 'Completed':
-        return { backgroundColor: '#6366F1', color: '#FFFFFF' };
+      case 'Active': return isDark ? '#00FF88' : '#00CC6A';
+      case 'Completed': return isDark ? '#88AAFF' : '#5577FF';
       case 'Not Active':
-      default:
-        return { backgroundColor: '#F59E0B', color: '#FFFFFF' };
+      default: return isDark ? '#FFAA44' : '#FF8800';
     }
   };
 
+  const renderHeader = () => (
+    <View style={[styles.headerContainer, { backgroundColor: isDark ? '#000' : '#FFF' }]}>
+      {/* Main Header */}
+      <View style={styles.mainHeader}>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.greeting, { color: isDark ? '#CCC' : '#666' }]}>
+            {getTimeBasedGreeting()}
+          </Text>
+          <Text style={[styles.userName, { color: isDark ? '#FFF' : '#000' }]}>
+            {clientProfile?.name || userEmail?.split('@')[0] || 'User'}
+          </Text>
+        </View>
+        
+        <TouchableOpacity style={[styles.avatarButton, { backgroundColor: isDark ? '#333' : '#F5F5F5' }]}>
+          <Text style={[styles.avatarText, { color: isDark ? '#FFF' : '#000' }]}>
+            {(clientProfile?.name || userEmail || 'U').charAt(0).toUpperCase()}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Stats Summary */}
+      <View style={[styles.statsContainer, { backgroundColor: isDark ? '#111' : '#F8F8F8' }]}>
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: isDark ? '#FFF' : '#000' }]}>
+            {rooms.length}
+          </Text>
+          <Text style={[styles.statLabel, { color: isDark ? '#CCC' : '#666' }]}>
+            Total
+          </Text>
+        </View>
+        
+        <View style={styles.statDivider} />
+        
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: isDark ? '#FFF' : '#000' }]}>
+            {rooms.filter(r => r.status === 'Active').length}
+          </Text>
+          <Text style={[styles.statLabel, { color: isDark ? '#CCC' : '#666' }]}>
+            Active
+          </Text>
+        </View>
+      </View>
+
+      {/* Client Info - Compact */}
+      {clientProfile && (
+        <View style={[styles.clientCard, { backgroundColor: isDark ? '#111' : '#F8F8F8' }]}>
+          <View style={styles.clientHeader}>
+            <IconSymbol name="person" size={16} color={isDark ? '#CCC' : '#666'} />
+            <Text style={[styles.clientTitle, { color: isDark ? '#FFF' : '#000' }]}>
+              Contact Information
+            </Text>
+          </View>
+          
+          <View style={styles.clientDetails}>
+            {clientProfile.contact_number && (
+              <View style={styles.clientDetailRow}>
+                <IconSymbol name="phone" size={14} color={isDark ? '#888' : '#999'} />
+                <Text style={[styles.clientDetailText, { color: isDark ? '#CCC' : '#666' }]}>
+                  {clientProfile.contact_number}
+                </Text>
+              </View>
+            )}
+            
+            {clientProfile.email && (
+              <View style={styles.clientDetailRow}>
+                <IconSymbol name="envelope" size={14} color={isDark ? '#888' : '#999'} />
+                <Text style={[styles.clientDetailText, { color: isDark ? '#CCC' : '#666' }]}>
+                  {clientProfile.email}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Section Title */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: isDark ? '#FFF' : '#000' }]}>
+          Your Rooms
+        </Text>
+        <Text style={[styles.roomCount, { color: isDark ? '#CCC' : '#666' }]}>
+          {rooms.length} room{rooms.length !== 1 ? 's' : ''}
+        </Text>
+      </View>
+    </View>
+  );
+
   const renderRoomItem = ({ item }: { item: Room }) => {
-    const statusStyle = getStatusBadgeStyle(item.status || 'Not Active');
+    const statusColor = getStatusColor(item.status || 'Not Active');
+    
     return (
       <TouchableOpacity
         style={[
-          styles.roomCard,
-          { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
-          { borderColor: isDark ? Colors.dark.border : Colors.light.border },
+          styles.roomItem,
+          { 
+            backgroundColor: isDark ? '#111' : '#FFF',
+            borderColor: isDark ? '#222' : '#EEE'
+          }
         ]}
         onPress={() => router.push(`/room/${item.id}` as any)}
+        activeOpacity={0.7}
       >
-        <View style={styles.roomDetails}>
+        <View style={styles.roomContent}>
           <View style={styles.roomHeader}>
-            <Text style={[styles.roomType, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            <Text style={[styles.roomTitle, { color: isDark ? '#FFF' : '#000' }]} numberOfLines={1}>
               {item.room_type || 'Unnamed Room'}
             </Text>
-            <View style={[styles.statusBadge, { backgroundColor: statusStyle.backgroundColor }]}>
-              <Text style={[styles.statusText, { color: statusStyle.color }]}>
-                {item.status || 'Not Active'}
-              </Text>
-            </View>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
           </View>
-          <Text style={[styles.roomDescription, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+          
+          <Text style={[styles.roomDescription, { color: isDark ? '#CCC' : '#666' }]} numberOfLines={2}>
             {item.description || 'No description available'}
           </Text>
-          <Text style={[styles.roomSqFt, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-            {item.total_sq_ft ? `${item.total_sq_ft} sq ft` : 'No measurements'}
-          </Text>
+          
+          <View style={styles.roomFooter}>
+            <Text style={[styles.roomSize, { color: isDark ? '#888' : '#999' }]}>
+              {item.total_sq_ft ? `${item.total_sq_ft} sq ft` : 'No size data'}
+            </Text>
+            <Text style={[styles.roomStatus, { color: statusColor }]}>
+              {item.status || 'Not Active'}
+            </Text>
+          </View>
         </View>
-        <IconSymbol size={20} name="chevron.right" color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
+        
+        <IconSymbol name="chevron.right" size={16} color={isDark ? '#444' : '#CCC'} />
       </TouchableOpacity>
     );
   };
 
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <View style={[styles.emptyIcon, { backgroundColor: isDark ? '#222' : '#F5F5F5' }]}>
+        <IconSymbol name="house" size={32} color={isDark ? '#666' : '#CCC'} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: isDark ? '#FFF' : '#000' }]}>
+        No rooms yet
+      </Text>
+      <Text style={[styles.emptyMessage, { color: isDark ? '#CCC' : '#666' }]}>
+        Your rooms will appear here once they are created
+      </Text>
+    </View>
+  );
+
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? Colors.dark.background : Colors.light.background} />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+    <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#FFF' }]}>
+      <StatusBar 
+        barStyle={isDark ? 'light-content' : 'dark-content'} 
+        backgroundColor={isDark ? '#000' : '#FFF'}
+      />
+      
+      <FlatList
+        data={rooms}
+        renderItem={renderRoomItem}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={rooms.length === 0 && !loading ? renderEmptyState : null}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={isDark ? Colors.dark.text : Colors.light.text}
+            tintColor={isDark ? '#FFF' : '#000'}
+            colors={[isDark ? '#FFF' : '#000']}
           />
         }
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.greeting, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>Good morning</Text>
-            <Text style={[styles.userName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              {userEmail?.split('@')[0] || 'User'}
-            </Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={[styles.profileButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}>
-              <IconSymbol size={24} name="person.circle.fill" color={isDark ? Colors.dark.primary : Colors.light.primary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        {/* Client Profile Information */}
-        {clientProfile && (
-          <View style={[
-            styles.clientProfileCard,
-            { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
-            { borderColor: isDark ? Colors.dark.border : Colors.light.border },
-          ]}>
-            <View style={styles.profileHeader}>
-              <View style={[
-                styles.avatarPlaceholder,
-                { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }
-              ]}>
-                <Text style={styles.avatarText}>
-                  {clientProfile.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.profileInfo}>
-                <Text style={[styles.profileName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                  {clientProfile.name}
-                </Text>
-                <Text style={[styles.profileId, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
-                  ID: {clientProfile.id.substring(0, 8).toUpperCase()}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.contactDetails}>
-              {clientProfile.contact_number && (
-                <View style={styles.contactItem}>
-                  <IconSymbol size={18} name="phone.fill" color={isDark ? Colors.dark.secondaryText : Colors.light.secondaryText} />
-                  <Text style={[styles.contactText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                    {clientProfile.contact_number}
-                  </Text>
-                </View>
-              )}
-              
-              {clientProfile.email && (
-                <View style={styles.contactItem}>
-                  <IconSymbol size={18} name="envelope.fill" color={isDark ? Colors.dark.secondaryText : Colors.light.secondaryText} />
-                  <Text style={[styles.contactText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                    {clientProfile.email}
-                  </Text>
-                </View>
-              )}
-              
-              {clientProfile.address && (
-                <View style={styles.contactItem}>
-                  <IconSymbol size={18} name="location.fill" color={isDark ? Colors.dark.secondaryText : Colors.light.secondaryText} />
-                  <Text style={[styles.contactText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                    {clientProfile.address}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Rooms List */}
-        <View style={styles.roomsSection}>
-          <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Your Rooms</Text>
-          {rooms.length > 0 ? (
-            rooms.map((room) => (
-              <View key={room.id}>
-                {renderRoomItem({ item: room })}
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyIcon, { borderColor: isDark ? Colors.dark.border : Colors.light.border }]}>
-                <IconSymbol size={48} name="house" color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>No rooms yet</Text>
-              <Text style={[styles.emptyMessage, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-                Your rooms will appear here once they are created
-              </Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
+      />
     </View>
   );
 }
@@ -282,12 +326,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 32,
   },
   loadingContainer: {
     flex: 1,
@@ -297,183 +335,185 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     fontWeight: '500',
+    marginTop: 12,
   },
-  header: {
+  listContent: {
+    flexGrow: 1,
+  },
+  headerContainer: {
+    paddingTop: StatusBar.currentHeight || 44,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  mainHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  greeting: {
-    fontSize: 16,
-    fontWeight: '400',
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginTop: 4,
-    letterSpacing: -0.5,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  profileButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  clientProfileCard: {
-    marginHorizontal: 24,
-    marginBottom: 32,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  profileHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
   },
-  avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  profileInfo: {
+  headerLeft: {
     flex: 1,
   },
-  profileName: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  profileId: {
+  greeting: {
     fontSize: 14,
     fontWeight: '500',
-    letterSpacing: 0.5,
+    marginBottom: 4,
   },
-  contactDetails: {
-    gap: 12,
+  userName: {
+    fontSize: 24,
+    fontWeight: '700',
   },
-  contactItem: {
+  avatarButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  statsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  contactText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  roomsSection: {
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     marginBottom: 16,
   },
-  roomCard: {
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#333',
+    marginHorizontal: 16,
+  },
+  clientCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  clientHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  clientTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  clientDetails: {
+    gap: 8,
+  },
+  clientDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  clientDetailText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    marginBottom: 16,
   },
-  roomDetails: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  roomCount: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  roomItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  roomContent: {
     flex: 1,
   },
   roomHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
-  roomType: {
+  roomTitle: {
     fontSize: 16,
     fontWeight: '600',
     flex: 1,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     marginLeft: 8,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   roomDescription: {
     fontSize: 14,
     fontWeight: '400',
-    marginBottom: 4,
+    marginBottom: 8,
+    lineHeight: 18,
   },
-  roomSqFt: {
+  roomFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  roomSize: {
     fontSize: 12,
-    fontWeight: '400',
+    fontWeight: '500',
+  },
+  roomStatus: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 50,
+    paddingVertical: 60,
+    paddingHorizontal: 40,
   },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 1,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyMessage: {
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '400',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 20,
   },
 });
