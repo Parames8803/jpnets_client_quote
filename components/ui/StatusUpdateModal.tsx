@@ -1,61 +1,58 @@
-import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { QuotationStatus, RoomStatus } from '@/types/db';
+import React from 'react';
+import { Dimensions, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface StatusUpdateModalProps {
-  isVisible: boolean;
+  visible: boolean;
   onClose: () => void;
-  onSelectStatus: (status: string) => void;
+  onUpdate: (status: QuotationStatus | RoomStatus) => Promise<void>;
   currentStatus: string | null;
+  statusOptions: (QuotationStatus | RoomStatus)[];
+  colors: any; // Themed styles colors
 }
 
 const { width } = Dimensions.get('window');
 
 export const StatusUpdateModal: React.FC<StatusUpdateModalProps> = ({
-  isVisible,
+  visible,
   onClose,
-  onSelectStatus,
+  onUpdate,
   currentStatus,
+  statusOptions,
+  colors,
 }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  const statuses = ['Assigned', 'In Progress', 'Completed', 'Cancelled'];
-
   return (
     <Modal
       animationType="fade"
       transparent={true}
-      visible={isVisible}
+      visible={visible}
       onRequestClose={onClose}
     >
       <View style={styles.centeredView}>
-        <View style={[styles.modalView, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
+        <View style={[styles.modalView, { backgroundColor: colors.cardBackground }]}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <IconSymbol name="xmark.circle.fill" size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
+            <IconSymbol name="xmark.circle.fill" size={24} color={colors.text} />
           </TouchableOpacity>
-          <ThemedText style={styles.modalTitle}>Update Quotation Status</ThemedText>
+          <ThemedText style={[styles.modalTitle, { color: colors.text }]}>Update Status</ThemedText>
           {currentStatus && (
-            <ThemedText style={styles.currentStatusText}>Current Status: {currentStatus}</ThemedText>
+            <ThemedText style={[styles.currentStatusText, { color: colors.subtext }]}>Current Status: {currentStatus}</ThemedText>
           )}
           <View style={styles.statusOptionsContainer}>
-            {statuses.map((status) => (
+            {statusOptions.map((status) => (
               <TouchableOpacity
                 key={status}
                 style={[
                   styles.statusOptionButton,
-                  { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground },
-                  currentStatus === status && styles.selectedStatusOptionButton,
+                  currentStatus === status && { borderColor: colors.tint, borderWidth: 2 },
                 ]}
-                onPress={() => onSelectStatus(status)}
+                onPress={() => onUpdate(status as QuotationStatus | RoomStatus)}
               >
                 <Text style={[
                   styles.statusOptionText,
-                  { color: isDark ? Colors.dark.text : Colors.light.text },
-                  currentStatus === status && styles.selectedStatusOptionText,
+                  { color: colors.text },
+                  currentStatus === status && { color: colors.tint, fontWeight: 'bold' },
                 ]}>
                   {status}
                 </Text>
@@ -115,17 +112,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
     alignItems: 'center',
-  },
-  selectedStatusOptionButton: {
-    borderWidth: 2,
-    borderColor: Colors.light.tint, // Or a specific color for selected
+    backgroundColor: "#3182CE"
   },
   statusOptionText: {
     fontSize: 16,
     fontWeight: '500',
-  },
-  selectedStatusOptionText: {
-    fontWeight: 'bold',
-    color: Colors.light.tint, // Or a specific color for selected
   },
 });

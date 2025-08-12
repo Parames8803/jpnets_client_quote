@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Client, Product, Room } from '../../types/db';
+import { Client, Product, Room, ROOM_STATUS_TYPES, QUOTATION_STATUS_TYPES } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
 
 type EditableProduct = Product & { originalId: string };
@@ -234,7 +234,7 @@ export default function QuotationPreviewScreen() {
     try {
       const { data: quotationData, error: quotationError } = await supabase
         .from('quotations')
-        .insert({ client_id: clientId, total_price: grandTotal, status: 'Not Active' })
+        .insert({ client_id: clientId, total_price: grandTotal, status: QUOTATION_STATUS_TYPES.PENDING })
         .select().single();
       if (quotationError) throw quotationError;
 
@@ -244,7 +244,7 @@ export default function QuotationPreviewScreen() {
       }));
 
       await supabase.from('quotation_rooms').insert(quotationRooms);
-      await supabase.from('rooms').update({ status: 'In Quotation' }).in('id', selectedRoomIds);
+      await supabase.from('rooms').update({ status: ROOM_STATUS_TYPES.IN_QUOTATION }).in('id', selectedRoomIds);
 
       Alert.alert('Success', 'Quotation submitted!', [
         { text: 'OK', onPress: () => router.replace({ pathname: '/quotation/[id]', params: { id: newQuotationId } }) }

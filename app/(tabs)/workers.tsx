@@ -58,7 +58,7 @@ export default function WorkersScreen() {
       .from('quotations')
       .select('*, clients(name)')
       .is('assigned_worker_id', null)
-      .in('status', ['Active', 'Not Active']);
+      .in('status', ['Closed']);
 
     if (error) {
       Alert.alert('Error fetching quotations', error.message);
@@ -163,7 +163,7 @@ export default function WorkersScreen() {
     setLoading(true);
     const { error } = await supabase
       .from('quotations')
-      .update({ assigned_worker_id: selectedWorkerId, status: 'Assigned' })
+      .update({ assigned_worker_id: selectedWorkerId })
       .eq('id', selectedQuotation.id);
 
     if (error) {

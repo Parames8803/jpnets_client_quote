@@ -16,8 +16,9 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { Client, Product, Quotation, Room } from '../../types/db';
+import { Client, Product, Quotation, Room, QUOTATION_STATUS_TYPES, ROOM_STATUS_TYPES, QuotationStatus, RoomStatus } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
+import { StatusUpdateModal } from '@/components/ui/StatusUpdateModal';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +34,7 @@ function useQuotationDetails(quotationId: string | string[] | undefined) {
   const [data, setData] = useState<QuotationDetailsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [quotationStatus, setQuotationStatus] = useState<QuotationStatus | null>(null);
   const id_str = Array.isArray(quotationId) ? quotationId[0] : quotationId;
 
   const fetchData = useCallback(async () => {
@@ -66,6 +68,7 @@ function useQuotationDetails(quotationId: string | string[] | undefined) {
       
       const { clients, quotation_rooms, ...quotation } = rawData;
       setData({ quotation: quotation as Quotation, client, rooms, allProducts });
+      setQuotationStatus(quotation.status as QuotationStatus);
     } catch (e: any) {
       console.error('Failed to fetch quotation details:', e.message);
       setError(e);
@@ -82,7 +85,7 @@ function useQuotationDetails(quotationId: string | string[] | undefined) {
     await supabase.from('quotation_rooms').delete().eq('quotation_id', id_str);
     await supabase.from('quotations').delete().eq('id', id_str);
     if (roomIdsToUpdate.length > 0) {
-        const { error: updateRoomsError } = await supabase.from('rooms').update({ status: 'Not Active' }).in('id', roomIdsToUpdate);
+        const { error: updateRoomsError } = await supabase.from('rooms').update({ status: ROOM_STATUS_TYPES.ACTIVE }).in('id', roomIdsToUpdate);
         if (updateRoomsError) {
             console.error('Warning: Failed to revert room statuses.', updateRoomsError.message);
             Alert.alert('Warning', 'Quotation deleted, but failed to revert room statuses.');
@@ -90,9 +93,46 @@ function useQuotationDetails(quotationId: string | string[] | undefined) {
     }
   }, [id_str]);
 
+  const updateQuotationStatus = useCallback(async (newStatus: QuotationStatus | RoomStatus) => {
+    if (!id_str) throw new Error('Cannot update: Quotation ID is missing.');
+    setLoading(true);
+    try {
+      // Ensure newStatus is a QuotationStatus before proceeding with quotation update
+      if (!Object.values(QUOTATION_STATUS_TYPES).includes(newStatus as QuotationStatus)) {
+        throw new Error('Invalid status for quotation.');
+      }
+
+      const { error: updateError } = await supabase
+        .from('quotations')
+        .update({ status: newStatus as QuotationStatus }) // Cast here for supabase
+        .eq('id', id_str);
+      if (updateError) throw updateError;
+
+      setQuotationStatus(newStatus as QuotationStatus);
+
+      if (newStatus === QUOTATION_STATUS_TYPES.CLOSED) {
+        const { data: quotationRooms, error: fetchQrError } = await supabase.from('quotation_rooms').select('room_id').eq('quotation_id', id_str);
+        if (fetchQrError) throw fetchQrError;
+        const roomIdsToUpdate = quotationRooms?.map(qr => qr.room_id) || [];
+        if (roomIdsToUpdate.length > 0) {
+          const { error: updateRoomsError } = await supabase.from('rooms').update({ status: ROOM_STATUS_TYPES.READY_TO_START }).in('id', roomIdsToUpdate);
+          if (updateRoomsError) {
+            console.error('Warning: Failed to update room statuses to "Ready to Start".', updateRoomsError.message);
+            Alert.alert('Warning', 'Quotation status updated, but failed to update associated room statuses.');
+          }
+        }
+      }
+      Alert.alert('Success', 'Quotation status updated successfully!');
+    } catch (e: any) {
+      Alert.alert('Error updating status', e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [id_str]);
+
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  return { data, loading, error, deleteQuotation, refetch: fetchData };
+  return { data, loading, error, deleteQuotation, updateQuotationStatus, quotationStatus, refetch: fetchData };
 }
 
 // --- Tab Content Components ---
@@ -153,9 +193,10 @@ export default function QuotationDetailsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const { data, loading, error, deleteQuotation } = useQuotationDetails(quotationId);
+  const { data, loading, error, deleteQuotation, updateQuotationStatus, quotationStatus } = useQuotationDetails(quotationId);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
 
   const handleDelete = () => Alert.alert('Delete Quotation', 'Are you sure?', [
     { text: 'Cancel', style: 'cancel' },
@@ -217,12 +258,18 @@ export default function QuotationDetailsScreen() {
       
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Quotation</Text>
-        <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
-          <IconSymbol size={22} name="trash.fill" color={colors.error} />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity onPress={() => setIsStatusModalVisible(true)} style={styles.headerButton}>
+            <IconSymbol size={22} name="pencil.circle.fill" color={colors.tint} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
+            <IconSymbol size={22} name="trash.fill" color={colors.error} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={[styles.summaryHeader, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
+        <StatItem label="Status" value={quotationStatus || 'N/A'} colors={colors} />
         <StatItem label="Total Value" value={`₹${data.quotation.total_price?.toFixed(2)}`} colors={colors} />
         <StatItem label="Products" value={data.allProducts.length.toString()} colors={colors} />
         <StatItem label="Rooms" value={data.rooms.length.toString()} colors={colors} />
@@ -239,6 +286,15 @@ export default function QuotationDetailsScreen() {
       <TouchableOpacity style={[styles.fab, { backgroundColor: '#3B82F6' }]} onPress={generatePdf} activeOpacity={0.8}>
         <IconSymbol name="doc.richtext" size={24} color="#FFF" />
       </TouchableOpacity>
+
+      <StatusUpdateModal
+        visible={isStatusModalVisible}
+        onClose={() => setIsStatusModalVisible(false)}
+        currentStatus={quotationStatus || ''}
+        onUpdate={updateQuotationStatus as (status: QuotationStatus | RoomStatus) => Promise<void>}
+        statusOptions={Object.values(QUOTATION_STATUS_TYPES)}
+        colors={colors}
+      />
     </View>
   );
 }
@@ -682,6 +738,7 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 16, fontWeight: '500', textAlign: 'center' },
   header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1 },
   headerTitle: { fontSize: 28, fontWeight: 'bold' },
+  headerButtons: { flexDirection: 'row', gap: 10 },
   headerButton: { padding: 5 },
   summaryHeader: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 15, borderBottomWidth: 1 },
   statItem: { alignItems: 'center', gap: 4 },

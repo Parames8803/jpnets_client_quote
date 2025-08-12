@@ -84,6 +84,23 @@ export interface Room {
   total_sq_ft: string | null; // text, nullable
 }
 
+export const ROOM_STATUS_TYPES = {
+  ACTIVE: 'Active',
+  IN_QUOTATION: 'In Quotation',
+  READY_TO_START: 'Ready to Start',
+  IN_PROGRESS: 'In Progress',
+  COMPLETED: 'Completed',
+} as const;
+
+export type RoomStatus = typeof ROOM_STATUS_TYPES[keyof typeof ROOM_STATUS_TYPES];
+
+export const QUOTATION_STATUS_TYPES = {
+  PENDING: 'Pending',
+  CLOSED: 'Closed',
+} as const;
+
+export type QuotationStatus = typeof QUOTATION_STATUS_TYPES[keyof typeof QUOTATION_STATUS_TYPES];
+
 export interface ProductType {
   name: string;
   default_price: number;

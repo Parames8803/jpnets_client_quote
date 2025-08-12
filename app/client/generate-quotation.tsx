@@ -3,7 +3,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Client, Room } from '../../types/db';
+import { Client, Room, ROOM_STATUS_TYPES } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
 
 export default function GenerateQuotationScreen() {
@@ -41,7 +41,7 @@ export default function GenerateQuotationScreen() {
           .from('rooms')
           .select('*')
           .eq('client_id', client_id_str)
-          .eq('status', 'Not Active')
+          .eq('status', ROOM_STATUS_TYPES.ACTIVE)
           .order('created_at', { ascending: false });
 
         if (roomsError) throw roomsError;
@@ -149,7 +149,7 @@ export default function GenerateQuotationScreen() {
           <IconSymbol name="folder.badge.questionmark" size={60} color={themedStyles.subtext.color} style={{ marginBottom: 20 }} />
           <Text style={[styles.emptyTitle, themedStyles.text]}>No Rooms Available</Text>
           <Text style={[styles.emptyText, themedStyles.subtext]}>
-            There are no rooms with "Not Active" status to generate a quotation for.
+            There are no rooms with "Active" status to generate a quotation for.
           </Text>
         </View>
       )}

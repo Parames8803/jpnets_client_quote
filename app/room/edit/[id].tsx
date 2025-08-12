@@ -25,9 +25,9 @@ import {
 } from 'react-native';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+import { ROOM_STATUS_TYPES } from '@/types/db';
 
 const SUPABASE_IMAGE_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_IMAGE_BUCKET || 'file-storage';
-const STATUS_OPTIONS = ['Not Active', 'Active', 'In Progress', 'Completed'];
 const UNIT_OPTIONS = ['ft', 'inches', 'cm', 'm'];
 
 export default function EditRoomScreen() {
@@ -38,7 +38,6 @@ export default function EditRoomScreen() {
 
   const [roomType, setRoomType] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState('Not Active');
   
   const [length, setLength] = useState('');
   const [lengthUnit, setLengthUnit] = useState<'ft' | 'inches' | 'cm' | 'm'>('ft');
@@ -55,7 +54,7 @@ export default function EditRoomScreen() {
 
   // Modal states
   const [isModalVisible, setModalVisible] = useState(false);
-  const [modalContent, setModalContent] = useState<'roomType' | 'status' | 'unit' | 'product' | 'subProduct' | 'productUnit' | null>(null);
+  const [modalContent, setModalContent] = useState<'roomType' | 'unit' | 'product' | 'subProduct' | 'productUnit' | null>(null);
   
   // Product form states
   const [isAddingProduct, setIsAddingProduct] = useState(false);
@@ -84,10 +83,10 @@ export default function EditRoomScreen() {
       setTotalSqFt(null);
     }
     
-    const fields = [roomType, description, status, hasDimensions, products.length > 0, images.length > 0 || existingImageUrls.length > 0];
+    const fields = [roomType, description, hasDimensions, products.length > 0, images.length > 0 || existingImageUrls.length > 0];
     const completedFields = fields.filter(f => f).length;
     setProgress(completedFields / fields.length);
-  }, [roomType, description, status, length, width, lengthUnit, widthUnit, products, images, existingImageUrls]);
+  }, [roomType, description, length, width, lengthUnit, widthUnit, products, images, existingImageUrls]);
   
   useEffect(() => {
     ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -118,7 +117,6 @@ export default function EditRoomScreen() {
 
         setRoomType(room.room_type);
         setDescription(room.description || '');
-        setStatus(room.status);
         setTotalSqFt(room.total_sq_ft);
 
         if (room.measurements && room.measurements.length > 0) {
@@ -241,7 +239,6 @@ export default function EditRoomScreen() {
         .from('rooms').update({
           room_type: roomType.trim(),
           description: description.trim(),
-          status: status,
           total_sq_ft: totalSqFt,
         }).eq('id', room_id_str).select().single();
       if (roomError) throw roomError;
@@ -296,11 +293,6 @@ export default function EditRoomScreen() {
             title = 'Select Room Type';
             options = ROOM_TYPES;
             onSelect = (option) => { setRoomType(option.name); setSelectedProducts([]); setModalVisible(false); };
-            break;
-        case 'status':
-            title = 'Select Status';
-            options = STATUS_OPTIONS.map(name => ({ name }));
-            onSelect = (option) => { setStatus(option.name); setModalVisible(false); };
             break;
         case 'unit':
             title = 'Select Unit';
@@ -384,10 +376,6 @@ export default function EditRoomScreen() {
             <IconSymbol name="chevron.down" size={16} color={themedStyles.subtext.color} />
           </TouchableOpacity>
           <TextInput style={[styles.input, themedStyles.input]} placeholder="Description" placeholderTextColor={themedStyles.subtext.color} value={description} onChangeText={setDescription} />
-          <TouchableOpacity style={[styles.selector, themedStyles.input]} onPress={() => openModal('status')}>
-            <Text style={themedStyles.text}>{status}</Text>
-            <IconSymbol name="chevron.down" size={16} color={themedStyles.subtext.color} />
-          </TouchableOpacity>
         </View>
 
         <View style={[styles.card, themedStyles.card]}>
