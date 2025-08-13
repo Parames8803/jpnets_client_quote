@@ -75,6 +75,7 @@ const MAPPING = {
   'exclamationmark.triangle.fill': 'warning', // Added mapping for exclamationmark.triangle.fill
   'ellipsis.horizontal': 'more-horiz', // Added mapping for ellipsis.horizontal
   'person.badge.plus': 'person-add', // Added mapping for person.badge.plus
+  'person.badge.plus.fill': 'person-add', // Added mapping for person.badge.plus.fill
   'lock': 'lock', // Added mapping for lock
   'bell': 'notifications', // Added mapping for bell
   'checkmark.circle': 'check-circle-outline', // Added mapping for checkmark.circle
