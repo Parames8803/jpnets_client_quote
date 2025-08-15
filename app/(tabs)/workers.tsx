@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { Quotation, Worker } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import React, { useEffect, useState } from 'react';
@@ -21,6 +22,9 @@ import {
 const { width, height } = Dimensions.get('window');
 
 export default function WorkersScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,6 +36,28 @@ export default function WorkersScreen() {
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'workers' | 'quotations'>('workers');
+
+  // Theme styles
+  const themedStyles = {
+    background: { backgroundColor: isDark ? '#111827' : '#F8F9FA' },
+    card: { backgroundColor: isDark ? '#1f2937' : '#ffffff' },
+    text: { color: isDark ? '#f9fafb' : '#111827' },
+    subtext: { color: isDark ? '#9ca3af' : '#6b7280' },
+    border: { borderColor: isDark ? '#374151' : '#e5e7eb' },
+    input: { 
+      backgroundColor: isDark ? '#374151' : '#f8fafc', 
+      borderColor: isDark ? '#4b5563' : '#e2e8f0',
+      color: isDark ? '#f9fafb' : '#111827',
+    },
+    modalOverlay: { backgroundColor: isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.5)' },
+    header: { backgroundColor: isDark ? '#0f172a' : '#1A1A2E' },
+    tabContainer: { backgroundColor: isDark ? '#1f2937' : '#ffffff' },
+    activeTab: { backgroundColor: isDark ? '#374151' : '#F0F8FF' },
+    selectedOption: { 
+      backgroundColor: isDark ? '#065f46' : '#F0FFF4',
+      borderColor: isDark ? '#10b981' : '#4CAF50'
+    },
+  };
 
   useEffect(() => {
     fetchWorkers();
@@ -179,14 +205,14 @@ export default function WorkersScreen() {
   };
 
   const renderWorkerCard = ({ item }: { item: Worker }) => (
-    <View style={styles.card}>
+    <View style={[styles.card, themedStyles.card]}>
       <View style={styles.cardHeader}>
         <View style={styles.avatarContainer}>
           <IconSymbol name="person.circle.fill" size={40} color="#4A90E2" />
         </View>
         <View style={styles.cardHeaderText}>
-          <ThemedText style={styles.cardTitle}>{item.name}</ThemedText>
-          <ThemedText style={styles.cardSubtitle}>{item.email}</ThemedText>
+          <ThemedText style={[styles.cardTitle, themedStyles.text]}>{item.name}</ThemedText>
+          <ThemedText style={[styles.cardSubtitle, themedStyles.subtext]}>{item.email}</ThemedText>
         </View>
         <View style={styles.statusBadge}>
           <ThemedText style={styles.statusText}>Active</ThemedText>
@@ -196,25 +222,25 @@ export default function WorkersScreen() {
   );
 
   const renderQuotationCard = ({ item }: { item: Quotation }) => (
-    <View style={styles.card}>
+    <View style={[styles.card, themedStyles.card]}>
       <View style={styles.cardContent}>
         <View style={styles.quotationHeader}>
           <View style={styles.quotationIconContainer}>
             <IconSymbol name="doc.text" size={32} color="#FF6B6B" />
           </View>
           <View style={styles.quotationDetails}>
-            <ThemedText style={styles.quotationId}>#{item.id.slice(0, 8)}</ThemedText>
-            <ThemedText style={styles.clientName}>{item.clients?.name || 'N/A'}</ThemedText>
+            <ThemedText style={[styles.quotationId, themedStyles.text]}>#{item.id.slice(0, 8)}</ThemedText>
+            <ThemedText style={[styles.clientName, themedStyles.subtext]}>{item.clients?.name || 'N/A'}</ThemedText>
           </View>
         </View>
         
         <View style={styles.quotationInfo}>
           <View style={styles.infoRow}>
-            <ThemedText style={styles.infoLabel}>Amount</ThemedText>
-            <ThemedText style={styles.infoValue}>${item.total_price?.toFixed(2) || '0.00'}</ThemedText>
+            <ThemedText style={[styles.infoLabel, themedStyles.subtext]}>Amount</ThemedText>
+            <ThemedText style={[styles.infoValue, themedStyles.text]}>${item.total_price?.toFixed(2) || '0.00'}</ThemedText>
           </View>
           <View style={styles.infoRow}>
-            <ThemedText style={styles.infoLabel}>Status</ThemedText>
+            <ThemedText style={[styles.infoLabel, themedStyles.subtext]}>Status</ThemedText>
             <View style={[styles.statusBadge, { backgroundColor: item.status === 'Active' ? '#4CAF50' : '#FFA726' }]}>
               <ThemedText style={styles.statusText}>{item.status || 'N/A'}</ThemedText>
             </View>
@@ -236,11 +262,11 @@ export default function WorkersScreen() {
   );
 
   return (
-    <ThemedView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1A1A2E" />
+    <ThemedView style={[styles.container, themedStyles.background]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'light-content'} backgroundColor={themedStyles.header.backgroundColor} />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, themedStyles.header]}>
         <ThemedText style={styles.headerTitle}>Workforce Manager</ThemedText>
         <TouchableOpacity 
           style={styles.createButton}
@@ -251,23 +277,31 @@ export default function WorkersScreen() {
       </View>
 
       {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, themedStyles.tabContainer]}>
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'workers' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'workers' && { ...styles.activeTab, ...themedStyles.activeTab }]}
           onPress={() => setActiveTab('workers')}
         >
-          <IconSymbol name="person.2" size={20} color={activeTab === 'workers' ? '#4A90E2' : '#666'} />
-          <ThemedText style={[styles.tabText, activeTab === 'workers' && styles.activeTabText]}>
+          <IconSymbol name="person.2" size={20} color={activeTab === 'workers' ? '#4A90E2' : themedStyles.subtext.color} />
+          <ThemedText style={[
+            styles.tabText, 
+            { color: themedStyles.subtext.color },
+            activeTab === 'workers' && styles.activeTabText
+          ]}>
             Workers ({workers.length})
           </ThemedText>
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'quotations' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'quotations' && { ...styles.activeTab, ...themedStyles.activeTab }]}
           onPress={() => setActiveTab('quotations')}
         >
-          <IconSymbol name="doc.text" size={20} color={activeTab === 'quotations' ? '#4A90E2' : '#666'} />
-          <ThemedText style={[styles.tabText, activeTab === 'quotations' && styles.activeTabText]}>
+          <IconSymbol name="doc.text" size={20} color={activeTab === 'quotations' ? '#4A90E2' : themedStyles.subtext.color} />
+          <ThemedText style={[
+            styles.tabText,
+            { color: themedStyles.subtext.color },
+            activeTab === 'quotations' && styles.activeTabText
+          ]}>
             Quotations ({quotations.length})
           </ThemedText>
         </TouchableOpacity>
@@ -278,7 +312,7 @@ export default function WorkersScreen() {
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4A90E2" />
-            <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+            <ThemedText style={[styles.loadingText, themedStyles.subtext]}>Loading...</ThemedText>
           </View>
         ) : (
           <View style={{ flex: 1 }}>
@@ -296,9 +330,9 @@ export default function WorkersScreen() {
                     <IconSymbol 
                       name="person.3" 
                       size={64} 
-                      color="#ccc" 
+                      color={themedStyles.subtext.color} 
                     />
-                    <ThemedText style={styles.emptyText}>
+                    <ThemedText style={[styles.emptyText, themedStyles.subtext]}>
                       No workers found
                     </ThemedText>
                   </View>
@@ -319,9 +353,9 @@ export default function WorkersScreen() {
                     <IconSymbol 
                       name="doc.text" 
                       size={64} 
-                      color="#ccc" 
+                      color={themedStyles.subtext.color} 
                     />
-                    <ThemedText style={styles.emptyText}>
+                    <ThemedText style={[styles.emptyText, themedStyles.subtext]}>
                       No unassigned quotations found
                     </ThemedText>
                   </View>
@@ -339,52 +373,52 @@ export default function WorkersScreen() {
         transparent={true}
         onRequestClose={() => setIsCreateModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Create New Worker</ThemedText>
+        <View style={[styles.modalOverlay, themedStyles.modalOverlay]}>
+          <View style={[styles.modalContainer, themedStyles.card]}>
+            <View style={[styles.modalHeader, themedStyles.border]}>
+              <ThemedText style={[styles.modalTitle, themedStyles.text]}>Create New Worker</ThemedText>
               <TouchableOpacity 
                 onPress={() => setIsCreateModalVisible(false)}
                 style={styles.closeButton}
               >
-                <IconSymbol name="xmark.circle.fill" size={24} color="#666" />
+                <IconSymbol name="xmark.circle.fill" size={24} color={themedStyles.subtext.color} />
               </TouchableOpacity>
             </View>
             
             <ScrollView style={styles.modalContent}>
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.inputLabel}>Full Name</ThemedText>
+                <ThemedText style={[styles.inputLabel, themedStyles.text]}>Full Name</ThemedText>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, themedStyles.input]}
                   placeholder="Enter worker's full name"
                   value={name}
                   onChangeText={setName}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={themedStyles.subtext.color}
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.inputLabel}>Email Address</ThemedText>
+                <ThemedText style={[styles.inputLabel, themedStyles.text]}>Email Address</ThemedText>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, themedStyles.input]}
                   placeholder="Enter worker's email"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={themedStyles.subtext.color}
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.inputLabel}>Password</ThemedText>
+                <ThemedText style={[styles.inputLabel, themedStyles.text]}>Password</ThemedText>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, themedStyles.input]}
                   placeholder="Create a password"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
-                  placeholderTextColor="#999"
+                  placeholderTextColor={themedStyles.subtext.color}
                 />
               </View>
 
@@ -414,44 +448,45 @@ export default function WorkersScreen() {
         transparent={true}
         onRequestClose={() => setIsAssignModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Assign Quotation</ThemedText>
+        <View style={[styles.modalOverlay, themedStyles.modalOverlay]}>
+          <View style={[styles.modalContainer, themedStyles.card]}>
+            <View style={[styles.modalHeader, themedStyles.border]}>
+              <ThemedText style={[styles.modalTitle, themedStyles.text]}>Assign Quotation</ThemedText>
               <TouchableOpacity 
                 onPress={() => setIsAssignModalVisible(false)}
                 style={styles.closeButton}
               >
-                <IconSymbol name="xmark.circle.fill" size={24} color="#666" />
+                <IconSymbol name="xmark.circle.fill" size={24} color={themedStyles.subtext.color} />
               </TouchableOpacity>
             </View>
             
             <ScrollView style={styles.modalContent}>
               {selectedQuotation && (
-                <View style={styles.quotationSummary}>
-                  <ThemedText style={styles.summaryTitle}>Quotation Details</ThemedText>
-                  <ThemedText style={styles.summaryText}>ID: #{selectedQuotation.id.slice(0, 8)}</ThemedText>
-                  <ThemedText style={styles.summaryText}>Client: {selectedQuotation.clients?.name || 'N/A'}</ThemedText>
-                  <ThemedText style={styles.summaryText}>Amount: ${selectedQuotation.total_price?.toFixed(2) || '0.00'}</ThemedText>
+                <View style={[styles.quotationSummary, { backgroundColor: isDark ? '#1e40af' : '#F0F8FF' }]}>
+                  <ThemedText style={[styles.summaryTitle, { color: isDark ? '#93c5fd' : '#4A90E2' }]}>Quotation Details</ThemedText>
+                  <ThemedText style={[styles.summaryText, themedStyles.text]}>ID: #{selectedQuotation.id.slice(0, 8)}</ThemedText>
+                  <ThemedText style={[styles.summaryText, themedStyles.text]}>Client: {selectedQuotation.clients?.name || 'N/A'}</ThemedText>
+                  <ThemedText style={[styles.summaryText, themedStyles.text]}>Amount: ${selectedQuotation.total_price?.toFixed(2) || '0.00'}</ThemedText>
                 </View>
               )}
 
-              <ThemedText style={styles.sectionTitle}>Select Worker</ThemedText>
+              <ThemedText style={[styles.sectionTitle, themedStyles.text]}>Select Worker</ThemedText>
               
               {workers.map((worker) => (
                 <TouchableOpacity
                   key={worker.id}
                   style={[
                     styles.workerOption,
-                    selectedWorkerId === worker.id && styles.selectedWorkerOption,
+                    themedStyles.border,
+                    selectedWorkerId === worker.id && themedStyles.selectedOption,
                   ]}
                   onPress={() => setSelectedWorkerId(worker.id)}
                 >
                   <View style={styles.workerOptionContent}>
                     <IconSymbol name="person.circle" size={32} color="#4A90E2" />
                     <View style={styles.workerOptionText}>
-                      <ThemedText style={styles.workerOptionName}>{worker.name}</ThemedText>
-                      <ThemedText style={styles.workerOptionEmail}>{worker.email}</ThemedText>
+                      <ThemedText style={[styles.workerOptionName, themedStyles.text]}>{worker.name}</ThemedText>
+                      <ThemedText style={[styles.workerOptionEmail, themedStyles.subtext]}>{worker.email}</ThemedText>
                     </View>
                     {selectedWorkerId === worker.id && (
                       <IconSymbol name="checkmark.circle.fill" size={24} color="#4CAF50" />
@@ -477,13 +512,13 @@ export default function WorkersScreen() {
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={[styles.modalButton, styles.cancelButton]}
+                  style={[styles.modalButton, styles.cancelButton, { backgroundColor: isDark ? '#374151' : '#F5F5F5' }]}
                   onPress={() => {
                     setIsAssignModalVisible(false);
                     setSelectedWorkerId(null);
                   }}
                 >
-                  <ThemedText style={[styles.modalButtonText, { color: '#666' }]}>Cancel</ThemedText>
+                  <ThemedText style={[styles.modalButtonText, { color: themedStyles.subtext.color }]}>Cancel</ThemedText>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -497,7 +532,6 @@ export default function WorkersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
@@ -506,7 +540,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
-    backgroundColor: '#1A1A2E',
   },
   headerTitle: {
     fontSize: 28,
@@ -518,7 +551,6 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     marginHorizontal: 20,
     marginTop: -10,
     borderRadius: 12,
@@ -538,12 +570,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   activeTab: {
-    backgroundColor: '#F0F8FF',
+    // Background will be applied via themedStyles
   },
   tabText: {
     fontSize: 16,
     marginLeft: 8,
-    color: '#666',
   },
   activeTabText: {
     color: '#4A90E2',
@@ -558,7 +589,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   card: {
-    backgroundColor: 'white',
     borderRadius: 16,
     marginBottom: 16,
     shadowColor: '#000',
@@ -586,7 +616,6 @@ const styles = StyleSheet.create({
   },
   cardSubtitle: {
     fontSize: 14,
-    color: '#666',
   },
   statusBadge: {
     backgroundColor: '#4CAF50',
@@ -620,7 +649,6 @@ const styles = StyleSheet.create({
   },
   clientName: {
     fontSize: 16,
-    color: '#666',
   },
   quotationInfo: {
     marginBottom: 20,
@@ -633,7 +661,6 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
   },
   infoValue: {
     fontSize: 16,
@@ -662,7 +689,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
   },
   emptyContainer: {
     flex: 1,
@@ -672,17 +698,14 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
     marginTop: 16,
     textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: height * 0.9,
@@ -693,7 +716,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
   },
   modalTitle: {
     fontSize: 20,
@@ -712,16 +734,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#333',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E5E5',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    backgroundColor: '#F8F9FA',
   },
   modalButton: {
     flexDirection: 'row',
@@ -740,7 +759,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
   },
   cancelButton: {
-    backgroundColor: '#F5F5F5',
+    // Background will be applied via themedStyles
   },
   modalButtonText: {
     color: 'white',
@@ -749,7 +768,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   quotationSummary: {
-    backgroundColor: '#F0F8FF',
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
@@ -758,29 +776,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
-    color: '#4A90E2',
   },
   summaryText: {
     fontSize: 14,
     marginBottom: 4,
-    color: '#333',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 16,
-    color: '#333',
   },
   workerOption: {
     borderWidth: 1,
-    borderColor: '#E5E5E5',
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
   },
   selectedWorkerOption: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#F0FFF4',
+    // Styles will be applied via themedStyles.selectedOption
   },
   workerOptionContent: {
     flexDirection: 'row',
@@ -798,7 +811,6 @@ const styles = StyleSheet.create({
   },
   workerOptionEmail: {
     fontSize: 14,
-    color: '#666',
   },
   modalButtons: {
     marginTop: 20,

@@ -278,7 +278,7 @@ const ProductCard = ({ product, colors }: { product: Product, colors: any }) => 
       </Text>
       <View style={styles.productMetaRow}>
         <Text style={[styles.productMeta, { color: colors.text }]}>Qty: {product.quantity} {product.unit_type}</Text>
-        <Text style={[styles.productMeta, { color: colors.tint, fontWeight: 'bold' }]}>₹{product.price?.toFixed(2)}</Text>
+        <Text style={[styles.productMeta, { color: colors.tint, fontWeight: 'bold' }]}>₹{product.wages?.toFixed(2)}</Text>
       </View>
     </View>
 );

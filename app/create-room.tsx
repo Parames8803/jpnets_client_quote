@@ -26,14 +26,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { Product, ProductType, ROOM_STATUS_TYPES, ROOM_TYPES } from '../types/db';
 import { supabase } from '../utils/supabaseClient';
 
+
 const SUPABASE_IMAGE_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_IMAGE_BUCKET || 'file-storage';
 const UNIT_OPTIONS = ['ft', 'inches', 'cm', 'm'];
+
 
 export default function CreateRoomScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { clientId } = useLocalSearchParams();
   const isDark = colorScheme === 'dark';
+
 
   const [roomType, setRoomType] = useState('');
   const [description, setDescription] = useState('');
@@ -50,6 +53,7 @@ export default function CreateRoomScreen() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
 
+
   // Modal states
   const [isModalVisible, setModalVisible] = useState(false);
   const [modalContent, setModalContent] = useState<'roomType' | 'unit' | 'product' | 'subProduct' | 'productUnit' | null>(null);
@@ -63,6 +67,7 @@ export default function CreateRoomScreen() {
   const [availableProductUnits, setAvailableProductUnits] = useState<string[]>([]);
   const [currentUnitField, setCurrentUnitField] = useState<'length' | 'width' | null>(null);
   const [isDimensionModalVisible, setDimensionModalVisible] = useState(false);
+
 
 
   const convertToFeet = (value: number, unit: 'ft' | 'inches' | 'cm' | 'm'): number => {
@@ -90,6 +95,7 @@ export default function CreateRoomScreen() {
     ImagePicker.requestMediaLibraryPermissionsAsync();
   }, []);
 
+
   const openModal = (type: typeof modalContent) => {
     if (type === 'product' && !roomType.trim()) {
       Alert.alert('Validation Error', 'Please select a Room Type first.');
@@ -103,6 +109,7 @@ export default function CreateRoomScreen() {
     setModalVisible(true);
   };
 
+
   const resetProductForm = () => {
     setIsAddingProduct(false);
     setSelectedProducts([]);
@@ -111,6 +118,7 @@ export default function CreateRoomScreen() {
     setNewProductDescription('');
     setAvailableProductUnits([]);
   };
+
 
   const handleAddProduct = () => {
     if (selectedProducts.length > 0 && newProductQuantity.trim()) {
@@ -134,15 +142,18 @@ export default function CreateRoomScreen() {
     }
   };
 
+
   const pickImage = async (source: 'camera' | 'library') => {
     const permission = source === 'camera' 
       ? await ImagePicker.requestCameraPermissionsAsync() 
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permission.status !== 'granted') return;
 
+
     const result = source === 'camera'
       ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsMultipleSelection: true, quality: 0.8 });
+
 
     if (!result.canceled && result.assets) {
       const newImages = result.assets.map(asset => ({
@@ -154,6 +165,7 @@ export default function CreateRoomScreen() {
     }
   };
 
+
   const handleSaveRoom = async () => {
     if (!roomType.trim()) {
       Alert.alert('Validation Error', 'Room type is required');
@@ -164,6 +176,7 @@ export default function CreateRoomScreen() {
       Alert.alert('Error', 'Client ID is missing.');
       return;
     }
+
 
     setLoading(true);
     try {
@@ -177,7 +190,9 @@ export default function CreateRoomScreen() {
         }).select().single();
       if (roomError) throw roomError;
 
+
       const newRoomId = roomData.id;
+
 
       await Promise.all([
         supabase.from('measurements').insert({
@@ -202,6 +217,7 @@ export default function CreateRoomScreen() {
         })()
       ]);
 
+
       Alert.alert('Success', 'Room created successfully!', [{ text: 'OK', onPress: () => router.push({ pathname: '/client/[id]', params: { id: client_id_str } }) }]);
     } catch (error: any) {
       Alert.alert('An unexpected error occurred', error.message);
@@ -214,6 +230,7 @@ export default function CreateRoomScreen() {
     let title = '';
     let options: any[] = [];
     let onSelect: (option: any) => void = () => {};
+
 
     switch (modalContent) {
         case 'roomType':
@@ -243,19 +260,35 @@ export default function CreateRoomScreen() {
             break;
     }
 
+
     return (
       <Modal visible={isModalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? '#1f2937' : '#fff' }]}>
+        <View style={[styles.modalOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? '#1f2937' : '#ffffff' }]}>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setModalVisible(false)}>
-              <IconSymbol name="xmark.circle.fill" size={24} color={isDark ? '#fff' : '#000'} />
+              <IconSymbol name="xmark.circle.fill" size={24} color={isDark ? '#9ca3af' : '#6b7280'} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: isDark ? '#fff' : '#000' }]}>{title}</Text>
-            {options.map((option, index) => (
-              <TouchableOpacity key={index} style={styles.modalOption} onPress={() => onSelect(option)}>
-                <Text style={styles.modalOptionText}>{option.name}</Text>
-              </TouchableOpacity>
-            ))}
+            <Text style={[styles.modalTitle, { color: isDark ? '#f9fafb' : '#111827' }]}>{title}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalOptionsContainer}>
+              {options.map((option, index) => (
+                <TouchableOpacity 
+                  key={index} 
+                  style={[
+                    styles.modalOption, 
+                    { 
+                      backgroundColor: isDark ? '#374151' : '#f8fafc',
+                      borderColor: isDark ? '#4b5563' : '#e2e8f0',
+                    }
+                  ]} 
+                  onPress={() => onSelect(option)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.modalOptionText, { color: isDark ? '#f9fafb' : '#1e293b' }]}>
+                    {option.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -268,20 +301,23 @@ export default function CreateRoomScreen() {
     text: { color: isDark ? '#f9fafb' : '#111827' },
     subtext: { color: isDark ? '#9ca3af' : '#6b7280' },
     input: { 
-      backgroundColor: isDark ? '#374151' : '#f3f4f6', 
-      borderColor: isDark ? '#4b5563' : '#e5e7eb',
+      backgroundColor: isDark ? '#374151' : '#f8fafc', 
+      borderColor: isDark ? '#4b5563' : '#e2e8f0',
       color: isDark ? '#f9fafb' : '#111827',
     },
     primary: { color: isDark ? '#38bdf8' : '#0ea5e9' },
+    border: { borderBottomColor: isDark ? '#374151' : '#e2e8f0' },
+    buttonCancel: { color: isDark ? '#9ca3af' : '#64748b' },
   };
+
 
   return (
     <KeyboardAvoidingView style={[styles.container, themedStyles.background]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
         <Text style={[styles.headerTitle, themedStyles.text]}>Create New Room</Text>
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
+        <View style={[styles.progressBarContainer, { backgroundColor: isDark ? '#374151' : '#e2e8f0' }]}>
+          <View style={[styles.progressBar, { backgroundColor: themedStyles.primary.color }]} />
         </View>
       </View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
@@ -289,11 +325,12 @@ export default function CreateRoomScreen() {
         <View style={[styles.card, themedStyles.card]}>
           <Text style={[styles.cardTitle, themedStyles.text]}>Room Details</Text>
           <TouchableOpacity style={[styles.selector, themedStyles.input]} onPress={() => openModal('roomType')}>
-            <Text style={themedStyles.text}>{roomType || 'Select Room Type *'}</Text>
+            <Text style={[themedStyles.text, !roomType && themedStyles.subtext]}>{roomType || 'Select Room Type *'}</Text>
             <IconSymbol name="chevron.down" size={16} color={themedStyles.subtext.color} />
           </TouchableOpacity>
           <TextInput style={[styles.input, themedStyles.input]} placeholder="Description" placeholderTextColor={themedStyles.subtext.color} value={description} onChangeText={setDescription} />
         </View>
+
 
         <View style={[styles.card, themedStyles.card]}>
           <Text style={[styles.cardTitle, themedStyles.text]}>Dimensions</Text>
@@ -314,10 +351,11 @@ export default function CreateRoomScreen() {
           {typeof totalSqFt === 'number' && !isNaN(totalSqFt) && <Text style={[styles.totalSqFt, themedStyles.primary]}>Total: {totalSqFt.toFixed(2)} sq.ft</Text>}
         </View>
 
+
         <View style={[styles.card, themedStyles.card]}>
           <Text style={[styles.cardTitle, themedStyles.text]}>Products</Text>
           {products.map((p, i) => (
-            <View key={i} style={styles.productItem}>
+            <View key={i} style={[styles.productItem, themedStyles.border]}>
               <Text style={themedStyles.text}>{p.name} ({p.quantity} {p.unit_type})</Text>
               <TouchableOpacity onPress={() => setProducts(prev => prev.filter((_, idx) => idx !== i))}>
                 <IconSymbol name="xmark.circle.fill" size={20} color={themedStyles.subtext.color} />
@@ -325,19 +363,21 @@ export default function CreateRoomScreen() {
             </View>
           ))}
           {isAddingProduct ? (
-            <View style={styles.addProductContainer}>
+            <View style={[styles.addProductContainer, themedStyles.border]}>
                 <TouchableOpacity style={[styles.selector, themedStyles.input]} onPress={() => openModal('product')}>
-                    <Text style={themedStyles.text}>{selectedProducts.length > 0 ? selectedProducts.map(p => p.name).join(' > ') : 'Select Product'}</Text>
+                    <Text style={[themedStyles.text, selectedProducts.length === 0 && themedStyles.subtext]}>
+                      {selectedProducts.length > 0 ? selectedProducts.map(p => p.name).join(' > ') : 'Select Product'}
+                    </Text>
                 </TouchableOpacity>
                 <View style={{flexDirection: 'row', gap: 10}}>
                     <TextInput style={[styles.input, themedStyles.input, {flex: 1}]} placeholder="Qty" placeholderTextColor={themedStyles.subtext.color} value={newProductQuantity} onChangeText={setNewProductQuantity} keyboardType="numeric" />
                     <TouchableOpacity style={[styles.selector, themedStyles.input, {flex: 1}]} onPress={() => openModal('productUnit')}>
-                        <Text style={themedStyles.text}>{newProductUnitType || 'Unit'}</Text>
+                        <Text style={[themedStyles.text, !newProductUnitType && themedStyles.subtext]}>{newProductUnitType || 'Unit'}</Text>
                     </TouchableOpacity>
                 </View>
                 <TextInput style={[styles.input, themedStyles.input]} placeholder="Description" placeholderTextColor={themedStyles.subtext.color} value={newProductDescription} onChangeText={setNewProductDescription} />
                 <View style={{flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10}}>
-                    <TouchableOpacity onPress={resetProductForm}><Text style={themedStyles.subtext}>Cancel</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={resetProductForm}><Text style={themedStyles.buttonCancel}>Cancel</Text></TouchableOpacity>
                     <TouchableOpacity onPress={handleAddProduct}><Text style={themedStyles.primary}>Add</Text></TouchableOpacity>
                 </View>
             </View>
@@ -360,20 +400,32 @@ export default function CreateRoomScreen() {
                         </TouchableOpacity>
                     </View>
                 ))}
-                <TouchableOpacity style={[styles.addImageButton, {borderColor: themedStyles.subtext.color}]} onPress={() => pickImage('library')}>
+                <TouchableOpacity style={[styles.addImageButton, {borderColor: themedStyles.subtext.color}]} onPress={() => Alert.alert(
+                  'Add Image',
+                  'Choose an option to add an image:',
+                  [
+                    { text: 'Take Photo', onPress: () => pickImage('camera') },
+                    { text: 'Choose from Library', onPress: () => pickImage('library') },
+                    { text: 'Cancel', style: 'cancel' },
+                  ],
+                  { cancelable: true }
+                )}>
                     <IconSymbol name="plus" size={24} color={themedStyles.subtext.color} />
                 </TouchableOpacity>
             </View>
         </View>
 
+
         <TouchableOpacity style={[styles.saveButton]} onPress={handleSaveRoom} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Create Room</Text>}
         </TouchableOpacity>
         <TouchableOpacity style={[styles.cancelButton]} onPress={() => router.back()}>
-          <Text style={[styles.cancelButtonText, themedStyles.subtext]}>Cancel</Text>
+          <Text style={[styles.cancelButtonText, themedStyles.buttonCancel]}>Cancel</Text>
         </TouchableOpacity>
 
+
       </ScrollView>
+
 
       <SelectionModal />
       <ProductDimensionModal visible={isDimensionModalVisible} onClose={() => setDimensionModalVisible(false)} onSetQuantity={setNewProductQuantity} />
@@ -381,42 +433,150 @@ export default function CreateRoomScreen() {
   );
 }
 
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { padding: 20, paddingTop: 50 },
   modalCloseButton: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 15,
+    right: 15,
     zIndex: 1,
+    padding: 5,
   },
   headerTitle: { fontSize: 28, fontWeight: 'bold' },
-  progressBarContainer: { height: 4, backgroundColor: '#374151', borderRadius: 2, marginTop: 10 },
-  progressBar: { height: '100%', backgroundColor: '#38bdf8', borderRadius: 2 },
+  progressBarContainer: { height: 4, borderRadius: 2, marginTop: 10 },
+  progressBar: { height: '100%', borderRadius: 2 },
   scrollContainer: { paddingHorizontal: 20, paddingBottom: 100 },
-  card: { borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  card: { 
+    borderRadius: 16, 
+    padding: 20, 
+    marginBottom: 20, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 8, 
+    elevation: 3 
+  },
   cardTitle: { fontSize: 20, fontWeight: '600', marginBottom: 15 },
-  selector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 10, padding: 15, marginBottom: 10 },
-  input: { borderRadius: 10, padding: 15, marginBottom: 10, borderWidth: 1, color: 'white' },
+  selector: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    borderRadius: 12, 
+    padding: 15, 
+    marginBottom: 10,
+    borderWidth: 1,
+  },
+  input: { 
+    borderRadius: 12, 
+    padding: 15, 
+    marginBottom: 10, 
+    borderWidth: 1, 
+    fontSize: 16,
+  },
   dimensionRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   unitButton: { position: 'absolute', right: 15, top: 15 },
-  totalSqFt: { alignSelf: 'flex-end', fontSize: 16, fontWeight: '500' },
-  productItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#374151' },
-  addProductContainer: { paddingTop: 10, marginTop: 10, borderTopWidth: 1, borderTopColor: '#374151', gap: 10 },
-  addButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 10, borderRadius: 8, marginTop: 10 },
+  totalSqFt: { alignSelf: 'flex-end', fontSize: 16, fontWeight: '600' },
+  productItem: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    paddingVertical: 12, 
+    borderBottomWidth: 1,
+  },
+  addProductContainer: { 
+    paddingTop: 15, 
+    marginTop: 15, 
+    borderTopWidth: 1, 
+    gap: 10 
+  },
+  addButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 8, 
+    padding: 12, 
+    borderRadius: 10, 
+    marginTop: 10 
+  },
   addButtonText: { fontSize: 16, fontWeight: '600' },
   imageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   imageContainer: { position: 'relative' },
   imagePreview: { width: 80, height: 80, borderRadius: 10 },
-  removeImageButton: { position: 'absolute', top: -5, right: -5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12 },
-  addImageButton: { width: 80, height: 80, borderRadius: 10, borderStyle: 'dashed', borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  saveButton: { marginHorizontal: 20, padding: 18, borderRadius: 12, alignItems: 'center', backgroundColor:"#3182CE" },
+  removeImageButton: { 
+    position: 'absolute', 
+    top: -5, 
+    right: -5, 
+    backgroundColor: 'rgba(0,0,0,0.7)', 
+    borderRadius: 12,
+    padding: 2,
+  },
+  addImageButton: { 
+    width: 80, 
+    height: 80, 
+    borderRadius: 10, 
+    borderStyle: 'dashed', 
+    borderWidth: 2, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  saveButton: { 
+    marginHorizontal: 20, 
+    padding: 18, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    backgroundColor: "#3182CE" 
+  },
   saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)' },
-  modalContent: { width: '90%', borderRadius: 16, padding: 20 },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  modalOption: { padding: 15, borderRadius: 10, marginBottom: 10, backgroundColor: 'rgba(255,255,255,0.1)' },
-  modalOptionText: { color: '#fff', fontSize: 18, textAlign: 'center' },
-  cancelButton: { marginHorizontal: 20, padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 10 },
+  modalOverlay: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+  },
+  modalContent: { 
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 20, 
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: { 
+    fontSize: 22, 
+    fontWeight: 'bold', 
+    marginBottom: 20, 
+    textAlign: 'center',
+    paddingTop: 10,
+  },
+  modalOptionsContainer: {
+    maxHeight: 400,
+  },
+  modalOption: { 
+    padding: 16, 
+    borderRadius: 12, 
+    marginBottom: 8,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  modalOptionText: { 
+    fontSize: 16, 
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  cancelButton: { 
+    marginHorizontal: 20, 
+    padding: 18, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    marginTop: 10 
+  },
   cancelButtonText: { fontSize: 18, fontWeight: 'bold' },
 });

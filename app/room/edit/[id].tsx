@@ -451,7 +451,16 @@ export default function EditRoomScreen() {
                         </TouchableOpacity>
                     </View>
                 ))}
-                <TouchableOpacity style={[styles.addImageButton, {borderColor: themedStyles.subtext.color}]} onPress={() => pickImage('library')}>
+                <TouchableOpacity style={[styles.addImageButton, {borderColor: themedStyles.subtext.color}]} onPress={() => Alert.alert(
+                  'Add Image',
+                  'Choose an option to add an image:',
+                  [
+                    { text: 'Take Photo', onPress: () => pickImage('camera') },
+                    { text: 'Choose from Library', onPress: () => pickImage('library') },
+                    { text: 'Cancel', style: 'cancel' },
+                  ],
+                  { cancelable: true }
+                )}>
                     <IconSymbol name="plus" size={24} color={themedStyles.subtext.color} />
                 </TouchableOpacity>
             </View>

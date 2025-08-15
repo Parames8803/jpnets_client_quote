@@ -6,6 +6,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Quotation, QUOTATION_STATUS_TYPES, ROOM_STATUS_TYPES, Room } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -59,6 +60,8 @@ const QuotationCard = ({ item, isDark, onStatusUpdate }: {
   isDark: boolean; 
   onStatusUpdate: (quotation: Quotation, roomId: string) => void; 
 }) => {
+  const router = useRouter();
+
   const openMaps = () => {
     if (item.clients?.latitude && item.clients?.longitude) {
       const url = Platform.select({
@@ -68,6 +71,10 @@ const QuotationCard = ({ item, isDark, onStatusUpdate }: {
       if (url) Linking.openURL(url);
       else Alert.alert('Error', 'Could not open map application.');
     }
+  };
+
+  const navigateToRoomDetails = (roomId: string) => {
+    router.push({ pathname: '/room/[id]', params: { id: roomId } });
   };
 
   return (
@@ -104,10 +111,12 @@ const QuotationCard = ({ item, isDark, onStatusUpdate }: {
       {item.quotation_rooms?.map((qr, index) => (
         qr.rooms && (
           <View key={index} style={[styles.roomSection, { borderTopColor: isDark ? Colors.dark.border : Colors.light.border }]}>
-            <View style={styles.roomHeader}>
-              <ThemedText style={styles.roomTitle}>{qr.rooms.room_type}</ThemedText>
-              <StatusBadge status={qr.rooms.status || ''} isDark={isDark} />
-            </View>
+            <TouchableOpacity onPress={() => navigateToRoomDetails(qr.rooms!.id)}>
+              <View style={styles.roomHeader}>
+                <ThemedText style={styles.roomTitle}>{qr.rooms.room_type}</ThemedText>
+                <StatusBadge status={qr.rooms.status || ''} isDark={isDark} />
+              </View>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={() => onStatusUpdate(item, qr.rooms!.id)}>
               <IconSymbol name="arrow.triangle.2.circlepath" size={18} color="#FFFFFF" />
               <Text style={styles.actionButtonText}>Update Room Status</Text>
