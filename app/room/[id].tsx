@@ -5,7 +5,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Measurement, Product, Room } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, FC } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -84,32 +84,36 @@ function useRoomDetails(roomId: string | string[] | undefined) {
 
 // --- Tab Content Components ---
 
-const DetailsTab = ({ room, measurement, colors }: { room: Room, measurement: Measurement | null, colors: any }) => (
-  <ScrollView contentContainerStyle={styles.tabContentContainer}>
-    <InfoSection icon="house.fill" title="Room Information" colors={colors}>
-      <InfoItem label="Description" value={room.description || 'N/A'} colors={colors} />
-      <InfoItem label="Created On" value={new Date(room.created_at).toLocaleDateString()} colors={colors} />
-      {room.total_sq_ft && <InfoItem label="Total Area" value={`${room.total_sq_ft} sq.ft`} colors={colors} />}
-    </InfoSection>
+const DetailsTab = ({ room, measurement, colors, refreshing, onRefresh }: { room: Room, measurement: Measurement | null, colors: any, refreshing: boolean, onRefresh: () => void }) => (
+  <ScrollView contentContainerStyle={styles.tabContentContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />}>
+    <InfoSection icon="house.fill" title="Room Information" colors={colors} children={
+      <>
+        <InfoItem label="Description" value={room.description || 'N/A'} colors={colors} />
+        <InfoItem label="Created On" value={new Date(room.created_at).toLocaleDateString()} colors={colors} />
+        {room.total_sq_ft && <InfoItem label="Total Area" value={`${room.total_sq_ft} sq.ft`} colors={colors} />}
+      </>
+    }/>
     
-    <InfoSection icon="ruler.fill" title="Dimensions" colors={colors}>
-      {measurement ? (
-        <>
-          <InfoItem label="Length" value={`${measurement.length_value} ${measurement.length_unit_type}`} colors={colors} />
-          <InfoItem label="Width" value={`${measurement.width_value} ${measurement.width_unit_type}`} colors={colors} />
-          {measurement.converted_sq_ft !== null && (
-            <InfoItem label="Calculated Area" value={`${measurement.converted_sq_ft.toFixed(2)} sq.ft`} colors={colors} />
-          )}
-        </>
-      ) : (
-        <EmptyState icon="ruler" text="No measurements recorded." colors={colors} />
-      )}
-    </InfoSection>
+    <InfoSection icon="ruler.fill" title="Dimensions" colors={colors} children={
+      <>
+        {measurement ? (
+          <>
+            <InfoItem label="Length" value={`${measurement.length_value} ${measurement.length_unit_type}`} colors={colors} />
+            <InfoItem label="Width" value={`${measurement.width_value} ${measurement.width_unit_type}`} colors={colors} />
+            {measurement.converted_sq_ft !== null && (
+              <InfoItem label="Calculated Area" value={`${measurement.converted_sq_ft.toFixed(2)} sq.ft`} colors={colors} />
+            )}
+          </>
+        ) : (
+          <EmptyState icon="ruler" text="No measurements recorded." colors={colors} />
+        )}
+      </>
+    }/>
   </ScrollView>
 );
 
-const ProductsTab = ({ products, colors }: { products: Product[], colors: any }) => (
-  <ScrollView contentContainerStyle={styles.tabContentContainer}>
+const ProductsTab = ({ products, colors, refreshing, onRefresh }: { products: Product[], colors: any, refreshing: boolean, onRefresh: () => void }) => (
+  <ScrollView contentContainerStyle={styles.tabContentContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />}>
     {products.length > 0 ? (
       products.map((product) => (
         <ProductCard key={product.id} product={product} colors={colors} />
@@ -120,7 +124,7 @@ const ProductsTab = ({ products, colors }: { products: Product[], colors: any })
   </ScrollView>
 );
 
-const ImagesTab = ({ imageUrls, colors }: { imageUrls: string[] | null, colors: any }) => {
+const ImagesTab = ({ imageUrls, colors, refreshing, onRefresh }: { imageUrls: string[] | null, colors: any, refreshing: boolean, onRefresh: () => void }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -131,7 +135,7 @@ const ImagesTab = ({ imageUrls, colors }: { imageUrls: string[] | null, colors: 
   };
   
   return (
-    <ScrollView contentContainerStyle={styles.tabContentContainer}>
+    <ScrollView contentContainerStyle={styles.tabContentContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />}>
       {imageUrls && imageUrls.length > 0 ? (
         <View style={styles.imageGrid}>
           {imageUrls.map((url, index) => (
@@ -203,11 +207,10 @@ export default function RoomDetailsScreen() {
   const { room, measurement, products } = data;
 
   const renderTabContent = () => {
-    const contentProps = { refreshing, onRefresh };
     switch (activeTab) {
-      case 'details': return <DetailsTab room={room} measurement={measurement} colors={colors} />;
-      case 'products': return <ProductsTab products={products} colors={colors} />;
-      case 'images': return <ImagesTab imageUrls={room.ref_image_urls} colors={colors} />;
+      case 'details': return <DetailsTab room={room} measurement={measurement} colors={colors} refreshing={refreshing} onRefresh={onRefresh} />;
+      case 'products': return <ProductsTab products={products} colors={colors} refreshing={refreshing} onRefresh={onRefresh} />;
+      case 'images': return <ImagesTab imageUrls={room.ref_image_urls} colors={colors} refreshing={refreshing} onRefresh={onRefresh} />;
       default: return null;
     }
   };
@@ -234,9 +237,7 @@ export default function RoomDetailsScreen() {
         <TabButton id="images" title={`Images (${room.ref_image_urls?.length || 0})`} activeTab={activeTab} onPress={setActiveTab} colors={colors} />
       </View>
       
-      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint}>
-        {renderTabContent()}
-      </RefreshControl>
+      {renderTabContent()}
       
       {userRole !== 'client' && userRole !== 'worker' && (
         <TouchableOpacity 
@@ -253,7 +254,14 @@ export default function RoomDetailsScreen() {
 
 // --- Helper UI Components ---
 
-const InfoSection = ({ icon, title, children, colors }: { icon: IconSymbolName, title: string, children: React.ReactNode, colors: any }) => (
+interface InfoSectionProps {
+  icon: IconSymbolName;
+  title: string;
+  children: React.ReactNode;
+  colors: any;
+}
+
+const InfoSection = ({ icon, title, children, colors }: InfoSectionProps) => (
     <View style={[styles.infoSection, {backgroundColor: colors.cardBackground, borderColor: colors.border}]}>
         <View style={styles.sectionHeader}>
             <IconSymbol name={icon} size={18} color={colors.tint} />
@@ -270,7 +278,13 @@ const InfoItem = ({ label, value, colors }: { label: string, value: string, colo
     </View>
 );
 
-const ProductCard = ({ product, colors }: { product: Product, colors: any }) => (
+interface ProductCardProps {
+  product: Product;
+  colors: any;
+  key?: React.Key;
+}
+
+const ProductCard: FC<ProductCardProps> = ({ product, colors }) => (
     <View style={[styles.productCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
       <Text style={[styles.productName, { color: colors.text }]}>{product.name}</Text>
       <Text style={[styles.productCategory, { color: colors.secondaryText }]}>
