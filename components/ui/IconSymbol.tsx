@@ -89,6 +89,8 @@ const MAPPING = {
   'desktopcomputer': 'desktop-windows', // Added mapping for desktopcomputer
   'flag.checkered': 'flag', // Added mapping for flag.checkered
   'map': 'map', // Added mapping for map
+  'gearshape.fill': 'settings', // Added mapping for gearshape.fill
+  'gearshape': 'settings', // Added mapping for gearshape
 } as const;
 
 /**

@@ -19,12 +19,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Client, Quotation, Room } from '../../types/db';
+import { Client, Quotation, QUOTATION_STATUS_TYPES, Room, QuotationStatus } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
 
 const { width } = Dimensions.get('window');
-
-const QUOTATION_STATUSES = ['Not Active', 'Active', 'Closed'];
 
 export default function ClientDetailsScreen() {
   const router = useRouter();
@@ -355,7 +353,7 @@ export default function ClientDetailsScreen() {
                         </TouchableOpacity>
               <Text style={[styles.modalTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Update Status</Text>
               <View style={styles.statusOptionsContainer}>
-                {QUOTATION_STATUSES.map(status => (
+                {Object.values(QUOTATION_STATUS_TYPES).map((status: QuotationStatus) => (
                   <TouchableOpacity
                     key={status}
                     style={[

@@ -29,17 +29,6 @@ export default function AuthLayout() {
           header: () => <CustomHeader title="Login" showBackButton={false} showLogoutButton={false} />,
         }}
       />
-      <Tabs.Screen
-        name="register"
-        options={{
-          title: 'Register',
-          tabBarIcon: ({ color, focused }) => (
-            <IconSymbol name={focused ? 'person.badge.plus.fill' : 'person.badge.plus'} color={color} size={24} />
-          ),
-          headerShown: true,
-          header: () => <CustomHeader title="Register" showBackButton={false} showLogoutButton={false} />,
-        }}
-      />
     </Tabs>
   );
 }

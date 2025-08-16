@@ -54,6 +54,17 @@ export default function TabLayout() {
           header: () => <CustomHeader title="Workers" showLogoutButton={true} />,
         }}
       />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol name={focused ? 'gearshape.fill' : 'gearshape'} color={color} size={24} />
+          ),
+          headerShown: true,
+          header: () => <CustomHeader title="Settings" showLogoutButton={true} />,
+        }}
+      />
     </Tabs>
   );
 }

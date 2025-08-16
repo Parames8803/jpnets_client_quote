@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, Dimensions, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { supabase } from '../../utils/supabaseClient';
+import { supabase } from '../utils/supabaseClient';
+import { Session } from '@supabase/supabase-js';
 
 const { width, height } = Dimensions.get('window');
 
@@ -13,18 +14,6 @@ export default function RegisterScreen() {
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const router = useRouter();
-
-  useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        router.replace('/(tabs)');
-      }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [router]);
 
   const validateFields = () => {
     if (!email || !password) {
@@ -47,26 +36,84 @@ export default function RegisterScreen() {
     if (!validateFields()) return;
 
     setLoading(true);
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.signUp({
-      email: email,
-      password: password,
-      options: {
-        data: {
-          role: 'admin', // Set default role to "admin"
-        },
-      },
-    });
+    let originalSession: Session | null = null;
 
-    if (error) {
+    try {
+      // Get current session before creating new user
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error("Error getting current session:", sessionError);
+        Alert.alert('Error', 'Could not retrieve current session.');
+        setLoading(false);
+        return;
+      }
+      originalSession = session;
+
+      // Sign up the new user (this will automatically sign them in)
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            role: 'admin', // Set default role to "admin"
+          },
+        },
+      });
+
+      if (signUpError) {
+        Alert.alert('Error', signUpError.message);
+        setLoading(false);
+        return;
+      }
+
+      // If a new user was created and signed in, sign them out
+      if (signUpData.user) {
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) {
+          console.error("Error signing out new user:", signOutError);
+          Alert.alert('Sign Out Error', 'Failed to sign out newly created user.');
+        }
+      }
+
+      // Restore the original session
+      if (originalSession) {
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: originalSession.access_token,
+          refresh_token: originalSession.refresh_token,
+        });
+
+        if (setSessionError) {
+          console.error("Error restoring session:", setSessionError);
+          Alert.alert('Session Restore Error', 'Failed to restore original user session. Please re-login.');
+          router.replace('/(auth)/login');
+          return;
+        }
+
+        // Verify the restored session
+        const { data: { user: restoredUser }, error: getRestoredUserError } = await supabase.auth.getUser();
+        if (getRestoredUserError || !restoredUser || restoredUser.id !== originalSession.user.id) {
+          console.error("Session not restored to original user:", restoredUser);
+          Alert.alert('Session Verification Error', 'Original user session could not be verified. Please re-login.');
+          router.replace('/(auth)/login');
+          return;
+        }
+
+      } else {
+        // If there was no original session, just go back to login
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      Alert.alert('Success', 'Admin account created successfully!');
+      setEmail('');
+      setPassword('');
+      router.replace('/(tabs)/settings'); // Navigate back to the Settings page explicitly
+
+    } catch (error: any) {
       Alert.alert('Error', error.message);
-    } else {
-      Alert.alert('Success', 'Account created! Please sign in to continue.');
-      router.replace('/(auth)/login');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
@@ -129,12 +176,6 @@ export default function RegisterScreen() {
             </Text>
           </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-              <Text style={styles.linkText}>Sign in</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     </>
@@ -229,21 +270,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.1,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  footerText: {
-    fontSize: 15,
-    color: '#6B7280',
-    fontWeight: '400',
-  },
-  linkText: {
-    fontSize: 15,
-    color: '#3B82F6',
-    fontWeight: '600',
   },
 });

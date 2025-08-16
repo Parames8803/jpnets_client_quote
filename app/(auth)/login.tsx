@@ -173,14 +173,18 @@ export default function LoginScreen() {
               {loading ? 'Signing in...' : 'Sign In'}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.loginTextButton, loading && styles.loginButtonDisabled]}
+            disabled={loading} // Disable button when loading
+            onPress={() => router.push('/landing')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginTextButtonText}>
+              {loading ? 'Going Home...' : 'Back Home'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Footer section with sign up link */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-              <Text style={styles.linkText}>Sign up</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
 
@@ -277,6 +281,19 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
+  loginTextButton: {
+    height: 56,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    shadowColor: '#1F2937',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
   loginButtonDisabled: {
     backgroundColor: '#9CA3AF',
     shadowOpacity: 0,
@@ -288,21 +305,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.1,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  footerText: {
-    fontSize: 15,
-    color: '#6B7280',
-    fontWeight: '400',
-  },
-  linkText: {
-    fontSize: 15,
-    color: '#3B82F6',
+  loginTextButtonText: {
+    color: '#1F2937',
+    fontSize: 16,
     fontWeight: '600',
+    letterSpacing: -0.1,
   },
   // Styles for the custom modal
   modalOverlay: {

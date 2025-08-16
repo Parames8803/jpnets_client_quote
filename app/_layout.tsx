@@ -21,15 +21,9 @@ export default function RootLayout() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      // Redirect based on role after session is loaded
-      if (loaded && session?.user?.user_metadata?.role) {
-        const role = session.user.user_metadata.role;
-        if (role === 'admin') router.replace('/(tabs)');
-        else if (role === 'client') router.replace('/(clients)');
-        else if (role === 'worker') router.replace('/(workers)');
-        else router.replace('/(auth)/login');
-      } else if (loaded && !session) {
-        router.replace('/(auth)/login');
+      // Always go to landing page initially
+      if (loaded) {
+        router.replace('/landing');
       }
     });
 
@@ -59,11 +53,13 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(clients)" options={{ headerShown: false }} />
         <Stack.Screen name="(workers)" options={{ headerShown: false }} />
+        <Stack.Screen name="landing" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ headerShown: false }} />
         <Stack.Screen name="create-room" options={{ title: 'Manage Room' }} />
         <Stack.Screen name="edit-client" options={{ title: 'Manage Client' }} />
         <Stack.Screen name="create-client" options={{ title: 'Manage Client' }} />
         <Stack.Screen name="client/[id]" options={{ title: 'Manage Client' }} />
+        <Stack.Screen name="register" options={{ title: 'Manage Admin' }} />
         <Stack.Screen name="client/generate-quotation" options={{ title: 'Generate Quotation' }} />
         <Stack.Screen name="quotation/[id]" options={{ title: 'Manage Quotation' }} />
         <Stack.Screen name="quotation/preview" options={{ title: 'Manage Quotation' }} />
