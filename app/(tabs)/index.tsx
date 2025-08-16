@@ -1,364 +1,258 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Dimensions, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { supabase } from '../../utils/supabaseClient';
+import { IconSymbol } from "@/components/ui/IconSymbol";
+import { Colors } from "@/constants/Colors";
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { supabase } from "@/utils/supabaseClient";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  Dimensions,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { BarChart, PieChart } from "react-native-chart-kit";
 
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
-
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 type AnalyticsData = {
   totalClients: number;
   totalWorkers: number;
   quotationsPending: number;
   quotationsClosed: number;
-  roomsStatusCounts: { [key: string]: number };
+  roomsStatusCounts: Record<string, number>;
   totalRevenueClosedQuotations: number;
 };
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState<string | undefined>(undefined);
-  const [userId, setUserId] = useState<string | null>(null);
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
+
+  const [userEmail, setUserEmail] = useState<string>();
+  const [userId, setUserId] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    if (userId) {
-      await fetchAnalytics();
-    }
-    setRefreshing(false);
-  }, [userId]);
-
-  const fetchAnalytics = async () => {
+  /** ==========================
+   *  Fetch Analytics
+   *  ========================== */
+  const fetchAnalytics = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
     try {
-      // Fetch total clients
-      const { data: clientsCount, error: clientsError } = await supabase.rpc('get_total_clients');
-      if (clientsError) throw clientsError;
-
-      // Fetch total workers  
-      const { data: workersCount, error: workersError } = await supabase.rpc('get_total_workers');
-      if (workersError) throw workersError;
-
-      // Fetch quotation status counts
-      const { data: quotationCounts, error: quotationError } = await supabase.rpc('get_quotation_status_counts');
-      if (quotationError) throw quotationError;
-
-      // Fetch room status counts
-      const { data: roomCounts, error: roomError } = await supabase.rpc('get_room_status_counts');
-      if (roomError) throw roomError;
-
-      // Fetch total revenue from closed quotations
-      const { data: revenue, error: revenueError } = await supabase.rpc('get_total_revenue_from_closed_quotations');
-      if (revenueError) throw revenueError;
+      const { data: clients } = await supabase.rpc("get_total_clients");
+      const { data: workers } = await supabase.rpc("get_total_workers");
+      const { data: quotes } = await supabase.rpc("get_quotation_status_counts");
+      const { data: rooms } = await supabase.rpc("get_room_status_counts");
+      const { data: revenue } = await supabase.rpc("get_total_revenue_from_closed_quotations");
 
       setAnalytics({
-        totalClients: clientsCount || 0,
-        totalWorkers: workersCount || 0,
-        quotationsPending: quotationCounts?.pending || 0,
-        quotationsClosed: quotationCounts?.closed || 0,
-        roomsStatusCounts: roomCounts || {},
+        totalClients: clients || 0,
+        totalWorkers: workers || 0,
+        quotationsPending: quotes?.pending || 0,
+        quotationsClosed: quotes?.closed || 0,
+        roomsStatusCounts: rooms || {},
         totalRevenueClosedQuotations: revenue || 0,
       });
-
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to fetch analytics: ' + error.message);
-      setAnalytics(null); // Clear analytics on error
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to load analytics.");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [userId]);
 
+  /** ==========================
+   *  Session / Auth
+   *  ========================== */
   useEffect(() => {
-    const checkUserAndFetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email);
-        setUserId(user.id);
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        setUserEmail(data.user.email);
+        setUserId(data.user.id);
         fetchAnalytics();
       } else {
-        router.replace('/(auth)/login');
+        router.replace("/(auth)/login");
       }
     };
+    loadUser();
 
-    checkUserAndFetchData();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_evt, session) => {
       if (!session) {
-        router.replace('/(auth)/login');
-      } else if (session.user) {
+        router.replace("/(auth)/login");
+      } else {
         setUserEmail(session.user.email);
         setUserId(session.user.id);
         fetchAnalytics();
       }
     });
 
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
+    return () => authListener?.subscription.unsubscribe();
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (userId) {
-        fetchAnalytics();
-      }
-    }, [userId])
+  useFocusEffect(useCallback(() => { if (userId) fetchAnalytics(); }, [userId]));
+
+  /** ==========================
+   *  UI Helper Components
+   *  ========================== */
+
+  const Header = () => (
+    <View style={styles.header}>
+      <View>
+        <Text style={[styles.greeting, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+          Good morning
+        </Text>
+        <Text style={[styles.userName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+          {userEmail?.split("@")[0] ?? "User"}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.profileButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}
+      >
+        <IconSymbol name="person.circle.fill" size={32} color={isDark ? Colors.dark.primary : Colors.light.primary} />
+      </TouchableOpacity>
+    </View>
   );
 
-  if (userEmail === undefined || userId === null || analytics === null) {
+  const RevenueCard = () => (
+    <View style={[styles.revenueCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+        <IconSymbol name="dollarsign.circle.fill" size={28} color="#22C55E" />
+        <Text style={[styles.revenueLabel, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+          Total Revenue
+        </Text>
+      </View>
+      <Text style={[styles.revenueNumber, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+        ${analytics?.totalRevenueClosedQuotations.toFixed(2)}
+      </Text>
+    </View>
+  );
+
+  const StatCard = ({ label, value, icon, color }: any) => (
+    <View style={[styles.statCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
+      <View style={[styles.statIcon, { backgroundColor: color + "20" }]}>
+        <IconSymbol name={icon} size={20} color={color} />
+      </View>
+      <Text style={[styles.statValue, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{label}</Text>
+    </View>
+  );
+
+  const RoomStatusPie = () =>
+    analytics?.roomsStatusCounts && Object.keys(analytics.roomsStatusCounts).length > 0 ? (
+      <View style={styles.chartSection}>
+        <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+          Room Status Distribution
+        </Text>
+        <PieChart
+          data={Object.entries(analytics.roomsStatusCounts).map(([status, count], i) => ({
+            name: status,
+            population: count,
+            color: ["#EF4444", "#10B981", "#3B82F6", "#F59E0B"][i % 4],
+            legendFontColor: isDark ? Colors.dark.text : Colors.light.text,
+            legendFontSize: 14,
+          }))}
+          width={width - 48}
+          height={220}
+          accessor="population"
+          backgroundColor="transparent"
+          paddingLeft="15"
+          absolute
+          chartConfig={{
+            color: (o = 1) => `rgba(0,0,0,${o})`,
+            labelColor: (o = 1) => (isDark ? `rgba(255,255,255,${o})` : `rgba(0,0,0,${o})`),
+          }}
+        />
+      </View>
+    ) : null;
+
+  const QuotationBar = () => (
+    <View style={styles.chartSection}>
+      <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+        Quotation Status Overview
+      </Text>
+      <BarChart
+        data={{
+          labels: ["Pending", "Closed"],
+          datasets: [{ data: [analytics?.quotationsPending || 0, analytics?.quotationsClosed || 0] }],
+        }}
+        width={width - 48}
+        height={220}
+        fromZero
+        yAxisLabel=""
+        yAxisSuffix=""
+        chartConfig={{
+          backgroundGradientFrom: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          backgroundGradientTo: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          color: (o = 1) => (isDark ? `rgba(255,255,255,${o})` : `rgba(0,0,0,${o})`),
+          labelColor: (o = 1) => (isDark ? `rgba(255,255,255,${o})` : `rgba(0,0,0,${o})`),
+        }}
+        style={{ borderRadius: 16 }}
+      />
+    </View>
+  );
+
+  /** ==========================
+   *  Render
+   *  ========================== */
+  if (!analytics) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading analytics...</Text>
+      <View style={[styles.loading, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+        <Text style={{ color: isDark ? Colors.dark.text : Colors.light.text }}>
+          {loading ? "Loading analytics..." : "No data available"}
+        </Text>
       </View>
     );
   }
 
-  const analyticsCards = [
-    { id: 'totalClients', label: 'Total Clients', icon: 'person.3.fill', color: '#3B82F6', value: analytics.totalClients },
-    { id: 'totalWorkers', label: 'Total Workers', icon: 'person.fill', color: '#10B981', value: analytics.totalWorkers },
-    { id: 'quotationsPending', label: 'Quotes Pending', icon: 'pencil.and.outline', color: '#F59E0B', value: analytics.quotationsPending },
-    { id: 'quotationsClosed', label: 'Quotes Closed', icon: 'checkmark.circle.fill', color: '#6366F1', value: analytics.quotationsClosed },
-    { id: 'totalRevenue', label: 'Total Revenue', icon: 'dollarsign.circle.fill', color: '#22C55E', value: analytics.totalRevenueClosedQuotations, isCurrency: true },
-  ];
-
-  const roomStatusCards = Object.entries(analytics.roomsStatusCounts).map(([status, count], index) => ({
-    id: `roomStatus-${index}`,
-    label: `${status} Rooms`,
-    icon: 'house.fill', // You might want different icons for different statuses
-    color: '#EF4444', // Example color
-    value: count,
-  }));
-
   return (
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? Colors.dark.background : Colors.light.background} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={isDark ? Colors.dark.text : Colors.light.text}
-          />
-        }
-        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAnalytics} />}
+        contentContainerStyle={{ paddingBottom: 32 }}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.greeting, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>Good morning</Text>
-            <Text style={[styles.userName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              {userEmail?.split('@')[0] || 'User'}
-            </Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={[styles.profileButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}>
-              <IconSymbol size={24} name="person.circle.fill" color={isDark ? Colors.dark.primary : Colors.light.primary} />
-            </TouchableOpacity>
+        <Header />
+        <View style={{ paddingHorizontal: 24 }}>
+          <RevenueCard />
+          <View style={styles.statsRow}>
+            <StatCard label="Total Clients" value={analytics.totalClients} icon="person.3.fill" color="#3B82F6" />
+            <StatCard label="Total Workers" value={analytics.totalWorkers} icon="person.fill" color="#10B981" />
+            <StatCard label="Quotes Pending" value={analytics.quotationsPending} icon="pencil.and.outline" color="#F59E0B" />
+            <StatCard label="Quotes Closed" value={analytics.quotationsClosed} icon="checkmark.circle.fill" color="#6366F1" />
           </View>
         </View>
-
-        {/* Analytics Grid */}
-        <View style={styles.statsGrid}>
-          {analyticsCards.map((stat) => (
-            <View key={stat.id} style={[styles.statCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
-              <View style={[styles.statIconContainer, { backgroundColor: stat.color + '20' }]}>
-                <IconSymbol size={24} name={stat.icon as any} color={stat.color} />
-              </View>
-              <Text style={[styles.statNumber, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-                {stat.isCurrency ? `$${stat.value.toFixed(2)}` : stat.value}
-              </Text>
-              <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Room Statuses */}
-        {roomStatusCards.length > 0 && (
-          <View style={styles.roomStatusSection}>
-            <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Room Statuses</Text>
-            <View style={styles.statsGrid}>
-              {roomStatusCards.map((stat) => (
-                <View key={stat.id} style={[styles.statCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
-                  <View style={[styles.statIconContainer, { backgroundColor: stat.color + '20' }]}>
-                    <IconSymbol size={24} name={stat.icon as any} color={stat.color} />
-                  </View>
-                  <Text style={[styles.statNumber, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{stat.value}</Text>
-                  <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{stat.label}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
+        <RoomStatusPie />
+        <QuotationBar />
       </ScrollView>
     </View>
   );
 }
 
+/** ==========================
+ *  Styles
+ *  ========================== */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  greeting: {
-    fontSize: 16,
-    fontWeight: '400',
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginTop: 4,
-    letterSpacing: -0.5,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  profileButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 24,
-    marginBottom: 32,
-    gap: 12,
-  },
-  statCard: {
-    width: (width - 60) / 2,
-    padding: 20,
-    borderRadius: 16,
-    // Add shadow for a raised, modern card effect
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'left',
-  },
-  roomStatusSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  clientListSection: {
-    paddingHorizontal: 24,
-  },
-  clientCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
-  },
-  clientDetails: {
-    flex: 1,
-  },
-  clientName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  clientEmail: {
-    fontSize: 14,
-    fontWeight: '400',
-    marginTop: 4,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    marginVertical: 8,
-  },
-  noClientsContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 50,
-  },
-  noClientsText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  container: { flex: 1 },
+  loading: { flex: 1, justifyContent: "center", alignItems: "center" },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24 },
+  greeting: { fontSize: 16 },
+  userName: { fontSize: 28, fontWeight: "700", marginTop: 4 },
+  profileButton: { width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center" },
+  revenueCard: { borderRadius: 20, padding: 20, marginBottom: 20, elevation: 4 },
+  revenueLabel: { fontSize: 18, fontWeight: "600", marginLeft: 8 },
+  revenueNumber: { fontSize: 36, fontWeight: "800", marginTop: 4 },
+  statsRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  statCard: { width: (width - 24 * 2 - 12) / 2, borderRadius: 16, padding: 16, marginBottom: 12, ...Platform.select({ android: { elevation: 2 }, ios: { shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 6 } }) },
+  statIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  statValue: { fontSize: 22, fontWeight: "800" },
+  statLabel: { fontSize: 13, fontWeight: "500" },
+  chartSection: { paddingHorizontal: 24, marginVertical: 20 },
+  sectionTitle: { fontSize: 20, fontWeight: "700", marginBottom: 16 },
 });
