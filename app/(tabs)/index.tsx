@@ -7,18 +7,16 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
-import { Client } from '../../types/db';
-
 const { width } = Dimensions.get('window');
 
-// A placeholder for client data statistics.
-// In a real app, these would be fetched from the database.
-const clientStats = [
-  { id: '1', label: 'Total Clients', icon: 'person.fill', color: '#3B82F6', value: 0 },
-  { id: '2', label: 'Active Projects', icon: 'list.clipboard.fill', color: '#10B981', value: 25 },
-  { id: '3', label: 'Pending Quotes', icon: 'pencil.and.outline', color: '#F59E0B', value: 12 },
-  { id: '4', label: 'Completed', icon: 'checkmark.circle.fill', color: '#6366F1', value: 100 },
-];
+type AnalyticsData = {
+  totalClients: number;
+  totalWorkers: number;
+  quotationsPending: number;
+  quotationsClosed: number;
+  roomsStatusCounts: { [key: string]: number };
+  totalRevenueClosedQuotations: number;
+};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -26,53 +24,67 @@ export default function HomeScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const [clients, setClients] = useState<Client[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Update the stats with the actual total number of clients
-  const updatedStats = clientStats.map(stat =>
-    stat.id === '1' ? { ...stat, value: clients.length } : stat
-  ) as typeof clientStats;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     if (userId) {
-      await fetchClients(userId);
+      await fetchAnalytics();
     }
     setRefreshing(false);
   }, [userId]);
 
-  const fetchClients = async (currentUserId: string) => {
+  const fetchAnalytics = async () => {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('created_by', currentUserId)
-        .order('created_at', { ascending: false });
+      // Fetch total clients
+      const { data: clientsCount, error: clientsError } = await supabase.rpc('get_total_clients');
+      if (clientsError) throw clientsError;
 
-      if (error) {
-        Alert.alert('Error', 'Failed to fetch clients: ' + error.message);
-      } else {
-        setClients(data || []);
-      }
+      // Fetch total workers  
+      const { data: workersCount, error: workersError } = await supabase.rpc('get_total_workers');
+      if (workersError) throw workersError;
+
+      // Fetch quotation status counts
+      const { data: quotationCounts, error: quotationError } = await supabase.rpc('get_quotation_status_counts');
+      if (quotationError) throw quotationError;
+
+      // Fetch room status counts
+      const { data: roomCounts, error: roomError } = await supabase.rpc('get_room_status_counts');
+      if (roomError) throw roomError;
+
+      // Fetch total revenue from closed quotations
+      const { data: revenue, error: revenueError } = await supabase.rpc('get_total_revenue_from_closed_quotations');
+      if (revenueError) throw revenueError;
+
+      setAnalytics({
+        totalClients: clientsCount || 0,
+        totalWorkers: workersCount || 0,
+        quotationsPending: quotationCounts?.pending || 0,
+        quotationsClosed: quotationCounts?.closed || 0,
+        roomsStatusCounts: roomCounts || {},
+        totalRevenueClosedQuotations: revenue || 0,
+      });
+
     } catch (error: any) {
-      Alert.alert('Error', 'An unexpected error occurred while fetching clients: ' + error.message);
+      Alert.alert('Error', 'Failed to fetch analytics: ' + error.message);
+      setAnalytics(null); // Clear analytics on error
     }
   };
 
   useEffect(() => {
-    const checkUserAndFetchClients = async () => {
+    const checkUserAndFetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email);
         setUserId(user.id);
-        fetchClients(user.id);
+        fetchAnalytics();
       } else {
         router.replace('/(auth)/login');
       }
     };
 
-    checkUserAndFetchClients();
+    checkUserAndFetchData();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
@@ -80,7 +92,7 @@ export default function HomeScreen() {
       } else if (session.user) {
         setUserEmail(session.user.email);
         setUserId(session.user.id);
-        fetchClients(session.user.id);
+        fetchAnalytics();
       }
     });
 
@@ -92,35 +104,34 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       if (userId) {
-        fetchClients(userId);
+        fetchAnalytics();
       }
     }, [userId])
   );
 
-  if (userEmail === undefined || userId === null) {
+  if (userEmail === undefined || userId === null || analytics === null) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading...</Text>
+        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading analytics...</Text>
       </View>
     );
   }
 
-  const renderClientItem = ({ item }: { item: Client }) => (
-    <TouchableOpacity
-      style={[
-        styles.clientCard,
-        { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
-        { borderColor: isDark ? Colors.dark.border : Colors.light.border },
-      ]}
-      onPress={() => router.push(`/client/${item.id}` as any)}
-    >
-      <View style={styles.clientDetails}>
-        <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.name}</Text>
-        <Text style={[styles.clientEmail, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{item.email}</Text>
-      </View>
-      <IconSymbol size={20} name="chevron.right" color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
-    </TouchableOpacity>
-  );
+  const analyticsCards = [
+    { id: 'totalClients', label: 'Total Clients', icon: 'person.3.fill', color: '#3B82F6', value: analytics.totalClients },
+    { id: 'totalWorkers', label: 'Total Workers', icon: 'person.fill', color: '#10B981', value: analytics.totalWorkers },
+    { id: 'quotationsPending', label: 'Quotes Pending', icon: 'pencil.and.outline', color: '#F59E0B', value: analytics.quotationsPending },
+    { id: 'quotationsClosed', label: 'Quotes Closed', icon: 'checkmark.circle.fill', color: '#6366F1', value: analytics.quotationsClosed },
+    { id: 'totalRevenue', label: 'Total Revenue', icon: 'dollarsign.circle.fill', color: '#22C55E', value: analytics.totalRevenueClosedQuotations, isCurrency: true },
+  ];
+
+  const roomStatusCards = Object.entries(analytics.roomsStatusCounts).map(([status, count], index) => ({
+    id: `roomStatus-${index}`,
+    label: `${status} Rooms`,
+    icon: 'house.fill', // You might want different icons for different statuses
+    color: '#EF4444', // Example color
+    value: count,
+  }));
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
@@ -152,18 +163,38 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Stats Grid */}
+        {/* Analytics Grid */}
         <View style={styles.statsGrid}>
-          {updatedStats.map((stat) => (
+          {analyticsCards.map((stat) => (
             <View key={stat.id} style={[styles.statCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
               <View style={[styles.statIconContainer, { backgroundColor: stat.color + '20' }]}>
                 <IconSymbol size={24} name={stat.icon as any} color={stat.color} />
               </View>
-              <Text style={[styles.statNumber, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{stat.value}</Text>
+              <Text style={[styles.statNumber, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                {stat.isCurrency ? `$${stat.value.toFixed(2)}` : stat.value}
+              </Text>
               <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{stat.label}</Text>
             </View>
           ))}
         </View>
+
+        {/* Room Statuses */}
+        {roomStatusCards.length > 0 && (
+          <View style={styles.roomStatusSection}>
+            <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Room Statuses</Text>
+            <View style={styles.statsGrid}>
+              {roomStatusCards.map((stat) => (
+                <View key={stat.id} style={[styles.statCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
+                  <View style={[styles.statIconContainer, { backgroundColor: stat.color + '20' }]}>
+                    <IconSymbol size={24} name={stat.icon as any} color={stat.color} />
+                  </View>
+                  <Text style={[styles.statNumber, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{stat.value}</Text>
+                  <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{stat.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -260,13 +291,17 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'left',
   },
-  clientListSection: {
+  roomStatusSection: {
     paddingHorizontal: 24,
+    marginBottom: 32,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,
+  },
+  clientListSection: {
+    paddingHorizontal: 24,
   },
   clientCard: {
     flexDirection: 'row',
