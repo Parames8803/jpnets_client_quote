@@ -3,7 +3,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { StatusUpdateModal } from '@/components/ui/StatusUpdateModal';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Quotation, QUOTATION_STATUS_TYPES, ROOM_STATUS_TYPES, Room } from '@/types/db';
+import { Quotation, QUOTATION_STATUS_TYPES, Room, ROOM_STATUS_TYPES } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';

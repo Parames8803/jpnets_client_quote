@@ -1,4 +1,5 @@
-import { useNavigation, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../utils/supabaseClient';
@@ -15,14 +16,26 @@ interface CustomHeaderProps {
 }
 
 export function CustomHeader({ title, showBackButton = true, rightContent, showLogoutButton = false }: CustomHeaderProps) {
-  const navigation = useNavigation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [session, setSession] = useState<any>(null);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
+  useEffect(() => {
+    const fetchSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session);
+    };
+    fetchSession();
+  }, []);
+
   const handleBack = () => {
     router.back();
+  };
+
+  const handleLogin = () => {
+    router.replace('/(auth)/login');
   };
 
   const handleLogout = async () => {
@@ -89,33 +102,42 @@ export function CustomHeader({ title, showBackButton = true, rightContent, showL
         {hasRightContent && (
           <View style={styles.rightContentWrapper}>
             {rightContent}
-            {showLogoutButton && (
-              <TouchableOpacity 
-                style={[
-                  styles.logoutButton, 
-                  { 
-                    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)',
-                    borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)',
-                  }
-                ]} 
-                onPress={handleLogout}
-                activeOpacity={0.8}
-              >
-                <IconSymbol 
-                  size={18} 
-                  name="arrow.right.square" 
-                  color={isDark ? '#ef4444' : '#dc2626'} 
-                />
-                <Text 
+            {showLogoutButton &&
+              (session ? (
+                <TouchableOpacity
                   style={[
-                    styles.logoutButtonText, 
-                    { color: isDark ? '#ef4444' : '#dc2626' }
+                    styles.logoutButton,
+                    {
+                      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+                      borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)',
+                    },
                   ]}
+                  onPress={handleLogout}
+                  activeOpacity={0.8}
                 >
-                  Logout
-                </Text>
-              </TouchableOpacity>
-            )}
+                  <IconSymbol size={18} name="arrow.right.square" color={isDark ? '#ef4444' : '#dc2626'} />
+                  <Text style={[styles.logoutButtonText, { color: isDark ? '#ef4444' : '#dc2626' }]}>
+                    Logout
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.logoutButton,
+                    {
+                      backgroundColor: isDark ? 'rgba(96, 165, 250, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+                      borderColor: isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(59, 130, 246, 0.2)',
+                    },
+                  ]}
+                  onPress={handleLogin}
+                  activeOpacity={0.8}
+                >
+                  <IconSymbol size={18} name="person.circle" color={isDark ? '#60A5FA' : '#3B82F6'} />
+                  <Text style={[styles.logoutButtonText, { color: isDark ? '#60A5FA' : '#3B82F6' }]}>
+                    Login
+                  </Text>
+                </TouchableOpacity>
+              ))}
           </View>
         )}
       </View>

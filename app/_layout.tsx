@@ -66,6 +66,8 @@ export default function RootLayout() {
         <Stack.Screen name="room/[id]" options={{ title: 'Manage Room' }} />
         <Stack.Screen name="room/edit/[id]" options={{ title: 'Manage Room' }} />
         <Stack.Screen name="room/add-product/[id]" options={{ title: 'Manage Room' }} />
+        <Stack.Screen name="gallery" options={{ title: 'Manage Gallery' }} />
+        <Stack.Screen name="gallery/[roomType]" options={{ title: 'Manage Gallery' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

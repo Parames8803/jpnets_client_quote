@@ -16,9 +16,9 @@ export default function SettingsScreen() {
       <View style={styles.content}>
         <TouchableOpacity
           style={[styles.optionButton, { borderColor: colors.border, backgroundColor: colors.cardBackground }]}
-          onPress={() => router.push('/register')}
+          onPress={() => router.push('/gallery')}
         >
-          <Text style={[styles.optionText, { color: colors.text }]}>Create Admins</Text>
+          <Text style={[styles.optionText, { color: colors.text }]}>Update Gallery</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -109,9 +109,10 @@ export interface ProductType {
   sub_products?: ProductType[];
 }
 
-export const ROOM_TYPES: { name: string; products: ProductType[] }[] = [
-    {
+export const ROOM_TYPES: { name: string; slug: string; products: ProductType[] }[] = [
+  {
     name: 'Living Room',
+    slug: 'living-room',
     products: [
       { name: 'Sofa', default_price: 500, units: ['pcs', 'm'], wages: 50 },
       { name: 'Coffee Table', default_price: 150, units: ['pcs'], wages: 20 },
@@ -120,6 +121,7 @@ export const ROOM_TYPES: { name: string; products: ProductType[] }[] = [
   },
   {
     name: 'Kitchen',
+    slug: 'kitchen',
     products: [
       { name: 'Counter Top Bottom', default_price: 100, units: ['sq.ft', 'm²'], wages: 15,sub_products: [
           {
@@ -147,6 +149,7 @@ export const ROOM_TYPES: { name: string; products: ProductType[] }[] = [
   },
   {
     name: 'Bedroom',
+    slug: 'bedroom',
     products: [
       { name: 'Bed Frame', default_price: 400, units: ['pcs'], wages: 60 },
       {
