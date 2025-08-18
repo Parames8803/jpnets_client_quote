@@ -7,24 +7,61 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useColorScheme,
   View,
-  Dimensions,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const GRID_IMAGE_WIDTH = (width - 60) / 3;
 
+// JP Aluminium Interior Works Brand Palette
+const design = {
+  light: {
+    bg: '#FAFAFA', // Soft White
+    surface: '#FAFAFA',
+    text: '#212121', // Charcoal Black
+    subtext: '#9E9E9E', // Cool Gray
+    primary: '#E53935', // Brand Red
+    primaryOn: '#FAFAFA',
+    border: '#9E9E9E',
+    shadow: '#E0E0E0',
+    muted: '#F3F4F6',
+  },
+  dark: {
+    bg: '#121212',
+    surface: '#1E1E1E',
+    text: '#FFFFFF',
+    subtext: '#9E9E9E',
+    primary: '#E53935',
+    primaryOn: '#FAFAFA',
+    border: '#333333',
+    shadow: '#000000',
+    muted: '#111827',
+  },
+  radius: {
+    sm: 10,
+    md: 14,
+    lg: 18,
+    xl: 24,
+  },
+  space: (n: number) => 4 * n,
+};
+
 type Role = 'admin' | 'client' | 'worker' | 'viewer' | undefined;
 
 export default function RoomGalleryScreen() {
+  const scheme = useColorScheme();
+  const colors = scheme === 'dark' ? design.dark : design.light;
+
   const { roomType: roomTypeSlug } = useLocalSearchParams<{ roomType: string }>();
   const [images, setImages] = useState<{ path: string; url: string }[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -124,25 +161,39 @@ export default function RoomGalleryScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6366f1" />
-        <Text style={styles.loadingText}>Loading gallery...</Text>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.subtext }]}>Loading gallery...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.titleText}>{roomType?.name || 'Gallery'}</Text>
-        <Text style={styles.subtitleText}>
-          {images.length > 0 ? `Tap to preview images (${images.length})` : 'No images yet'}
+        <Text style={[styles.titleText, { color: colors.text }]}>
+          {roomType?.name || 'Gallery'}
+        </Text>
+        <Text style={[styles.subtitleText, { color: colors.subtext }]}>
+          {images.length > 0
+            ? `Tap to preview images (${images.length})`
+            : 'No images yet'}
         </Text>
 
         {/* Masonry grid */}
         <View style={styles.gridContainer}>
           {images.map((image) => (
-            <View style={styles.card} key={image.path}>
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.surface,
+                  shadowColor: colors.shadow,
+                  shadowOpacity: Platform.OS === 'android' ? 0.09 : 0.17,
+                },
+              ]}
+              key={image.path}
+            >
               <TouchableOpacity
                 style={styles.imageWrapper}
                 activeOpacity={0.95}
@@ -158,7 +209,7 @@ export default function RoomGalleryScreen() {
                   style={styles.deleteIcon}
                   onPress={() => handleDeleteConfirmation(image.path)}
                 >
-                  <Text style={styles.deleteIconText}>🗑️</Text>
+                  <Text style={[styles.deleteIconText, { color: colors.text }]}>🗑️</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -168,8 +219,11 @@ export default function RoomGalleryScreen() {
 
       {/* Floating action for upload */}
       {role === 'admin' && (
-        <TouchableOpacity style={styles.fab} onPress={pickAndUploadImages}>
-          <Text style={styles.fabText}>＋</Text>
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
+          onPress={pickAndUploadImages}
+        >
+          <Text style={[styles.fabText, { color: colors.primaryOn }]}>＋</Text>
         </TouchableOpacity>
       )}
 
@@ -180,12 +234,16 @@ export default function RoomGalleryScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
             <TouchableOpacity style={styles.closeModal} onPress={() => setModalVisible(false)}>
-              <Text style={styles.closeModalText}>✕</Text>
+              <Text style={[styles.closeModalText, { color: colors.text }]}>✕</Text>
             </TouchableOpacity>
             {!!selectedImage && (
-              <Image source={{ uri: selectedImage }} style={styles.modalImage} resizeMode="contain" />
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
             )}
           </View>
         </View>
@@ -195,10 +253,7 @@ export default function RoomGalleryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f7f8fd',
-  },
+  container: { flex: 1 },
   scrollContent: {
     paddingVertical: 32,
     paddingHorizontal: 16,
@@ -207,31 +262,28 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f7f8fd',
   },
   loadingText: {
     marginTop: 16,
-    color: '#64748b',
     fontWeight: '500',
     fontSize: 16,
   },
   titleText: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#1e293b',
     textAlign: 'center',
     marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subtitleText: {
-    fontSize: 14,
-    color: '#64748b',
+    fontSize: 15,
     textAlign: 'center',
     marginBottom: 24,
+    fontWeight: '500',
   },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
     gap: 12,
   },
   card: {
@@ -240,19 +292,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     margin: 6,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255, 0.93)',
-    shadowColor: '#6366f1',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: Platform.OS === 'android' ? 0.09 : 0.18,
     shadowRadius: 10,
     elevation: 3,
     position: 'relative',
   },
-  imageWrapper: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
+  imageWrapper: { flex: 1, width: '100%', height: '100%' },
   gridImage: {
     width: '100%',
     height: '100%',
@@ -274,22 +319,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 22,
     bottom: 32,
-    backgroundColor: '#6366f1',
     width: 56,
     height: 56,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#6366f1',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.21,
     shadowRadius: 12,
     elevation: 8,
   },
   fabText: {
-    color: 'white',
     fontSize: 32,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   modalBackdrop: {
     flex: 1,
@@ -300,7 +342,6 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '90%',
     height: '70%',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 14,
     alignItems: 'center',
@@ -315,7 +356,6 @@ const styles = StyleSheet.create({
   },
   closeModalText: {
     fontSize: 24,
-    color: '#555',
   },
   modalImage: {
     width: '100%',

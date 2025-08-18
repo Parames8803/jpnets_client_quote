@@ -1,4 +1,5 @@
 import { IconSymbol, IconSymbolName } from '@/components/ui/IconSymbol';
+import { StatusUpdateModal } from '@/components/ui/StatusUpdateModal';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import * as Print from 'expo-print';
@@ -16,9 +17,8 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { Client, Product, Quotation, Room, QUOTATION_STATUS_TYPES, ROOM_STATUS_TYPES, QuotationStatus, RoomStatus } from '../../types/db';
+import { Client, Product, Quotation, QUOTATION_STATUS_TYPES, QuotationStatus, Room, ROOM_STATUS_TYPES, RoomStatus } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
-import { StatusUpdateModal } from '@/components/ui/StatusUpdateModal';
 
 const { width } = Dimensions.get('window');
 

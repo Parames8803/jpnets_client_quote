@@ -5,7 +5,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Measurement, Product, Room } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState, FC } from 'react';
+import React, { FC, useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,

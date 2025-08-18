@@ -19,7 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Client, Quotation, QUOTATION_STATUS_TYPES, Room, QuotationStatus } from '../../types/db';
+import { Client, Quotation, QUOTATION_STATUS_TYPES, QuotationStatus, Room } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
 
 const { width } = Dimensions.get('window');

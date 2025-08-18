@@ -1,7 +1,3 @@
-import { ROOM_TYPES } from '@/types/db';
-import { supabase } from '@/utils/supabaseClient';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,17 +8,60 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  useColorScheme,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { supabase } from '@/utils/supabaseClient';
+import { ROOM_TYPES } from '@/types/db';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 
+const BRAND_RED = '#E53935';
+const CHARCOAL_BLACK = '#212121';
+const COOL_GRAY = '#9E9E9E';
+const SOFT_WHITE = '#FAFAFA';
+
+const design = {
+  light: {
+    bg: SOFT_WHITE,
+    surface: SOFT_WHITE,
+    text: CHARCOAL_BLACK,
+    subtext: COOL_GRAY,
+    primary: BRAND_RED,
+    primaryOn: SOFT_WHITE,
+    border: COOL_GRAY,
+    shadow: '#E0E0E0',
+  },
+  dark: {
+    bg: '#121212',
+    surface: '#1E1E1E',
+    text: '#FFFFFF',
+    subtext: COOL_GRAY,
+    primary: BRAND_RED,
+    primaryOn: SOFT_WHITE,
+    border: '#333333',
+    shadow: '#000000',
+  },
+  radius: {
+    sm: 10,
+    md: 14,
+    lg: 18,
+    xl: 24,
+  },
+  space: (n: number) => 4 * n,
+};
+
 type Role = 'admin' | 'client' | 'worker' | 'viewer' | undefined;
 
 export default function GalleryScreen() {
+  const scheme = useColorScheme();
+  const colors = scheme === 'dark' ? design.dark : design.light;
   const router = useRouter();
+
   const [roomPreviews, setRoomPreviews] = useState<{ [key: string]: string[] }>({});
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
@@ -53,6 +92,7 @@ export default function GalleryScreen() {
             .getPublicUrl(`${roomType.slug}/${file.name}`);
           return data.publicUrl;
         });
+
         newPreviews[roomType.slug] = urls;
       }
 
@@ -65,14 +105,23 @@ export default function GalleryScreen() {
 
   const role: Role = session?.user?.user_metadata?.role;
 
-  const renderRoomCard = ({ item: roomType, index }: { item: typeof ROOM_TYPES[0], index: number }) => {
+  const renderRoomCard = ({
+    item: roomType,
+    index,
+  }: {
+    item: typeof ROOM_TYPES[0];
+    index: number;
+  }) => {
     const previews = roomPreviews[roomType.slug] || [];
     const mainImage = previews[0];
     const isEven = index % 2 === 0;
 
     return (
       <TouchableOpacity
-        style={[styles.card, { marginRight: isEven ? 16 : 0 }]}
+        style={[
+          styles.card,
+          { marginRight: isEven ? 16 : 0, backgroundColor: colors.surface },
+        ]}
         onPress={() =>
           router.push({
             pathname: '/gallery/[roomType]',
@@ -91,13 +140,12 @@ export default function GalleryScreen() {
               />
             </>
           ) : (
-            <View style={styles.placeholderImage}>
-              <Text style={styles.placeholderText}>📷</Text>
-              <Text style={styles.placeholderSubtext}>No images</Text>
+            <View style={[styles.placeholderImage, { backgroundColor: colors.surface || '#86888bff' }]}>
+              <Text style={[styles.placeholderText, { color: colors.subtext }]}>📷</Text>
+              <Text style={[styles.placeholderSubtext, { color: colors.subtext }]}>No images</Text>
             </View>
           )}
-          
-          {/* Image count badge */}
+
           {previews.length > 0 && (
             <View style={styles.countBadge}>
               <Text style={styles.countText}>{previews.length}</Text>
@@ -106,22 +154,24 @@ export default function GalleryScreen() {
         </View>
 
         <View style={styles.cardContent}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
+          <Text
+            style={[styles.cardTitle, { color: colors.text }]}
+            numberOfLines={2}
+          >
             {roomType.name}
           </Text>
-          
-          {/* Mini preview strip */}
+
           {previews.length > 1 && (
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.miniPreviewContainer}
             >
               {previews.slice(1, 4).map((url, idx) => (
-                <Image 
-                  key={`${url}-${idx}`} 
-                  source={{ uri: url }} 
-                  style={styles.miniPreview} 
+                <Image
+                  key={`${url}-${idx}`}
+                  source={{ uri: url }}
+                  style={styles.miniPreview}
                 />
               ))}
               {previews.length > 4 && (
@@ -138,21 +188,21 @@ export default function GalleryScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.bg }]}>
         <View style={styles.loadingContent}>
-          <ActivityIndicator size="large" color="#6366f1" />
-          <Text style={styles.loadingText}>Loading gallery...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.subtext }]}>Loading gallery...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Gallery</Text>
-        <Text style={styles.subtitle}>Explore our collections</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Gallery</Text>
+        <Text style={[styles.subtitle, { color: colors.subtext }]}>Explore our collections</Text>
       </View>
 
       {/* Grid */}
@@ -172,11 +222,9 @@ export default function GalleryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   loadingContent: {
     flex: 1,
@@ -186,7 +234,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#64748b',
     fontWeight: '500',
   },
   header: {
@@ -195,15 +242,13 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#1e293b',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#64748b',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   listContent: {
     paddingHorizontal: 16,
@@ -215,8 +260,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: CARD_WIDTH,
-    backgroundColor: 'white',
-    borderRadius: 20,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
@@ -236,7 +280,6 @@ const styles = StyleSheet.create({
   placeholderImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -246,7 +289,6 @@ const styles = StyleSheet.create({
   },
   placeholderSubtext: {
     fontSize: 14,
-    color: '#94a3b8',
     fontWeight: '500',
   },
   gradient: {
@@ -276,7 +318,6 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1e293b',
     marginBottom: 12,
     lineHeight: 22,
   },
@@ -289,7 +330,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 6,
     borderWidth: 2,
-    borderColor: '#f1f5f9',
+    borderColor: SOFT_WHITE,
   },
   moreIndicator: {
     width: 32,
