@@ -3,6 +3,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { SplashScreen, Stack, useRouter } from 'expo-router';
+import * as ScreenCapture from 'expo-screen-capture';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
@@ -17,6 +18,13 @@ export default function RootLayout() {
   });
   const [session, setSession] = useState<any>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    ScreenCapture.preventScreenCaptureAsync();
+    return () => {
+      ScreenCapture.allowScreenCaptureAsync();
+    };
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
