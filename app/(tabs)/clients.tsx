@@ -36,7 +36,6 @@ export default function ClientsScreen() {
       const { data, error } = await supabase
         .from('clients')
         .select('*')
-        .eq('created_by', currentUserId)
         .order('created_at', { ascending: false });
 
       if (error) {

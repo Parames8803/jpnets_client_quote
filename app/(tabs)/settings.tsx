@@ -20,6 +20,13 @@ export default function SettingsScreen() {
         >
           <Text style={[styles.optionText, { color: colors.text }]}>Update Gallery</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.optionButton, { borderColor: colors.border, backgroundColor: colors.cardBackground }]}
+          onPress={() => router.push('/register')}
+        >
+          <Text style={[styles.optionText, { color: colors.text }]}>Create Admin Account</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

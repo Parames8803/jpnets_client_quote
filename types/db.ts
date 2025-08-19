@@ -96,6 +96,7 @@ export type RoomStatus = typeof ROOM_STATUS_TYPES[keyof typeof ROOM_STATUS_TYPES
 
 export const QUOTATION_STATUS_TYPES = {
   PENDING: 'Pending',
+  ACTIVE: 'Active', // Added Active status
   CLOSED: 'Closed',
 } as const;
 

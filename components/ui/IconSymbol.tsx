@@ -91,6 +91,11 @@ const MAPPING = {
   'map': 'map', // Added mapping for map
   'gearshape.fill': 'settings', // Added mapping for gearshape.fill
   'gearshape': 'settings', // Added mapping for gearshape
+  'building.2': 'apartment', // Added mapping for building.2
+  'square.stack.3d.down.forward': 'layers', // Added mapping for square.stack.3d.down.forward
+  'sum': 'functions', // Added mapping for sum
+  'square': 'square-foot', // Added mapping for square
+  'tag': 'label', // Added mapping for tag
 } as const;
 
 /**

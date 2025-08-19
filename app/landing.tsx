@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -176,35 +177,54 @@ export default function LandingPage() {
   const [session, setSession] = useState<any>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [carouselImages, setCarouselImages] = useState<any[]>([]);
+  const [carouselLoading, setCarouselLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fallbackImages = [
+    require('../assets/images/adaptive-icon.png'),
+    require('../assets/images/favicon.png'),
+    require('../assets/images/icon.png'),
+    require('../assets/images/jp_logo.png'),
+    require('../assets/images/splash-icon.png'),
+  ];
+
+  const fetchRandomImages = async () => {
+    setCarouselLoading(true);
+    try {
+      let allFiles: { name: string; slug: string }[] = [];
+      for (const roomType of ROOM_TYPES) {
+        const { data: files, error } = await supabase.storage
+          .from('file-storage')
+          .list(roomType.slug);
+        if (!error && files) {
+          allFiles = allFiles.concat(
+            files.map((file) => ({ name: file.name, slug: roomType.slug }))
+          );
+        }
+      }
+      if (allFiles.length > 0) {
+        const shuffled = allFiles.sort(() => 0.5 - Math.random());
+        const selectedFiles = shuffled.slice(0, 5); // Reduced to 5 images
+        const imageUrls = selectedFiles.map(file => {
+          const { data } = supabase.storage
+            .from('file-storage')
+            .getPublicUrl(`${file.slug}/${file.name}`);
+          return { uri: data.publicUrl };
+        });
+        setCarouselImages(imageUrls.length > 0 ? imageUrls : fallbackImages);
+      } else {
+        setCarouselImages(fallbackImages);
+      }
+    } catch (e) {
+      console.error("Error fetching carousel images:", e);
+      setCarouselImages(fallbackImages);
+    } finally {
+      setCarouselLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchRandomImages = async () => {
-      try {
-        let allFiles: { name: string; slug: string }[] = [];
-        for (const roomType of ROOM_TYPES) {
-          const { data: files, error } = await supabase.storage
-            .from('file-storage')
-            .list(roomType.slug);
-          if (!error && files) {
-            allFiles = allFiles.concat(
-              files.map((file) => ({ name: file.name, slug: roomType.slug }))
-            );
-          }
-        }
-        if (allFiles.length > 0) {
-          const shuffled = allFiles.sort(() => 0.5 - Math.random());
-          const selectedFiles = shuffled.slice(0, 10);
-          const imageUrls = selectedFiles.map(file => {
-            const { data } = supabase.storage
-              .from('file-storage')
-              .getPublicUrl(`${file.slug}/${file.name}`);
-            return { uri: data.publicUrl };
-          });
-          setCarouselImages(imageUrls.length > 0 ? imageUrls : []);
-        }
-      } catch (e) { }
-    };
     fetchRandomImages();
     let unsub: any;
     const init = async () => {
@@ -223,6 +243,12 @@ export default function LandingPage() {
       if (unsub) unsub.unsubscribe();
     };
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchRandomImages();
+    setRefreshing(false);
+  };
 
   const role: Role = session?.user?.user_metadata?.role;
   const goToRoleHome = () => {
@@ -282,6 +308,13 @@ export default function LandingPage() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: design.space(8) }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* Hero */}
         <View style={{ paddingHorizontal: design.space(5), paddingTop: design.space(6) }}>
@@ -337,62 +370,86 @@ export default function LandingPage() {
         <View style={{ marginTop: design.space(7) }}>
           <SectionTitle>Selected Works</SectionTitle>
           <View style={{ alignItems: 'center' }}>
-            <View
-              style={{
-                width: screenWidth,
-                paddingHorizontal: design.space(4),
-              }}
-            >
-              <Carousel
-                loop
-                width={screenWidth - design.space(8)}
-                height={220}
-                autoPlay
-                autoPlayInterval={2800}
-                scrollAnimationDuration={900}
-                data={carouselImages}
-                onSnapToItem={setCurrentIndex}
-                renderItem={({ item, index }) => (
-                  <View
-                    key={index}
-                    style={{
-                      flex: 1,
-                      borderRadius: design.radius.lg,
-                      overflow: 'hidden',
-                      backgroundColor: colors.surface,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      shadowColor: colors.shadow,
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.13,
-                      shadowRadius: 7,
-                      transform: [{ scale: 0.98 }],
-                    }}
-                  >
-                    <Image
-                      source={item}
-                      resizeMode="cover"
-                      style={{ width: '100%', height: '100%' }}
-                    />
-                  </View>
-                )}
-              />
-            </View>
-            {/* Dots */}
-            <View style={{ flexDirection: 'row', marginTop: design.space(3), justifyContent: 'center' }}>
-              {carouselImages.map((_, i) => (
+            {carouselLoading ? (
+              <View
+                style={{
+                  width: screenWidth - design.space(8),
+                  height: 220,
+                  borderRadius: design.radius.lg,
+                  backgroundColor: colors.surface,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  shadowColor: colors.shadow,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.13,
+                  shadowRadius: 7,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={{ color: colors.subtext, marginTop: design.space(2) }}>Loading images...</Text>
+              </View>
+            ) : (
+              <>
                 <View
-                  key={i}
                   style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 999,
-                    marginHorizontal: 4,
-                    backgroundColor: i === currentIndex ? colors.dot : `${colors.dot}55`,
+                    width: screenWidth,
+                    paddingHorizontal: design.space(4),
                   }}
-                />
-              ))}
-            </View>
+                >
+                  <Carousel
+                    loop
+                    width={screenWidth - design.space(8)}
+                    height={220}
+                    autoPlay
+                    autoPlayInterval={2800}
+                    scrollAnimationDuration={900}
+                    data={carouselImages}
+                    onSnapToItem={setCurrentIndex}
+                    renderItem={({ item, index }) => (
+                      <View
+                        key={index}
+                        style={{
+                          flex: 1,
+                          borderRadius: design.radius.lg,
+                          overflow: 'hidden',
+                          backgroundColor: colors.surface,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          shadowColor: colors.shadow,
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.13,
+                          shadowRadius: 7,
+                          transform: [{ scale: 0.98 }],
+                        }}
+                      >
+                        <Image
+                          source={item}
+                          resizeMode="cover"
+                          style={{ width: '100%', height: '100%' }}
+                        />
+                      </View>
+                    )}
+                  />
+                </View>
+                {/* Dots */}
+                <View style={{ flexDirection: 'row', marginTop: design.space(3), justifyContent: 'center' }}>
+                  {carouselImages.map((_, i) => (
+                    <View
+                      key={i}
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 999,
+                        marginHorizontal: 4,
+                        backgroundColor: i === currentIndex ? colors.dot : `${colors.dot}55`,
+                      }}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
           </View>
         </View>
         {/* Features */}
