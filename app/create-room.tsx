@@ -67,6 +67,10 @@ export default function CreateRoomScreen() {
   const [availableProductUnits, setAvailableProductUnits] = useState<string[]>([]);
   const [currentUnitField, setCurrentUnitField] = useState<'length' | 'width' | null>(null);
   const [isDimensionModalVisible, setDimensionModalVisible] = useState(false);
+  const [productLengthValue, setProductLengthValue] = useState<number | null>(null);
+  const [productLengthUnitType, setProductLengthUnitType] = useState<string | null>(null);
+  const [productWidthValue, setProductWidthValue] = useState<number | null>(null);
+  const [productWidthUnitType, setProductWidthUnitType] = useState<string | null>(null);
 
 
 
@@ -117,6 +121,10 @@ export default function CreateRoomScreen() {
     setNewProductUnitType('');
     setNewProductDescription('');
     setAvailableProductUnits([]);
+    setProductLengthValue(null);
+    setProductLengthUnitType(null);
+    setProductWidthValue(null);
+    setProductWidthUnitType(null);
   };
 
 
@@ -134,6 +142,10 @@ export default function CreateRoomScreen() {
         wages: lastSelected.wages,
         default_wages: lastSelected.wages,
         description: newProductDescription,
+        length_value: productLengthValue,
+        length_unit_type: productLengthUnitType,
+        width_value: productWidthValue,
+        width_unit_type: productWidthUnitType,
       };
       setProducts(prev => [...prev, newProduct]);
       resetProductForm();
@@ -428,7 +440,17 @@ export default function CreateRoomScreen() {
 
 
       <SelectionModal />
-      <ProductDimensionModal visible={isDimensionModalVisible} onClose={() => setDimensionModalVisible(false)} onSetQuantity={setNewProductQuantity} />
+      <ProductDimensionModal
+        visible={isDimensionModalVisible}
+        onClose={() => setDimensionModalVisible(false)}
+        onSetDimensions={({ length, width, lengthUnit, widthUnit, totalSqFt }) => {
+          setNewProductQuantity(totalSqFt.toFixed(2));
+          setProductLengthValue(length);
+          setProductLengthUnitType(lengthUnit);
+          setProductWidthValue(width);
+          setProductWidthUnitType(widthUnit);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

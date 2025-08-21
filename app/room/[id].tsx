@@ -397,6 +397,9 @@ const ProductCard: FC<ProductCardProps> = ({ product, colors }) => (
     </Text>
     <View style={styles.productMetaRow}>
       <MetaBadge colors={colors} icon="list.clipboard.fill" text={`Qty: ${product.quantity} ${product.unit_type}`} />
+      {product.unit_type?.toLowerCase().includes('sq') && product.length_value && product.width_value && (
+        <MetaBadge colors={colors} icon="ruler.fill" text={`${product.length_value} ${product.length_unit_type} x ${product.width_value} ${product.width_unit_type}`} />
+      )}
     </View>
   </View>
 );

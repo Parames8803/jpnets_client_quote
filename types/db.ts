@@ -39,6 +39,10 @@ export interface Product {
   wages: number | null; // numeric, nullable
   default_wages: number | null; // numeric, nullable
   description: string | null; // text, nullable
+  length_value: number | null; // numeric, nullable, for products with sq.ft unit type
+  length_unit_type: string | null; // text, nullable, for products with sq.ft unit type
+  width_value: number | null; // numeric, nullable, for products with sq.ft unit type
+  width_unit_type: string | null; // text, nullable, for products with sq.ft unit type
 }
 
 // Interface for the 'quotation_rooms' table (junction table)
