@@ -82,6 +82,7 @@ export interface Room {
   status: string | null; // text, nullable (default 'Not Active')
   ref_image_urls: string[] | null; // text[], nullable
   total_sq_ft: string | null; // text, nullable
+  is_in_closed_quotation?: boolean; // Added to indicate if the room is part of a closed quotation
 }
 
 export const ROOM_STATUS_TYPES = {

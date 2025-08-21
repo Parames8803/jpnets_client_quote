@@ -49,7 +49,8 @@ function useRoomDetails(roomId: string | string[] | undefined) {
         .select(`
           *,
           measurements (*),
-          products (*)
+          products (*),
+          quotation_rooms(quotations(status))
         `)
         .eq('id', id_str)
         .single();
@@ -57,10 +58,12 @@ function useRoomDetails(roomId: string | string[] | undefined) {
       if (queryError) throw queryError;
       if (!rawData) throw new Error('Room not found.');
 
-      const { measurements, products, ...room } = rawData;
+      const { measurements, products, quotation_rooms, ...room } = rawData;
+
+      const isRoomInClosedQuotation = quotation_rooms.some((qr: any) => qr.quotations?.status === 'Closed');
 
       setData({
-        room: room as Room,
+        room: { ...room as Room, is_in_closed_quotation: isRoomInClosedQuotation },
         measurement: (measurements && measurements.length > 0) ? measurements[0] : null,
         products: products || [],
       });
@@ -217,6 +220,8 @@ export default function RoomDetailsScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('details');
   const [refreshing, setRefreshing] = useState(false);
 
+  const isRoomInClosedQuotation = data?.room?.is_in_closed_quotation || false;
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refetch();
@@ -261,8 +266,20 @@ export default function RoomDetailsScreen() {
         <View style={styles.stickyActions}>
           {userRole !== 'client' && userRole !== 'worker' && (
             <>
-              <SmallBtn colors={colors} icon="pencil" label="Edit" onPress={() => router.push(`/room/edit/${room.id}`)} />
-              <SmallBtn colors={colors} icon="plus" label="Product" onPress={() => router.push(`/room/add-product/${room.id}`)} />
+              <SmallBtn
+                colors={colors}
+                icon="pencil"
+                label="Edit"
+                onPress={() => router.push(`/room/edit/${room.id}`)}
+                disabled={isRoomInClosedQuotation}
+              />
+              <SmallBtn
+                colors={colors}
+                icon="plus"
+                label="Product"
+                onPress={() => router.push(`/room/add-product/${room.id}`)}
+                disabled={isRoomInClosedQuotation}
+              />
             </>
           )}
         </View>
@@ -318,9 +335,14 @@ function InlineMeta({ colors, room }: { colors: any; room: Room }) {
   );
 }
 
-function SmallBtn({ colors, icon, label, onPress }: { colors: any; icon: IconSymbolName; label: string; onPress: () => void }) {
+function SmallBtn({ colors, icon, label, onPress, disabled }: { colors: any; icon: IconSymbolName; label: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <TouchableOpacity style={[styles.smallBtn, { backgroundColor: colors.secondaryBackground }]} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={[styles.smallBtn, { backgroundColor: colors.secondaryBackground }, disabled && { opacity: 0.4 }]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      disabled={disabled}
+    >
       <IconSymbol name={icon} size={14} color={colors.tint} />
       <Text style={[styles.smallBtnText, { color: colors.tint }]}>{label}</Text>
     </TouchableOpacity>

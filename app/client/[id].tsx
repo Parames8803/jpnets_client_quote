@@ -58,7 +58,7 @@ export default function ClientDetailsScreen() {
 
       const { data: quotationsData, error: quotationsError } = await supabase
         .from('quotations')
-        .select('*')
+        .select('*, quotation_rooms(room_id)') // Fetch quotation_rooms to link to rooms
         .eq('client_id', clientId)
         .order('created_at', { ascending: false });
       setQuotations(quotationsError ? [] : quotationsData || []);
@@ -185,6 +185,41 @@ export default function ClientDetailsScreen() {
   );
   const activeQuotes = useMemo(() => quotations.filter(q => q.status === 'Active').length, [quotations]);
 
+  const roomsInClosedQuotationsIds = useMemo(() => {
+    const ids = new Set<string>();
+    quotations.forEach(q => {
+      if (q.status === 'Closed' && q.quotation_rooms) {
+        q.quotation_rooms.forEach((qr: any) => { // Cast to any for now, will refine type later if needed
+          if (qr.room_id) {
+            ids.add(qr.room_id);
+          }
+        });
+      }
+    });
+    return ids;
+  }, [quotations]);
+
+  const selectedRoomsInClosedQuotations = useMemo(() => {
+    if (batchMode !== 'rooms') return false;
+    for (const roomId of selectedIds) {
+      if (roomsInClosedQuotationsIds.has(roomId)) {
+        return true;
+      }
+    }
+    return false;
+  }, [selectedIds, roomsInClosedQuotationsIds, batchMode]);
+
+  const selectedQuotesAreClosed = useMemo(() => {
+    if (batchMode !== 'quotes') return false;
+    for (const quoteId of selectedIds) {
+      const quote = quotations.find(q => q.id === quoteId);
+      if (quote && quote.status === 'Closed') {
+        return true;
+      }
+    }
+    return false;
+  }, [selectedIds, quotations, batchMode]);
+
   const statusStyle = (status: string | null | undefined) => {
     const map: Record<string, { bg: string; text: string; border: string }> = isDark
       ? {
@@ -230,7 +265,11 @@ export default function ClientDetailsScreen() {
           </View>
         </View>
         {batchMode !== 'rooms' ? (
-          <TouchableOpacity onPress={() => handleDeleteRoom(item.id)}>
+          <TouchableOpacity
+            onPress={() => handleDeleteRoom(item.id)}
+            disabled={roomsInClosedQuotationsIds.has(item.id)}
+            style={roomsInClosedQuotationsIds.has(item.id) && { opacity: 0.4 }}
+          >
             <IconSymbol name="trash.fill" size={16} color={isDark ? '#FCA5A5' : '#DC2626'} />
           </TouchableOpacity>
         ) : (
@@ -368,6 +407,7 @@ export default function ClientDetailsScreen() {
               count={selectedIds.size}
               onDelete={performBatchDelete}
               onCancel={clearBatch}
+              disableDelete={selectedRoomsInClosedQuotations}
             />
           )}
         </CollapsibleSection>
@@ -399,6 +439,7 @@ export default function ClientDetailsScreen() {
               count={selectedIds.size}
               onDelete={performBatchDelete}
               onCancel={clearBatch}
+              disableDelete={selectedQuotesAreClosed}
             />
           )}
         </CollapsibleSection>
@@ -472,12 +513,12 @@ function Empty({ label, hint }: { label: string; hint: string }) {
   );
 }
 
-function BatchBar({ count, onDelete, onCancel }: { count: number; onDelete: () => void; onCancel: () => void }) {
+function BatchBar({ count, onDelete, onCancel, disableDelete }: { count: number; onDelete: () => void; onCancel: () => void; disableDelete?: boolean }) {
   return (
     <View style={styles.batchBar}>
       <Text style={styles.batchText}>{count} selected</Text>
       <View style={{ flexDirection: 'row', gap: 12 }}>
-        <TouchableOpacity onPress={onDelete} style={[styles.batchBtn, { backgroundColor: '#DC2626' }]}>
+        <TouchableOpacity onPress={onDelete} style={[styles.batchBtn, { backgroundColor: '#DC2626' }, disableDelete && { opacity: 0.4 }]} disabled={disableDelete}>
           <IconSymbol name="trash.fill" size={14} color="#fff" />
           <Text style={styles.batchBtnText}>Delete</Text>
         </TouchableOpacity>
