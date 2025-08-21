@@ -1,8 +1,10 @@
+import { Session } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Appearance,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -14,7 +16,6 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
-import { Session } from '@supabase/supabase-js';
 import { supabase } from '../../utils/supabaseClient';
 
 const { width, height } = Dimensions.get('window');
@@ -173,13 +174,16 @@ export default function LoginScreen() {
             {/* Logo/brand icon area */}
             <View style={{ alignItems: 'center', marginBottom: 32 }}>
               {/* Replace below with your logo/image */}
-              <View style={{
-                backgroundColor: theme.buttonBG + '22',
-                width: 60, height: 60, borderRadius: 20,
-                alignItems: 'center', justifyContent: 'center', marginBottom: 8
-              }}>
-                <Text style={{ fontSize: 32, color: theme.buttonBG }}>🚀</Text>
-              </View>
+              <View style={styles.brandWrap}>
+                        <Image
+                          source={require('../../assets/images/icon.png')}
+                          style={{
+                            width: 100,
+                            height: 100,
+                            borderRadius: 14,
+                          }}
+                        />
+                      </View>
               <Text style={[styles.title, { color: theme.title }]}>Sign In</Text>
               <Text style={[styles.subtitle, { color: theme.text }]}>
                 Welcome back. Please log in to your account.
@@ -322,6 +326,10 @@ export default function LoginScreen() {
 const CARD_PADDING = 28;
 
 const styles = StyleSheet.create({
+  brandWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   flex: { flex: 1 },
   card: {
     marginTop: height * 0.10,

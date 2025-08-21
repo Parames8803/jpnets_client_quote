@@ -435,7 +435,8 @@ export default function QuotationDetailsScreen() {
         <View style={styles.headerButtons}>
           <TouchableOpacity
             onPress={() => setIsStatusModalVisible(true)}
-            style={styles.headerButton}
+            style={[styles.headerButton, quotationStatus === 'Closed' && { opacity: 0.4 }]}
+            disabled={quotationStatus === 'Closed'}
           >
             <IconSymbol
               size={22}
@@ -443,9 +444,11 @@ export default function QuotationDetailsScreen() {
               color={colors.tint}
             />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
-            <IconSymbol size={22} name="trash.fill" color={colors.error} />
-          </TouchableOpacity>
+          {quotationStatus !== 'Closed' && (
+            <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
+              <IconSymbol size={22} name="trash.fill" color={colors.error} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

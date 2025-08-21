@@ -273,13 +273,16 @@ export default function ClientDetailsScreen() {
           <View style={styles.rowRight}>
             <TouchableOpacity
               style={[styles.statusChip, { backgroundColor: st.bg, borderColor: st.border }]}
-              onPress={() => updateQuotationStatusInline(item)}
+              onPress={() => item.status !== 'Closed' && updateQuotationStatusInline(item)}
+              disabled={item.status === 'Closed'}
             >
               <Text style={[styles.statusChipText, { color: st.text }]}>{item.status || 'Not Active'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleDeleteQuotation(item.id)} hitSlop={10}>
-              <IconSymbol name="trash.fill" size={16} color={isDark ? '#FCA5A5' : '#DC2626'} />
-            </TouchableOpacity>
+            {item.status !== 'Closed' && (
+              <TouchableOpacity onPress={() => handleDeleteQuotation(item.id)} hitSlop={10}>
+                <IconSymbol name="trash.fill" size={16} color={isDark ? '#FCA5A5' : '#DC2626'} />
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <View style={[styles.checkbox, selected && styles.checkboxChecked]} />

@@ -290,11 +290,18 @@ export default function LandingPage() {
           <Image
             source={require('../assets/images/icon.png')}
             style={{
-              width: 40,
-              height: 40,
+              width: 50,
+              height: 50,
               borderRadius: design.radius.md,
             }}
           />
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 20,
+              fontWeight: '700',
+              marginLeft: design.space(3),
+            }}>JP Interiors</Text>
         </View>
         {role !== 'viewer' && (
           <Button
