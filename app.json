@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ClientQuoteApp",
+    "name": "JP Interiors",
     "slug": "ClientQuoteApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon-square.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,

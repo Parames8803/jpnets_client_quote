@@ -717,7 +717,7 @@ function generateQuotationHtml({
       --color-bg-header: #f1f1f1;
       --color-accent: #007bff;
       --watermark-opacity: 0.15;
-      --watermark-size: 1000px;
+      --watermark-size: 700px;
       --watermark-rotation: 0deg;
       --watermark-url: url('https://curiqqrlajzvidcbcluj.supabase.co/storage/v1/object/public/file-storage/logo/JP-Aluminium-Kitchen-Cupboard-Interior-Works.jpg');
     }
