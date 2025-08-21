@@ -1,15 +1,16 @@
+import SplashScreen from '@/components/SplashScreen'; // Import your custom SplashScreen
 import { CustomHeader } from '@/components/ui/CustomHeader';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { SplashScreen, Stack, useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router'; // Removed Expo's SplashScreen
 import * as ScreenCapture from 'expo-screen-capture';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react'; // Added useCallback
 import 'react-native-reanimated';
 import { supabase } from '../utils/supabaseClient';
 
-SplashScreen.preventAutoHideAsync();
+// No longer need to preventAutoHideAsync from Expo's SplashScreen
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -17,6 +18,7 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
   const [session, setSession] = useState<any>(null);
+  const [appReady, setAppReady] = useState(false); // State to manage custom splash screen visibility
   const router = useRouter();
 
   useEffect(() => {
@@ -26,28 +28,28 @@ export default function RootLayout() {
     };
   }, []);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      // Always go to landing page initially
-      if (loaded) {
-        router.replace('/landing');
-      }
-    });
-
-    supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-  }, [loaded]);
+  const onLottieAnimationFinish = useCallback(() => {
+    setAppReady(true);
+  }, []);
 
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        // Always go to landing page initially after Lottie animation finishes
+        if (appReady) {
+          router.replace('/landing');
+        }
+      });
 
-  if (!loaded) {
-    return null;
+      supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+      });
+    }
+  }, [loaded, appReady]); // Depend on appReady
+
+  if (!appReady || !loaded) { // Show custom splash screen until app is ready and fonts are loaded
+    return <SplashScreen onAnimationFinish={onLottieAnimationFinish} />;
   }
 
   return (
