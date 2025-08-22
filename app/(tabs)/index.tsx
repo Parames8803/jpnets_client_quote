@@ -90,6 +90,7 @@ export default function HomeScreen() {
           { icon: "people-outline", title: "Workers", color: "#FF5722", onPress: () => router.push('/workers') },
           { icon: "hourglass-outline", title: "Pending works", color: "#9C27B0", onPress: () => router.push('/pending-works') },
           { icon: "play-circle-outline", title: "Ongoing works", color: "#FF9800", onPress: () => router.push('/ongoing-works') },
+          { icon: "wallet-outline", title: "Pending Amount", color: "#FFC107", onPress: () => router.push('/pending-amount') },
         ].map((action, index) => (
           <TouchableOpacity 
             key={index} 

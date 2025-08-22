@@ -10,6 +10,7 @@ export interface Client {
   address: string | null; // text, nullable
   latitude: number | null; // numeric, nullable
   longitude: number | null; // numeric, nullable
+  pending_amount?: number | null; // numeric, nullable, added for convenience
 }
 
 // Interface for the 'measurements' table
