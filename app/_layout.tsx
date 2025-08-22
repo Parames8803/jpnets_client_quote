@@ -6,7 +6,7 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter } from 'expo-router'; // Removed Expo's SplashScreen
 import * as ScreenCapture from 'expo-screen-capture';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState, useCallback } from 'react'; // Added useCallback
+import { useCallback, useEffect, useState } from 'react'; // Added useCallback
 import 'react-native-reanimated';
 import { supabase } from '../utils/supabaseClient';
 
@@ -78,6 +78,8 @@ export default function RootLayout() {
         <Stack.Screen name="room/add-product/[id]" options={{ title: 'Manage Room' }} />
         <Stack.Screen name="gallery" options={{ title: 'Manage Gallery' }} />
         <Stack.Screen name="gallery/[roomType]" options={{ title: 'Manage Gallery' }} />
+        <Stack.Screen name="pending-works" options={{ title: 'Pending Works' }} />
+        <Stack.Screen name="ongoing-works" options={{ title: 'Ongoing Works' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
