@@ -80,6 +80,9 @@ export default function RootLayout() {
         <Stack.Screen name="gallery/[roomType]" options={{ title: 'Manage Gallery' }} />
         <Stack.Screen name="pending-works" options={{ title: 'Pending Works' }} />
         <Stack.Screen name="ongoing-works" options={{ title: 'Ongoing Works' }} />
+        <Stack.Screen name="leads" options={{ title: 'Pending Measurements' }} />
+      <Stack.Screen name="create-lead" options={{ headerShown: false }} />
+      <Stack.Screen name="leads/[id]" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

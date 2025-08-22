@@ -108,6 +108,25 @@ export const QUOTATION_STATUS_TYPES = {
 
 export type QuotationStatus = typeof QUOTATION_STATUS_TYPES[keyof typeof QUOTATION_STATUS_TYPES];
 
+export const LEAD_STATUS_TYPES = {
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  PENDING: 'Pending',
+} as const;
+
+export type LeadStatus = typeof LEAD_STATUS_TYPES[keyof typeof LEAD_STATUS_TYPES];
+
+export interface Lead {
+  id: string; // uuid
+  created_at: string; // timestamp with time zone
+  user_id: string; // uuid (references auth.users.id)
+  name: string; // text
+  contact: string | null; // text, nullable
+  address: string | null; // text, nullable
+  comment: string | null; // text, nullable
+  status: LeadStatus; // 'Approved' | 'Rejected' | 'Pending'
+}
+
 export interface ProductType {
   name: string;
   default_price: number;
