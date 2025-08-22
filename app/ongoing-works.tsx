@@ -46,6 +46,7 @@ export default function OngoingWorksScreen() {
             id,
             status,
             assigned_worker_id,
+            quote_id,
             quotation_rooms (
               rooms (
                 id,
@@ -204,7 +205,7 @@ export default function OngoingWorksScreen() {
           <View style={styles.quotationHeader}>
             <Ionicons name="document-text-outline" size={16} color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
             <Text style={[styles.quotationTitle, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-              ID: {quotation.id.substring(0, 8)}...
+              ID: #{quotation.quote_id ?? 'N/A' }
             </Text>
           </View>
 

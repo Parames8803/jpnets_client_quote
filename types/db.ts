@@ -58,6 +58,7 @@ export interface QuotationRoom {
 export interface Quotation {
   id: string; // uuid
   created_at: string; // timestamp with time zone
+  quote_id: string; // text, unique identifier for the quotation (e.g., JP001)
   client_id: string | null; // uuid, nullable (references clients.id)
   total_price: number | null; // numeric, nullable
   pdf_url: string | null; // text, nullable

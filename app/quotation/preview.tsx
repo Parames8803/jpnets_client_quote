@@ -39,6 +39,10 @@ const EditProductModal = ({ visible, product, onClose, onSave, colors }: any) =>
     wages: null,
     default_wages: null,
     description: null,
+    length_value: null,
+    length_unit_type: null,
+    width_value: null,
+    width_unit_type: null,
     originalId: '',
   };
   const [editedProduct, setEditedProduct] = useState<EditableProduct>(product || defaultProduct);
@@ -156,6 +160,7 @@ export default function QuotationPreviewScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<EditableProduct | null>(null);
+  const [nextQuoteId, setNextQuoteId] = useState<string | null>(null);
 
   const selectedRoomIds: string[] = JSON.parse(selectedRoomIdsString as string);
   
@@ -198,7 +203,30 @@ export default function QuotationPreviewScreen() {
       }
     };
 
+    const fetchNextQuoteId = async () => {
+      const { data, error } = await supabase
+        .from('quotations')
+        .select('quote_id')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching latest quote ID:', error);
+        setNextQuoteId('JP001'); // Fallback to default
+        return;
+      }
+
+      if (data && data.length > 0 && data[0].quote_id) {
+        const latestQuoteId = data[0].quote_id;
+        const num = parseInt(latestQuoteId.replace('JP', ''), 10);
+        setNextQuoteId(`JP${String(num + 1).padStart(3, '0')}`);
+      } else {
+        setNextQuoteId('JP001');
+      }
+    };
+
     fetchQuotationData();
+    fetchNextQuoteId();
   }, [clientId, selectedRoomIdsString]);
 
   const groupedProducts: GroupedProduct[] = useMemo(() => {
@@ -232,9 +260,15 @@ export default function QuotationPreviewScreen() {
   const handleSubmitQuotation = async () => {
     setIsSubmitting(true);
     try {
+      if (!nextQuoteId) {
+        Alert.alert('Error', 'Quotation ID not generated. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const { data: quotationData, error: quotationError } = await supabase
         .from('quotations')
-        .insert({ client_id: clientId, total_price: grandTotal, status: QUOTATION_STATUS_TYPES.PENDING })
+        .insert({ client_id: clientId, total_price: grandTotal, status: QUOTATION_STATUS_TYPES.PENDING, quote_id: nextQuoteId })
         .select().single();
       if (quotationError) throw quotationError;
 
