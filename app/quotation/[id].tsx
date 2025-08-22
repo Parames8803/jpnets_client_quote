@@ -329,8 +329,7 @@ type Tab = "overview" | "products" | "rooms";
 export default function QuotationDetailsScreen() {
   const router = useRouter();
   const { id: quotationId } = useLocalSearchParams();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? "light"];
+  const colors = Colors.light; // Always use light theme
 
   const {
     data,
@@ -428,9 +427,7 @@ export default function QuotationDetailsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar
-        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
-      />
+      <StatusBar barStyle="dark-content" />
 
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>

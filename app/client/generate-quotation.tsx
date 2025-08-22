@@ -1,61 +1,80 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Client, Room, ROOM_STATUS_TYPES } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
 
 export default function GenerateQuotationScreen() {
   const router = useRouter();
   const { clientId } = useLocalSearchParams();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  // const colorScheme = useColorScheme(); // Removed
+  // const isDark = colorScheme === 'dark'; // Removed
 
   const [client, setClient] = useState<Client | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // New state for refresh
+
+  const fetchClientAndRooms = useCallback(async () => { // Wrapped in useCallback
+    if (!clientId) {
+      Alert.alert('Error', 'Client ID is missing.');
+      setLoading(false);
+      return;
+    }
+
+    const client_id_str = Array.isArray(clientId) ? clientId[0] : clientId;
+
+    try {
+      setRefreshing(true); // Set refreshing true at start
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', client_id_str)
+        .single();
+
+      if (clientError) throw clientError;
+      setClient(clientData);
+
+      const { data: roomsData, error: roomsError } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('client_id', client_id_str)
+        .eq('status', ROOM_STATUS_TYPES.ACTIVE)
+        .order('created_at', { ascending: false });
+
+      if (roomsError) throw roomsError;
+      setRooms(roomsData || []);
+
+      // Automatic navigation if no rooms
+      if (!roomsData || roomsData.length === 0) {
+        Alert.alert('No Rooms', 'No active rooms found for this client. Returning to client details.', [
+          { text: 'OK', onPress: () => router.replace(`/client/${client_id_str}`) }
+        ]);
+      }
+
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false); // Set refreshing false at end
+    }
+  }, [clientId, router]); // Added router to dependencies
 
   useEffect(() => {
-    const fetchClientAndRooms = async () => {
-      if (!clientId) {
-        Alert.alert('Error', 'Client ID is missing.');
-        setLoading(false);
-        return;
-      }
-
-      const client_id_str = Array.isArray(clientId) ? clientId[0] : clientId;
-
-      try {
-        const { data: clientData, error: clientError } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('id', client_id_str)
-          .single();
-
-        if (clientError) throw clientError;
-        setClient(clientData);
-
-        const { data: roomsData, error: roomsError } = await supabase
-          .from('rooms')
-          .select('*')
-          .eq('client_id', client_id_str)
-          .eq('status', ROOM_STATUS_TYPES.ACTIVE)
-          .order('created_at', { ascending: false });
-
-        if (roomsError) throw roomsError;
-        setRooms(roomsData || []);
-
-      } catch (error: any) {
-        Alert.alert('Error', error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchClientAndRooms();
-  }, [clientId]);
+  }, [fetchClientAndRooms]); // Depend on fetchClientAndRooms
 
   const toggleRoomSelection = (roomId: string) => {
     setSelectedRoomIds((prev) =>
@@ -70,7 +89,10 @@ export default function GenerateQuotationScreen() {
       Alert.alert('Selection Required', 'Please select at least one room.');
       return;
     }
-
+    // Refresh the current screen after navigation
+    fetchClientAndRooms();
+    // add some time delay to ensure the state is updated
+    setTimeout(() => {}, 200);
     router.push({
       pathname: '/quotation/preview',
       params: {
@@ -80,54 +102,51 @@ export default function GenerateQuotationScreen() {
     });
   };
 
-  const themedStyles = {
-    background: { backgroundColor: isDark ? '#111827' : '#f3f4f6' },
-    card: { backgroundColor: isDark ? '#1f2937' : '#ffffff' },
-    text: { color: isDark ? '#f9fafb' : '#111827' },
-    subtext: { color: isDark ? '#9ca3af' : '#6b7280' },
-    primary: { color: isDark ? '#38bdf8' : '#0ea5e9' },
-    separator: { backgroundColor: isDark ? '#374151' : '#e5e7eb' },
-    selectedCard: { borderColor: isDark ? '#38bdf8' : '#0ea5e9' },
-  };
+  // Removed themedStyles object
 
   const renderRoomItem = ({ item }: { item: Room }) => {
     const isSelected = selectedRoomIds.includes(item.id);
     return (
       <TouchableOpacity
-        style={[styles.roomCard, themedStyles.card, isSelected && styles.selectedRoomCard, isSelected && themedStyles.selectedCard]}
+        style={[
+          styles.roomCard,
+          { backgroundColor: Colors.light.cardBackground }, // Replaced themedStyles.card
+          isSelected && styles.selectedRoomCard,
+          isSelected && { borderColor: Colors.light.primary } // Replaced themedStyles.selectedCard
+        ]}
         onPress={() => toggleRoomSelection(item.id)}
       >
         <View style={styles.roomDetails}>
-          <Text style={[styles.roomTitle, themedStyles.text]}>{item.room_type || 'N/A'}</Text>
-          <Text style={[styles.roomDescription, themedStyles.subtext]} numberOfLines={1}>
+          <Text style={[styles.roomTitle, { color: Colors.light.text }]}>{item.room_type || 'N/A'}</Text>
+          <Text style={[styles.roomDescription, { color: Colors.light.subtext }]} numberOfLines={1}>
             {item.description || 'No description available'}
           </Text>
           <View style={styles.roomStats}>
-            <Text style={[styles.roomStatText, themedStyles.subtext]}>Area: {item.total_sq_ft || 'N/A'} sq.ft</Text>
-            <Text style={[styles.roomStatText, themedStyles.subtext]}>Status: {item.status}</Text>
+            <Text style={[styles.roomStatText, { color: Colors.light.subtext }]}>Area: {item.total_sq_ft || 'N/A'} sq.ft</Text>
+            <Text style={[styles.roomStatText, { color: Colors.light.subtext }]}>Status: {item.status}</Text>
           </View>
         </View>
-        <View style={[styles.checkbox, isSelected && { backgroundColor: themedStyles.primary.color, borderColor: themedStyles.primary.color }]}>
-          {isSelected && <IconSymbol name="checkmark" size={14} color="#fff" />}
+        <View style={[styles.checkbox, isSelected && { backgroundColor: Colors.light.primary, borderColor: Colors.light.primary }]}>
+          {isSelected && <IconSymbol name="checkmark" size={14} color={Colors.light.redText} />}
         </View>
       </TouchableOpacity>
     );
   };
-  
+
   if (loading) {
     return (
-      <View style={[styles.centeredContainer, themedStyles.background]}>
-        <ActivityIndicator size="large" color={themedStyles.primary.color} />
-        <Text style={[styles.loadingText, themedStyles.subtext]}>Fetching available rooms...</Text>
+      <View style={[styles.centeredContainer, { backgroundColor: Colors.light.background }]}>
+        <ActivityIndicator size="large" color={Colors.light.primary} />
+        <Text style={[styles.loadingText, { color: Colors.light.subtext }]}>Fetching available rooms...</Text>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, themedStyles.background]}>
+    <View style={[styles.container, { backgroundColor: Colors.light.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, themedStyles.text]}>Generate Quotation</Text>
-        <Text style={[styles.headerSubtitle, themedStyles.subtext]}>
+        <Text style={[styles.headerTitle, { color: Colors.light.text }]}>Generate Quotation</Text>
+        <Text style={[styles.headerSubtitle, { color: Colors.light.subtext }]}>
           For client: {client?.name || '...'}
         </Text>
       </View>
@@ -139,34 +158,41 @@ export default function GenerateQuotationScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           ListHeaderComponent={
-            <Text style={[styles.listHeader, themedStyles.text]}>
+            <Text style={[styles.listHeader, { color: Colors.light.text }]}>
               Select one or more rooms to include in the quotation.
             </Text>
+          }
+          refreshControl={ // Added RefreshControl
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={fetchClientAndRooms}
+              tintColor={Colors.light.primary}
+            />
           }
         />
       ) : (
         <View style={[styles.centeredContainer, { flex: 1 }]}>
-          <IconSymbol name="folder.badge.questionmark" size={60} color={themedStyles.subtext.color} style={{ marginBottom: 20 }} />
-          <Text style={[styles.emptyTitle, themedStyles.text]}>No Rooms Available</Text>
-          <Text style={[styles.emptyText, themedStyles.subtext]}>
+          <IconSymbol name="folder.badge.questionmark" size={60} color={Colors.light.subtext} style={{ marginBottom: 20 }} />
+          <Text style={[styles.emptyTitle, { color: Colors.light.text }]}>No Rooms Available</Text>
+          <Text style={[styles.emptyText, { color: Colors.light.subtext }]}>
             There are no rooms with "Active" status to generate a quotation for.
           </Text>
         </View>
       )}
 
       {rooms.length > 0 && (
-        <View style={[styles.footer, themedStyles.card, { borderTopColor: themedStyles.separator.backgroundColor }]}>
+        <View style={[styles.footer, { backgroundColor: Colors.light.cardBackground, borderTopColor: Colors.light.border }]}>
           <View style={styles.summary}>
-            <Text style={[styles.summaryText, themedStyles.text]}>Selected: </Text>
-            <Text style={[styles.summaryCount, themedStyles.primary]}>{selectedRoomIds.length} room(s)</Text>
+            <Text style={[styles.summaryText, { color: Colors.light.text }]}>Selected: </Text>
+            <Text style={[styles.summaryCount, { color: Colors.light.primary }]}>{selectedRoomIds.length} room(s)</Text>
           </View>
           <TouchableOpacity
-            style={[styles.generateButton, { backgroundColor: themedStyles.primary.color, opacity: selectedRoomIds.length === 0 ? 0.5 : 1 }]}
+            style={[styles.generateButton, { backgroundColor: Colors.light.primary, opacity: selectedRoomIds.length === 0 ? 0.5 : 1 }]}
             onPress={handleGenerateQuotation}
             disabled={selectedRoomIds.length === 0}
           >
             <Text style={styles.generateButtonText}>Preview Quotation</Text>
-            <IconSymbol name="chevron.right" size={16} color="#fff" />
+            <IconSymbol name="chevron.right" size={16} color={Colors.light.redText} />
           </TouchableOpacity>
         </View>
       )}

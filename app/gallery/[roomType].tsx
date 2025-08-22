@@ -18,44 +18,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 const { width } = Dimensions.get('window');
-
-// Design tokens (kept your palette, tuned surfaces)
-const design = {
-  light: {
-    bg: '#FAFAFA',
-    surface: '#FFFFFF',
-    text: '#111827',
-    subtext: '#6B7280',
-    primary: '#E53935',
-    primaryOn: '#FFFFFF',
-    border: '#E5E7EB',
-    shadow: '#E0E0E0',
-    muted: '#F3F4F6',
-    success: '#10B981',
-    error: '#EF4444',
-  },
-  dark: {
-    bg: '#0B1220',
-    surface: '#121826',
-    text: '#F9FAFB',
-    subtext: '#9CA3AF',
-    primary: '#E53935',
-    primaryOn: '#FFFFFF',
-    border: '#1F2937',
-    shadow: '#000000',
-    muted: '#111827',
-    success: '#34D399',
-    error: '#F87171',
-  },
-  radius: { sm: 10, md: 14, lg: 18, xl: 24 },
-  space: (n: number) => 4 * n,
-};
 
 // Responsive grid: 3 cols on phones, 4 on large phones
 const COLS = width >= 420 ? 4 : 3;
@@ -67,10 +36,6 @@ type Role = 'admin' | 'client' | 'worker' | 'viewer' | undefined;
 type GalleryItem = { path: string; url: string; name: string };
 
 export default function RoomGalleryScreen() {
-  const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
-  const colors = isDark ? design.dark : design.light;
-
   const { roomType: roomTypeSlug } = useLocalSearchParams<{ roomType: string }>();
   const [images, setImages] = useState<GalleryItem[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -247,10 +212,10 @@ export default function RoomGalleryScreen() {
           {
             width: CARD_SIZE,
             height: CARD_SIZE,
-            backgroundColor: colors.surface,
-            shadowColor: colors.shadow,
+            backgroundColor: Colors.light.cardBackground,
+            shadowColor: Colors.light.border,
           },
-          isSelected && { borderColor: colors.primary, borderWidth: 2 },
+          isSelected && { borderColor: Colors.light.primary, borderWidth: 2 },
         ]}
       >
         <Image source={{ uri: item.url }} style={styles.gridImage} />
@@ -260,11 +225,11 @@ export default function RoomGalleryScreen() {
             onPress={() => handleDeleteConfirmation(item.path)}
             hitSlop={8}
           >
-            <IconSymbol name="trash.fill" size={16} color={isDark ? '#FCA5A5' : '#DC2626'} />
+            <IconSymbol name="trash.fill" size={16} color={Colors.light.error} />
           </TouchableOpacity>
         )}
         {selectMode && (
-          <View style={[styles.checkbox, isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+          <View style={[styles.checkbox, isSelected && { backgroundColor: Colors.light.primary, borderColor: Colors.light.primary }]}>
             {isSelected ? <Text style={styles.checkboxTick}>✓</Text> : null}
           </View>
         )}
@@ -274,34 +239,34 @@ export default function RoomGalleryScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.bg }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.subtext }]}>Loading gallery…</Text>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: Colors.light.background }]}>
+        <ActivityIndicator size="large" color={Colors.light.primary} />
+        <Text style={[styles.loadingText, { color: Colors.light.subtext }]}>Loading gallery…</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} />
+    <SafeAreaView style={[styles.container, { backgroundColor: Colors.light.background }]}>
+      <StatusBar barStyle="dark-content" />
 
       {/* Sticky Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
+      <View style={[styles.header, { borderBottomColor: Colors.light.border, backgroundColor: Colors.light.cardBackground }]}>
         <View style={styles.headerLeft}>
-          <Text style={[styles.titleText, { color: colors.text }]} numberOfLines={1}>{headerTitle}</Text>
-          <Text style={[styles.subtitleText, { color: colors.subtext }]} numberOfLines={1}>{subtitle}</Text>
+          <Text style={[styles.titleText, { color: Colors.light.text }]} numberOfLines={1}>{headerTitle}</Text>
+          <Text style={[styles.subtitleText, { color: Colors.light.subtext }]} numberOfLines={1}>{subtitle}</Text>
         </View>
         {role === 'admin' && (
           <View style={styles.headerActions}>
             {selectMode ? (
               <>
-                <HeaderBtn label="Delete" onPress={deleteSelected} color={colors.primary} textColor="#FFF" />
-                <HeaderBtn label="Cancel" onPress={exitSelectMode} color={colors.muted} textColor={colors.text} />
+                <HeaderBtn label="Delete" onPress={deleteSelected} color={Colors.light.primary} textColor={Colors.light.redText} />
+                <HeaderBtn label="Cancel" onPress={exitSelectMode} color={Colors.light.buttonBackground} textColor={Colors.light.text} />
               </>
             ) : (
               <>
-                <HeaderBtn label={uploading ? 'Uploading…' : 'Upload'} onPress={pickAndUploadImages} color={colors.primary} textColor="#FFF" disabled={uploading} />
-                <HeaderBtn label="Select" onPress={() => setSelectMode(true)} color={colors.muted} textColor={colors.text} />
+                <HeaderBtn label={uploading ? 'Uploading…' : 'Upload'} onPress={pickAndUploadImages} color={Colors.light.primary} textColor={Colors.light.redText} disabled={uploading} />
+                <HeaderBtn label="Select" onPress={() => setSelectMode(true)} color={Colors.light.buttonBackground} textColor={Colors.light.text} />
               </>
             )}
           </View>
@@ -321,14 +286,14 @@ export default function RoomGalleryScreen() {
         />
       ) : (
         <ScrollView contentContainerStyle={[styles.emptyWrap, { paddingHorizontal: 24 }]}>
-          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No images yet</Text>
-            <Text style={[styles.emptyHint, { color: colors.subtext }]}>
+          <View style={[styles.emptyCard, { backgroundColor: Colors.light.cardBackground, borderColor: Colors.light.border }]}>
+            <Text style={[styles.emptyTitle, { color: Colors.light.text }]}>No images yet</Text>
+            <Text style={[styles.emptyHint, { color: Colors.light.subtext }]}>
               Upload reference images to build your {headerTitle.toLowerCase()} gallery.
             </Text>
             {role === 'admin' && (
-              <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: colors.primary }]} onPress={pickAndUploadImages}>
-                <Text style={[styles.ctaText, { color: colors.primaryOn }]}>Upload Images</Text>
+              <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: Colors.light.primary }]} onPress={pickAndUploadImages}>
+                <Text style={[styles.ctaText, { color: Colors.light.redText }]}>Upload Images</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -345,14 +310,14 @@ export default function RoomGalleryScreen() {
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalTopBar]}>
             <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={10}>
-              <Text style={styles.modalTopBtn}>Close</Text>
+              <Text style={[styles.modalTopBtn, { color: Colors.light.subtext }]}>Close</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTopTitle} numberOfLines={1}>
+            <Text style={[styles.modalTopTitle, { color: Colors.light.subtext }]} numberOfLines={1}>
               {selectedImage?.name || ''}
             </Text>
             {role === 'admin' && selectedImage ? (
               <TouchableOpacity onPress={() => handleDeleteConfirmation(selectedImage.path)} hitSlop={10}>
-                <Text style={[styles.modalTopBtn, { color: '#FCA5A5' }]}>Delete</Text>
+                <Text style={[styles.modalTopBtn, { color: Colors.light.error }]}>Delete</Text>
               </TouchableOpacity>
             ) : (
               <View style={{ width: 52 }} />
@@ -369,11 +334,11 @@ export default function RoomGalleryScreen() {
       {/* FAB (admin only, mirrors other screens) */}
       {role === 'admin' && !selectMode && (
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
+          style={[styles.fab, { backgroundColor: Colors.light.primary, shadowColor: Colors.light.primary }]}
           onPress={pickAndUploadImages}
           activeOpacity={0.9}
         >
-          <Text style={[styles.fabText, { color: colors.primaryOn }]}>＋</Text>
+          <Text style={[styles.fabText, { color: Colors.light.redText }]}>＋</Text>
         </TouchableOpacity>
       )}
     </SafeAreaView>

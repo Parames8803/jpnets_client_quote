@@ -2,7 +2,6 @@ import { Session } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Appearance,
   Dimensions,
   Image,
   KeyboardAvoidingView,
@@ -13,63 +12,16 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { supabase } from '../../utils/supabaseClient';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 const { width, height } = Dimensions.get('window');
 
 // Color palettes for light/dark theme
-const palette = {
-  light: {
-    bg: '#F6F8FA',
-    card: '#FFFFFF',
-    title: '#18181B',
-    text: '#374151',
-    inputBG: '#F6F7FB',
-    inputBorder: '#D1D5DB',
-    inputBorderActive: '#3B82F6',
-    inputText: '#18181B',
-    placeholder: '#A0A0A0',
-    buttonBG: '#3B82F6',
-    buttonText: '#FFF',
-    buttonAltBG: '#EEF0F3',
-    buttonAltText: '#1F2937',
-    modalBG: '#FFF',
-    modalTitle: '#18181B',
-    modalText: '#52525B',
-    modalButtonBG: '#3B82F6',
-    modalButtonText: '#FFF',
-    shadow: '#1F2937',
-  },
-  dark: {
-    bg: '#19191D',
-    card: '#23232A',
-    title: '#F6F8FA',
-    text: '#C9D1D9',
-    inputBG: '#23232A',
-    inputBorder: '#343544',
-    inputBorderActive: '#2563EB',
-    inputText: '#F3F3F8',
-    placeholder: '#767A8C',
-    buttonBG: '#2563EB',
-    buttonText: '#FFF',
-    buttonAltBG: '#252532',
-    buttonAltText: '#EAF1FB',
-    modalBG: '#23232A',
-    modalTitle: '#F6F8FA',
-    modalText: '#C9D1D9',
-    modalButtonBG: '#2563EB',
-    modalButtonText: '#FFF',
-    shadow: '#101010',
-  },
-};
-
 export default function LoginScreen() {
-  const colorScheme = useColorScheme() || Appearance.getColorScheme() || 'light';
-  const theme = useMemo(() => palette[colorScheme] || palette.light, [colorScheme]);
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -154,12 +106,12 @@ export default function LoginScreen() {
   return (
     <>
       <StatusBar
-        barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.bg}
+        barStyle="dark-content"
+        backgroundColor={Colors.light.background}
       />
 
       <KeyboardAvoidingView
-        style={[styles.flex, { backgroundColor: theme.bg }]}
+        style={[styles.flex, { backgroundColor: Colors.light.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.flex}>
@@ -167,8 +119,8 @@ export default function LoginScreen() {
           <View style={[
             styles.card,
             {
-              backgroundColor: theme.card,
-              shadowColor: theme.shadow,
+              backgroundColor: Colors.light.cardBackground,
+              shadowColor: Colors.light.border,
             }
           ]}>
             {/* Logo/brand icon area */}
@@ -184,8 +136,8 @@ export default function LoginScreen() {
                           }}
                         />
                       </View>
-              <Text style={[styles.title, { color: theme.title }]}>Sign In</Text>
-              <Text style={[styles.subtitle, { color: theme.text }]}>
+              <Text style={[styles.title, { color: Colors.light.text }]}>Sign In</Text>
+              <Text style={[styles.subtitle, { color: Colors.light.text }]}>
                 Welcome back. Please log in to your account.
               </Text>
             </View>
@@ -193,22 +145,22 @@ export default function LoginScreen() {
             {/* Form */}
             <View style={{ marginBottom: 8 }}>
               {/* Email */}
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Email</Text>
+              <Text style={[styles.inputLabel, { color: Colors.light.text }]}>Email</Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 placeholder="you@email.com"
-                placeholderTextColor={theme.placeholder}
+                placeholderTextColor={Colors.light.placeholder}
                 style={[
                   styles.input,
                   {
-                    backgroundColor: theme.inputBG,
-                    color: theme.inputText,
+                    backgroundColor: Colors.light.inputBackground,
+                    color: Colors.light.text,
                     borderColor: emailFocused
-                      ? theme.inputBorderActive
-                      : theme.inputBorder
+                      ? Colors.light.primary
+                      : Colors.light.border
                   }
                 ]}
                 onFocus={() => setEmailFocused(true)}
@@ -217,21 +169,21 @@ export default function LoginScreen() {
               />
 
               {/* Password */}
-              <Text style={[styles.inputLabel, { color: theme.text, marginTop: 14 }]}>Password</Text>
+              <Text style={[styles.inputLabel, { color: Colors.light.text, marginTop: 14 }]}>Password</Text>
               <TextInput
                 value={password}
                 onChangeText={setPassword}
                 autoCapitalize="none"
                 placeholder="Your password"
-                placeholderTextColor={theme.placeholder}
+                placeholderTextColor={Colors.light.placeholder}
                 style={[
                   styles.input,
                   {
-                    backgroundColor: theme.inputBG,
-                    color: theme.inputText,
+                    backgroundColor: Colors.light.inputBackground,
+                    color: Colors.light.text,
                     borderColor: passwordFocused
-                      ? theme.inputBorderActive
-                      : theme.inputBorder
+                      ? Colors.light.primary
+                      : Colors.light.border
                   }
                 ]}
                 secureTextEntry
@@ -246,9 +198,9 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={[
                 styles.loginButton,
-                { 
-                  backgroundColor: loading ? theme.inputBorder : theme.buttonBG, 
-                  shadowColor: theme.shadow 
+                {
+                  backgroundColor: loading ? Colors.light.border : Colors.light.primary,
+                  shadowColor: Colors.light.border
                 }
               ]}
               disabled={loading}
@@ -256,8 +208,8 @@ export default function LoginScreen() {
               activeOpacity={0.8}
             >
               <Text style={[
-                styles.loginButtonText, 
-                { color: theme.buttonText }
+                styles.loginButtonText,
+                { color: Colors.light.redText }
               ]}>
                 {loading ? 'Signing in...' : 'Sign In'}
               </Text>
@@ -267,7 +219,7 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={[
                 styles.loginTextButton,
-                { backgroundColor: theme.buttonAltBG }
+                { backgroundColor: Colors.light.buttonBackground }
               ]}
               disabled={loading}
               onPress={() => router.push('/landing')}
@@ -275,7 +227,7 @@ export default function LoginScreen() {
             >
               <Text style={[
                 styles.loginTextButtonText,
-                { color: theme.buttonAltText }
+                { color: Colors.light.text }
               ]}>
                 {loading ? 'Going Home...' : 'Back Home'}
               </Text>
@@ -294,25 +246,25 @@ export default function LoginScreen() {
             <View style={[
               styles.modalCard,
               {
-                backgroundColor: theme.modalBG,
-                shadowColor: theme.shadow
+                backgroundColor: Colors.light.cardBackground,
+                shadowColor: Colors.light.border
               }
             ]}>
               <Text style={[
-                styles.modalTitle, { color: theme.modalTitle }
+                styles.modalTitle, { color: Colors.light.text }
               ]}>{modalTitle}</Text>
               <Text style={[
-                styles.modalText, { color: theme.modalText }
+                styles.modalText, { color: Colors.light.subtext }
               ]}>{modalMessage}</Text>
               <TouchableOpacity
                 style={[
                   styles.modalButton,
-                  { backgroundColor: theme.modalButtonBG }
+                  { backgroundColor: Colors.light.primary }
                 ]}
                 onPress={hideCustomModal}
               >
                 <Text style={[
-                  styles.modalButtonText, { color: theme.modalButtonText }
+                  styles.modalButtonText, { color: Colors.light.redText }
                 ]}>OK</Text>
               </TouchableOpacity>
             </View>

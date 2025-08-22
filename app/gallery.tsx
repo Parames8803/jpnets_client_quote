@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,50 +15,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/utils/supabaseClient';
 import { ROOM_TYPES } from '@/types/db';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 
-const BRAND_RED = '#E53935';
-const CHARCOAL_BLACK = '#212121';
-const COOL_GRAY = '#9E9E9E';
-const SOFT_WHITE = '#FAFAFA';
-
-const design = {
-  light: {
-    bg: SOFT_WHITE,
-    surface: SOFT_WHITE,
-    text: CHARCOAL_BLACK,
-    subtext: COOL_GRAY,
-    primary: BRAND_RED,
-    primaryOn: SOFT_WHITE,
-    border: COOL_GRAY,
-    shadow: '#E0E0E0',
-  },
-  dark: {
-    bg: '#121212',
-    surface: '#1E1E1E',
-    text: '#FFFFFF',
-    subtext: COOL_GRAY,
-    primary: BRAND_RED,
-    primaryOn: SOFT_WHITE,
-    border: '#333333',
-    shadow: '#000000',
-  },
-  radius: {
-    sm: 10,
-    md: 14,
-    lg: 18,
-    xl: 24,
-  },
-  space: (n: number) => 4 * n,
-};
-
 type Role = 'admin' | 'client' | 'worker' | 'viewer' | undefined;
 
 export default function GalleryScreen() {
-  const scheme = useColorScheme();
-  const colors = scheme === 'dark' ? design.dark : design.light;
   const router = useRouter();
 
   const [roomPreviews, setRoomPreviews] = useState<{ [key: string]: string[] }>({});
@@ -120,7 +84,7 @@ export default function GalleryScreen() {
       <TouchableOpacity
         style={[
           styles.card,
-          { marginRight: isEven ? 16 : 0, backgroundColor: colors.surface },
+          { marginRight: isEven ? 16 : 0, backgroundColor: Colors.light.cardBackground },
         ]}
         onPress={() =>
           router.push({
@@ -140,9 +104,9 @@ export default function GalleryScreen() {
               />
             </>
           ) : (
-            <View style={[styles.placeholderImage, { backgroundColor: colors.surface || '#86888bff' }]}>
-              <Text style={[styles.placeholderText, { color: colors.subtext }]}>📷</Text>
-              <Text style={[styles.placeholderSubtext, { color: colors.subtext }]}>No images</Text>
+            <View style={[styles.placeholderImage, { backgroundColor: Colors.light.cardBackground || '#86888bff' }]}>
+              <Text style={[styles.placeholderText, { color: Colors.light.subtext }]}>📷</Text>
+              <Text style={[styles.placeholderSubtext, { color: Colors.light.subtext }]}>No images</Text>
             </View>
           )}
 
@@ -155,7 +119,7 @@ export default function GalleryScreen() {
 
         <View style={styles.cardContent}>
           <Text
-            style={[styles.cardTitle, { color: colors.text }]}
+            style={[styles.cardTitle, { color: Colors.light.text }]}
             numberOfLines={2}
           >
             {roomType.name}
@@ -188,21 +152,21 @@ export default function GalleryScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.bg }]}>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: Colors.light.background }]}>
         <View style={styles.loadingContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.subtext }]}>Loading gallery...</Text>
+          <ActivityIndicator size="large" color={Colors.light.primary} />
+          <Text style={[styles.loadingText, { color: Colors.light.subtext }]}>Loading gallery...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: Colors.light.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Gallery</Text>
-        <Text style={[styles.subtitle, { color: colors.subtext }]}>Explore our collections</Text>
+        <Text style={[styles.title, { color: Colors.light.text }]}>Gallery</Text>
+        <Text style={[styles.subtitle, { color: Colors.light.subtext }]}>Explore our collections</Text>
       </View>
 
       {/* Grid */}
@@ -330,7 +294,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 6,
     borderWidth: 2,
-    borderColor: SOFT_WHITE,
+    borderColor: Colors.light.background,
   },
   moreIndicator: {
     width: 32,

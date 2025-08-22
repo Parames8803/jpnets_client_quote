@@ -52,7 +52,7 @@ export const StatusUpdateModal: React.FC<StatusUpdateModalProps> = ({
                 <Text style={[
                   styles.statusOptionText,
                   { color: colors.text },
-                  currentStatus === status && { color: colors.tint, fontWeight: 'bold' },
+                  currentStatus === status && { color: "white", fontWeight: 'bold' },
                 ]}>
                   {status}
                 </Text>

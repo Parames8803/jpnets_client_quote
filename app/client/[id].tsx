@@ -365,8 +365,8 @@ export default function ClientDetailsScreen() {
           <View style={styles.rowRight}>
             <TouchableOpacity
               style={[styles.statusChip, { backgroundColor: st.bg, borderColor: st.border }]}
-              onPress={() => item.status !== 'Closed' && updateQuotationStatusInline(item)}
-              disabled={item.status === 'Closed'}
+              // onPress={() => item.status !== 'Closed' && updateQuotationStatusInline(item)}
+              // disabled={item.status === 'Closed'}
             >
               <Text style={[styles.statusChipText, { color: st.text }]}>{item.status || 'Not Active'}</Text>
             </TouchableOpacity>

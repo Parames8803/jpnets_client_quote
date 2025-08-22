@@ -8,16 +8,15 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors.light.tint,
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
-          borderTopColor: isDark ? Colors.dark.border : Colors.light.border,
+          backgroundColor: Colors.light.background,
+          borderTopColor: Colors.light.border,
         },
       }}
     >

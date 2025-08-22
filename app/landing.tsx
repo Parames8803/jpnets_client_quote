@@ -12,49 +12,15 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from 'react-native';
 import Carousel from 'react-native-reanimated-carousel';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../utils/supabaseClient';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 const { width: screenWidth } = Dimensions.get('window');
-
-const design = {
-  light: {
-    bg: '#F7F7FA',
-    surface: '#FFFFFF',
-    text: '#1F2937',
-    subtext: '#6B7280',
-    primary: '#3B82F6',
-    primaryOn: '#FFFFFF',
-    border: '#E5E7EB',
-    muted: '#F3F4F6',
-    dot: '#3B82F6',
-    shadow: '#E5E7EB'
-  },
-  dark: {
-    bg: '#0B0F14',
-    surface: '#151925',
-    text: '#F3F4F6',
-    subtext: '#9CA3AF',
-    primary: '#60A5FA',
-    primaryOn: '#0B0F14',
-    border: '#232B3B',
-    muted: '#111827',
-    dot: '#93C5FD',
-    shadow: '#232B3B'
-  },
-  radius: {
-    xs: 6,
-    sm: 10,
-    md: 14,
-    lg: 18,
-    xl: 24,
-  },
-  space: (n: number) => 4 * n,
-};
 
 type Role = 'admin' | 'client' | 'worker' | 'viewer' | undefined;
 
@@ -67,8 +33,7 @@ function Button({
   disabled?: boolean;
   accessibilityLabel?: string;
 }) {
-  const scheme = useColorScheme();
-  const c = scheme === 'dark' ? design.dark : design.light;
+  const c = Colors.light; // Always use light theme
   return (
     <TouchableOpacity
       activeOpacity={0.94}
@@ -76,11 +41,11 @@ function Button({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
       style={{
-        paddingVertical: design.space(3),
-        paddingHorizontal: design.space(5),
-        borderRadius: design.radius.xl,
+        paddingVertical: 12, // design.space(3)
+        paddingHorizontal: 20, // design.space(5)
+        borderRadius: 12, // design.radius.xl
         minHeight: 48,
-        shadowColor: c.shadow,
+        shadowColor: c.border, // c.shadow
         shadowOffset: { width: 1, height: 4 },
         shadowOpacity: 0.07,
         shadowRadius: 18,
@@ -91,7 +56,7 @@ function Button({
             ? disabled
               ? `${c.primary}55`
               : c.primary
-            : c.surface,
+            : c.cardBackground, // c.surface
         borderWidth: variant === 'ghost' ? 1 : 0,
         borderColor: c.border,
       }}
@@ -100,7 +65,7 @@ function Button({
     >
       <Text
         style={{
-          color: variant === 'primary' ? c.primaryOn : c.text,
+          color: variant === 'primary' ? c.redText : c.text, // c.primaryOn
           fontWeight: '700',
           fontSize: 16,
         }}
@@ -112,8 +77,7 @@ function Button({
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  const scheme = useColorScheme();
-  const c = scheme === 'dark' ? design.dark : design.light;
+  const c = Colors.light; // Always use light theme
   return (
     <Text
       style={{
@@ -121,7 +85,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
         fontWeight: '800',
         color: c.text,
         textAlign: 'center',
-        marginBottom: design.space(4),
+        marginBottom: 16, // design.space(4)
       }}
     >
       {children}
@@ -132,33 +96,32 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function FeatureCard({ title, description, emoji }: {
   title: string; description: string; emoji: string;
 }) {
-  const scheme = useColorScheme();
-  const c = scheme === 'dark' ? design.dark : design.light;
+  const c = Colors.light; // Always use light theme
   return (
     <View
       style={{
         flexDirection: 'row',
-        backgroundColor: c.surface,
-        borderRadius: design.radius.lg,
-        padding: design.space(4),
+        backgroundColor: c.cardBackground, // c.surface
+        borderRadius: 12, // design.radius.lg
+        padding: 16, // design.space(4)
         borderWidth: 1,
         borderColor: c.border,
-        shadowColor: c.shadow,
+        shadowColor: c.border, // c.shadow
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.09,
         shadowRadius: 7,
-        marginBottom: design.space(3),
+        marginBottom: 12, // design.space(3)
         alignItems: 'center',
-        gap: design.space(4)
+        gap: 16 // design.space(4)
       }}
     >
-      <Text style={{ fontSize: 28, marginRight: design.space(3), opacity: 0.88 }}>{emoji}</Text>
+      <Text style={{ fontSize: 28, marginRight: 12, opacity: 0.88 }}>{emoji}</Text> {/* design.space(3) */}
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.text, fontWeight: '700', fontSize: 16 }}>{title}</Text>
         <Text
           style={{
             color: c.subtext,
-            marginTop: design.space(1),
+            marginTop: 4, // design.space(1)
             lineHeight: 20,
             fontSize: 14,
           }}
@@ -172,8 +135,7 @@ function FeatureCard({ title, description, emoji }: {
 
 export default function LandingPage() {
   const router = useRouter();
-  const scheme = useColorScheme();
-  const colors = scheme === 'dark' ? design.dark : design.light;
+  const colors = Colors.light; // Always use light theme
   const [session, setSession] = useState<any>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [carouselImages, setCarouselImages] = useState<any[]>([]);
@@ -271,18 +233,18 @@ export default function LandingPage() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: Colors.light.background }]}>
       <StatusBar
-        barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
-        backgroundColor={colors.bg}
+        barStyle="dark-content"
+        backgroundColor={Colors.light.background}
       />
       {/* Top Bar */}
       <View
         style={[
           styles.header,
           {
-            backgroundColor: colors.surface,
-            borderBottomColor: colors.border,
+            backgroundColor: Colors.light.cardBackground,
+            borderBottomColor: Colors.light.border,
           },
         ]}
       >
@@ -292,15 +254,15 @@ export default function LandingPage() {
             style={{
               width: 50,
               height: 50,
-              borderRadius: design.radius.md,
+              borderRadius: 10, // design.radius.md
             }}
           />
           <Text
             style={{
-              color: colors.text,
+              color: Colors.light.text,
               fontSize: 20,
               fontWeight: '700',
-              marginLeft: design.space(3),
+              marginLeft: 12, // design.space(3)
             }}>JP Interiors</Text>
         </View>
         {role !== 'viewer' && (
@@ -313,37 +275,39 @@ export default function LandingPage() {
         )}
       </View>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: design.space(8) }}
+        contentContainerStyle={{ paddingBottom: 32 }} // design.space(8)
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
+            tintColor={Colors.light.primary}
+            title="Pull to refresh"
+            titleColor={Colors.light.subtext}
           />
         }
       >
         {/* Hero */}
-        <View style={{ paddingHorizontal: design.space(5), paddingTop: design.space(6) }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 24 }}> {/* design.space(5), design.space(6) */}
           <Text
             style={{
-              color: colors.text,
+              color: Colors.light.text,
               fontWeight: '900',
               fontSize: 32,
               letterSpacing: -0.5,
               textAlign: 'center',
-              marginBottom: design.space(3),
+              marginBottom: 12, // design.space(3)
             }}
           >
             Transform Your Space
           </Text>
           <Text
             style={{
-              color: colors.subtext,
+              color: Colors.light.subtext,
               fontSize: 16,
               textAlign: 'center',
-              marginTop: design.space(2),
-              marginBottom: design.space(4),
+              marginTop: 8, // design.space(2)
+              marginBottom: 16, // design.space(4)
               lineHeight: 22,
             }}
           >
@@ -353,8 +317,8 @@ export default function LandingPage() {
             style={{
               flexDirection: 'row',
               justifyContent: 'center',
-              gap: design.space(3),
-              marginTop: design.space(5),
+              gap: 12, // design.space(3)
+              marginTop: 20, // design.space(5)
             }}
           >
             {role !== 'viewer' && (
@@ -374,19 +338,19 @@ export default function LandingPage() {
           </View>
         </View>
         {/* Carousel */}
-        <View style={{ marginTop: design.space(7) }}>
+        <View style={{ marginTop: 28 }}> {/* design.space(7) */}
           <SectionTitle>Selected Works</SectionTitle>
           <View style={{ alignItems: 'center' }}>
             {carouselLoading ? (
               <View
                 style={{
-                  width: screenWidth - design.space(8),
+                  width: screenWidth - 32, // design.space(8)
                   height: 220,
-                  borderRadius: design.radius.lg,
-                  backgroundColor: colors.surface,
+                  borderRadius: 12, // design.radius.lg
+                  backgroundColor: Colors.light.cardBackground, // colors.surface
                   borderWidth: 1,
-                  borderColor: colors.border,
-                  shadowColor: colors.shadow,
+                  borderColor: Colors.light.border, // colors.border
+                  shadowColor: Colors.light.border, // colors.shadow
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.13,
                   shadowRadius: 7,
@@ -394,20 +358,20 @@ export default function LandingPage() {
                   alignItems: 'center',
                 }}
               >
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ color: colors.subtext, marginTop: design.space(2) }}>Loading images...</Text>
+                <ActivityIndicator size="large" color={Colors.light.primary} />
+                <Text style={{ color: Colors.light.subtext, marginTop: 8 }}>Loading images...</Text> {/* design.space(2) */}
               </View>
             ) : (
               <>
                 <View
                   style={{
                     width: screenWidth,
-                    paddingHorizontal: design.space(4),
+                    paddingHorizontal: 16, // design.space(4)
                   }}
                 >
                   <Carousel
                     loop
-                    width={screenWidth - design.space(8)}
+                    width={screenWidth - 32} // design.space(8)
                     height={220}
                     autoPlay
                     autoPlayInterval={2800}
@@ -419,12 +383,12 @@ export default function LandingPage() {
                         key={index}
                         style={{
                           flex: 1,
-                          borderRadius: design.radius.lg,
+                          borderRadius: 12, // design.radius.lg
                           overflow: 'hidden',
-                          backgroundColor: colors.surface,
+                          backgroundColor: Colors.light.cardBackground, // colors.surface
                           borderWidth: 1,
-                          borderColor: colors.border,
-                          shadowColor: colors.shadow,
+                          borderColor: Colors.light.border, // colors.border
+                          shadowColor: Colors.light.border, // colors.shadow
                           shadowOffset: { width: 0, height: 2 },
                           shadowOpacity: 0.13,
                           shadowRadius: 7,
@@ -441,7 +405,7 @@ export default function LandingPage() {
                   />
                 </View>
                 {/* Dots */}
-                <View style={{ flexDirection: 'row', marginTop: design.space(3), justifyContent: 'center' }}>
+                <View style={{ flexDirection: 'row', marginTop: 12, justifyContent: 'center' }}> {/* design.space(3) */}
                   {carouselImages.map((_, i) => (
                     <View
                       key={i}
@@ -450,7 +414,7 @@ export default function LandingPage() {
                         height: 8,
                         borderRadius: 999,
                         marginHorizontal: 4,
-                        backgroundColor: i === currentIndex ? colors.dot : `${colors.dot}55`,
+                        backgroundColor: i === currentIndex ? Colors.light.primary : `${Colors.light.primary}55`, // colors.dot
                       }}
                     />
                   ))}
@@ -460,7 +424,7 @@ export default function LandingPage() {
           </View>
         </View>
         {/* Features */}
-        <View style={{ paddingHorizontal: design.space(5), marginTop: design.space(7) }}>
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}> {/* design.space(5), design.space(7) */}
           <SectionTitle>Why Choose Us</SectionTitle>
           <FeatureCard
             emoji="🏆"
@@ -481,14 +445,14 @@ export default function LandingPage() {
         {/* CTA band */}
         <View
           style={{
-            marginTop: design.space(8),
-            marginHorizontal: design.space(5),
-            backgroundColor: colors.surface,
-            borderRadius: design.radius.xl,
-            padding: design.space(5),
+            marginTop: 32, // design.space(8)
+            marginHorizontal: 20, // design.space(5)
+            backgroundColor: Colors.light.cardBackground, // colors.surface
+            borderRadius: 12, // design.radius.xl
+            padding: 20, // design.space(5)
             borderWidth: 1,
-            borderColor: colors.border,
-            shadowColor: colors.shadow,
+            borderColor: Colors.light.border, // colors.border
+            shadowColor: Colors.light.border, // colors.shadow
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.11,
             shadowRadius: 12,
@@ -496,20 +460,20 @@ export default function LandingPage() {
         >
           <Text
             style={{
-              color: colors.text,
+              color: Colors.light.text,
               fontWeight: '800',
               fontSize: 20,
               textAlign: 'center',
-              marginBottom: design.space(2),
+              marginBottom: 8, // design.space(2)
             }}
           >
             Ready to Start Your Project?
           </Text>
           <Text
             style={{
-              color: colors.subtext,
+              color: Colors.light.subtext,
               textAlign: 'center',
-              marginBottom: design.space(3),
+              marginBottom: 12, // design.space(3)
             }}
           >
             Get a free consultation and a custom proposal.
@@ -518,7 +482,7 @@ export default function LandingPage() {
             onPress={() => Linking.openURL('tel:+917305341479')}
             style={{ alignItems: 'center' }}
           >
-            <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '600' }}>
+            <Text style={{ color: Colors.light.primary, fontSize: 16, fontWeight: '600' }}>
               Call Us: +91 73053 41479
             </Text>
           </TouchableOpacity>
@@ -528,13 +492,13 @@ export default function LandingPage() {
             style={{
               flexDirection: 'row',
               alignSelf: 'center',
-              marginTop: design.space(6),
+              marginTop: 24, // design.space(6)
               alignItems: 'center',
-              gap: design.space(2),
+              gap: 8, // design.space(2)
             }}
           >
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={{ color: colors.subtext }}>Checking session…</Text>
+            <ActivityIndicator size="small" color={Colors.light.primary} />
+            <Text style={{ color: Colors.light.subtext }}>Checking session…</Text>
           </View>
         )}
       </ScrollView>
@@ -545,8 +509,8 @@ export default function LandingPage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    paddingHorizontal: design.space(5),
-    paddingVertical: design.space(4),
+    paddingHorizontal: 20, // design.space(5)
+    paddingVertical: 16, // design.space(4)
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
