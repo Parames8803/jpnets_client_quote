@@ -1,12 +1,11 @@
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { QuotationStatus } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-import { QuotationStatus } from '@/types/db';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface QuotationListItem {
   id: string;
@@ -16,17 +15,33 @@ interface QuotationListItem {
   clients: { name: string | null } | null;
 }
 
-
 export default function QuotationListPage() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [quotations, setQuotations] = useState<QuotationListItem[]>([]);
+  const [filteredQuotations, setFilteredQuotations] = useState<QuotationListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
 
   useEffect(() => {
     fetchQuotations();
   }, []);
+
+  useEffect(() => {
+    // Filter quotations based on search query and status
+    let filtered = quotations;
+    if (searchQuery) {
+      filtered = filtered.filter(item => 
+        item.clients?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (filterStatus) {
+      filtered = filtered.filter(item => item.status === filterStatus);
+    }
+    setFilteredQuotations(filtered);
+  }, [searchQuery, filterStatus, quotations]);
 
   const fetchQuotations = async () => {
     setLoading(true);
@@ -52,31 +67,61 @@ export default function QuotationListPage() {
     <TouchableOpacity 
       style={[
         styles.card, 
-        { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }
+        { 
+          backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          borderColor: isDark ? Colors.dark.border : Colors.light.border
+        }
       ]}
-      onPress={() => { router.push(`/quotation/${item.id}`); }}
+      onPress={() => router.push(`/quotation/${item.id}`)}
     >
-      <View style={styles.cardHeader}>
-        <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-          {item.clients?.name || 'N/A'}
-        </Text>
-        <Text style={[styles.status, { color: item.status === 'Active' ? 'green' : item.status === 'Closed' ? 'red' : 'orange' }]}>
-          {item.status || 'N/A'}
-        </Text>
+      <View style={styles.cardContent}>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            {item.clients?.name || 'Unknown Client'}
+          </Text>
+          <View style={[
+            styles.statusBadge,
+            { 
+              backgroundColor: 
+                item.status === 'Active' ? '#E6F3E6' : 
+                item.status === 'Closed' ? '#FFE6E6' : '#FFF5E6'
+            }
+          ]}>
+            <Text style={[
+              styles.statusText,
+              { 
+                color: 
+                  item.status === 'Active' ? '#2E7D32' : 
+                  item.status === 'Closed' ? '#D32F2F' : '#F57C00'
+              }
+            ]}>
+              {item.status || 'Pending'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.cardDetails}>
+          <Text style={[styles.amount, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            ${item.total_price?.toFixed(2) || '0.00'}
+          </Text>
+          <Text style={[styles.date, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+            {new Date(item.created_at).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            })}
+          </Text>
+        </View>
       </View>
-      <Text style={[styles.amount, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-        ${item.total_price?.toFixed(2) || '0.00'}
-      </Text>
-      <Text style={[styles.date, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-        {new Date(item.created_at).toLocaleDateString()}
-      </Text>
     </TouchableOpacity>
   );
 
   if (loading) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-        <Text style={{ color: isDark ? Colors.dark.text : Colors.light.text }}>Loading quotations...</Text>
+        <Ionicons name="refresh-circle-outline" size={40} color={isDark ? Colors.dark.tint : Colors.light.tint} />
+        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+          Loading quotations...
+        </Text>
       </View>
     );
   }
@@ -84,9 +129,10 @@ export default function QuotationListPage() {
   if (error) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-        <Text style={{ color: 'red' }}>Error: {error}</Text>
-        <TouchableOpacity onPress={fetchQuotations} style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>Retry</Text>
+        <Ionicons name="alert-circle-outline" size={40} color="#D32F2F" />
+        <Text style={styles.errorText}>Error: {error}</Text>
+        <TouchableOpacity onPress={fetchQuotations} style={[styles.retryButton, { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }]}>
+          <Text style={styles.retryButtonText}>Try Again</Text>
         </TouchableOpacity>
       </View>
     );
@@ -94,9 +140,58 @@ export default function QuotationListPage() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-      <Stack.Screen options={{ title: 'Quotations' }} />
+      <Stack.Screen 
+        options={{ 
+          title: 'Quotations',
+          headerStyle: { backgroundColor: isDark ? Colors.dark.background : Colors.light.background },
+          headerTintColor: isDark ? Colors.dark.text : Colors.light.text,
+        }} 
+      />
+      <View style={styles.header}>
+        <View style={[styles.searchContainer, { 
+          backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          borderColor: isDark ? Colors.dark.border : Colors.light.border
+        }]}>
+          <Ionicons 
+            name="search-outline" 
+            size={20} 
+            color={isDark ? Colors.dark.secondary : Colors.light.secondary} 
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={[styles.searchInput, { color: isDark ? Colors.dark.text : Colors.light.text }]}
+            placeholder="Search by client name..."
+            placeholderTextColor={isDark ? Colors.dark.secondary : Colors.light.secondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        <View style={styles.filterContainer}>
+          {['All', 'Active', 'Closed', 'Pending'].map(status => (
+            <TouchableOpacity
+              key={status}
+              style={[
+                styles.filterButton,
+                filterStatus === (status === 'All' ? null : status) && {
+                  backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint
+                }
+              ]}
+              onPress={() => setFilterStatus(status === 'All' ? null : status)}
+            >
+              <Text style={[
+                styles.filterButtonText,
+                filterStatus === (status === 'All' ? null : status) && {
+                  color: isDark ? Colors.dark.background : Colors.light.background
+                }
+              ]}>
+                {status}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
       <FlatList
-        data={quotations}
+        data={filteredQuotations}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -104,14 +199,16 @@ export default function QuotationListPage() {
           <View style={styles.emptyState}>
             <Ionicons 
               name="document-text-outline" 
-              size={48} 
+              size={60} 
               color={isDark ? Colors.dark.secondary : Colors.light.secondary} 
             />
-            <Text style={[styles.emptyText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-              No quotations found
+            <Text style={[styles.emptyText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              No Quotations Found
             </Text>
             <Text style={[styles.emptySubtext, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-              Create a new quotation to see it here.
+              {searchQuery || filterStatus 
+                ? 'Try adjusting your search or filter criteria'
+                : 'Create a new quotation to get started'}
             </Text>
           </View>
         )}
@@ -124,71 +221,144 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  header: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   listContent: {
     padding: 16,
   },
   card: {
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 12,
-    elevation: 1,
+    borderWidth: 1,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  cardContent: {
+    gap: 8,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
   clientName: {
     fontSize: 18,
     fontWeight: '600',
   },
-  status: {
-    fontSize: 14,
-    fontWeight: 'bold',
+  statusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   amount: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontWeight: '600',
   },
   date: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 14,
+    fontWeight: '400',
   },
   emptyState: {
     padding: 32,
-    borderRadius: 12,
     alignItems: 'center',
     marginTop: 50,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    marginTop: 12,
+    marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
     fontWeight: '400',
-    marginTop: 4,
+    marginTop: 8,
     textAlign: 'center',
+    maxWidth: 300,
+  },
+  createButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   centered: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#D32F2F',
+    marginTop: 8,
+    textAlign: 'center',
   },
   retryButton: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: Colors.light.tint, // Assuming a tint color exists
-    borderRadius: 5,
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
   retryButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -1,12 +1,12 @@
 import { Colors } from '@/constants/Colors';
-import { useAuth } from '@/hooks/useAuth'; // Assuming useAuth.ts is in hooks folder
+import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Lead, LEAD_STATUS_TYPES, LeadStatus } from '@/types/db'; // Assuming db.ts is in types folder
-import { supabase } from '@/utils/supabaseClient'; // Assuming supabaseClient.ts is in utils folder
+import { Lead, LEAD_STATUS_TYPES, LeadStatus } from '@/types/db';
+import { supabase } from '@/utils/supabaseClient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, RefreshControl, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function LeadsScreen() {
   const router = useRouter();
@@ -16,18 +16,23 @@ export default function LeadsScreen() {
   const user = session?.user;
 
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<LeadStatus | 'All'>('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Re-fetch leads when the screen is focused
   useFocusEffect(
     useCallback(() => {
       if (user) {
         fetchLeads();
       }
-    }, [user, filterStatus])
+    }, [user])
   );
+
+  useEffect(() => {
+    filterLeads();
+  }, [searchQuery, filterStatus, leads]);
 
   const fetchLeads = async () => {
     setLoading(true);
@@ -45,10 +50,9 @@ export default function LeadsScreen() {
 
       if (error) {
         console.error('Error fetching leads:', error);
-        // Optionally, show an alert to the user
-      } else {
-        setLeads(data || []);
+        throw error;
       }
+      setLeads(data || []);
     } catch (error) {
       console.error('Unexpected error fetching leads:', error);
     } finally {
@@ -57,49 +61,76 @@ export default function LeadsScreen() {
     }
   };
 
+  const filterLeads = () => {
+    let filtered = leads;
+    if (searchQuery) {
+      filtered = filtered.filter(lead =>
+        lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        lead.contact?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        lead.address?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (filterStatus !== 'All') {
+      filtered = filtered.filter(lead => lead.status === filterStatus);
+    }
+    setFilteredLeads(filtered);
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchLeads();
   };
 
-  const renderLeadCard = (lead: Lead) => (
-    <TouchableOpacity
-      key={lead.id}
-      style={[
-        styles.leadCard,
-        { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
-      ]}
-      onPress={() => router.push(`/leads/${lead.id}` as any)} // Navigate to a detail page for the lead
-    >
-      <View style={styles.leadCardHeader}>
-        <Text style={[styles.leadName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{lead.name}</Text>
-        <Text style={[styles.leadStatus, { color: getStatusColor(lead.status) }]}>{lead.status}</Text>
-      </View>
-      <Text style={[styles.leadContact, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-        Contact: {lead.contact || 'N/A'}
-      </Text>
-      <Text style={[styles.leadAddress, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-        Address: {lead.address || 'N/A'}
-      </Text>
-      {lead.comment && (
-        <Text style={[styles.leadComment, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-          Comment: {lead.comment}
-        </Text>
-      )}
-    </TouchableOpacity>
-  );
-
   const getStatusColor = (status: LeadStatus) => {
     switch (status) {
       case LEAD_STATUS_TYPES.APPROVED:
-        return Colors.light.tint; // Green-ish
+        return { background: '#E6F3E6', text: '#2E7D32' }; // Green
       case LEAD_STATUS_TYPES.REJECTED:
-        return Colors.light.error; // Red-ish
+        return { background: '#FFE6E6', text: '#D32F2F' }; // Red
       case LEAD_STATUS_TYPES.PENDING:
       default:
-        return Colors.light.infoText; // Orange-ish
+        return { background: '#FFF5E6', text: '#F57C00' }; // Orange
     }
   };
+
+  const renderLeadCard = ({ item: lead }: { item: Lead }) => (
+    <TouchableOpacity
+      style={[
+        styles.leadCard,
+        { 
+          backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          borderColor: isDark ? Colors.dark.border : Colors.light.border
+        }
+      ]}
+      onPress={() => router.push(`/leads/${lead.id}` as any)}
+    >
+      <View style={styles.leadCardContent}>
+        <View style={styles.leadCardHeader}>
+          <Text style={[styles.leadName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            {lead.name}
+          </Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(lead.status).background }]}>
+            <Text style={[styles.statusText, { color: getStatusColor(lead.status).text }]}>
+              {lead.status}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.leadDetails}>
+          <Text style={[styles.leadContact, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+            {lead.contact || 'No contact info'}
+          </Text>
+          <Text style={[styles.leadAddress, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+            {lead.address || 'No address provided'}
+          </Text>
+          {lead.comment && (
+            <Text style={[styles.leadComment, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+              {lead.comment}
+            </Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
@@ -108,53 +139,71 @@ export default function LeadsScreen() {
           Leads
         </Text>
         <TouchableOpacity onPress={() => router.push('/create-lead')} style={styles.addButton}>
-          <Ionicons name="add-circle-outline" size={28} color={Colors.light.tint} />
+          <Ionicons 
+            name="add-circle-outline" 
+            size={28} 
+            color={isDark ? Colors.dark.tint : Colors.light.tint} 
+          />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.filterContainer}>
-        {['All', LEAD_STATUS_TYPES.APPROVED, LEAD_STATUS_TYPES.REJECTED, LEAD_STATUS_TYPES.PENDING].map((status) => (
-          <TouchableOpacity
-            key={status}
-            style={[
-              styles.filterButton,
-              filterStatus === status && { backgroundColor: Colors.light.tint },
-            ]}
-            onPress={() => setFilterStatus(status as LeadStatus | 'All')}
-          >
-            <Text style={[
-              styles.filterButtonText,
-              filterStatus === status && { color: Colors.light.background },
-            ]}>
-              {status}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.subHeader}>
+        <View style={[styles.searchContainer, { 
+          backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          borderColor: isDark ? Colors.dark.border : Colors.light.border
+        }]}>
+          <Ionicons 
+            name="search-outline" 
+            size= {20} 
+            color={isDark ? Colors.dark.secondary : Colors.light.secondary} 
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={[styles.searchInput, { color: isDark ? Colors.dark.text : Colors.light.text }]}
+            placeholder="Search by name, contact, or address..."
+            placeholderTextColor={isDark ? Colors.dark.secondary : Colors.light.secondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        <View style={styles.filterContainer}>
+          {['All', LEAD_STATUS_TYPES.APPROVED, LEAD_STATUS_TYPES.REJECTED, LEAD_STATUS_TYPES.PENDING].map((status) => (
+            <TouchableOpacity
+              key={status}
+              style={[
+                styles.filterButton,
+                filterStatus === status && { 
+                  backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint
+                }
+              ]}
+              onPress={() => setFilterStatus(status as LeadStatus | 'All')}
+            >
+              <Text style={[
+                styles.filterButtonText,
+                filterStatus === status && { 
+                  color: isDark ? Colors.dark.background : Colors.light.background
+                }
+              ]}>
+                {status}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.light.tint} />
-          <Text style={{ color: isDark ? Colors.dark.text : Colors.light.text, marginTop: 10 }}>Loading Leads...</Text>
-        </View>
-      ) : leads.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons
-            name="document-outline"
-            size={48}
-            color={isDark ? Colors.dark.secondary : Colors.light.secondary}
-          />
-          <Text style={[styles.emptyText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-            No leads found
-          </Text>
-          <Text style={[styles.emptySubtext, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-            Create a new lead to get started.
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={isDark ? Colors.dark.tint : Colors.light.tint} />
+          <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            Loading Leads...
           </Text>
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={styles.scrollViewContent}
-          showsVerticalScrollIndicator={false}
+        <FlatList
+          data={filteredLeads}
+          renderItem={renderLeadCard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -162,9 +211,30 @@ export default function LeadsScreen() {
               tintColor={isDark ? Colors.dark.text : Colors.light.text}
             />
           }
-        >
-          {leads.map(renderLeadCard)}
-        </ScrollView>
+          ListEmptyComponent={() => (
+            <View style={styles.emptyState}>
+              <Ionicons 
+                name="document-outline" 
+                size={60} 
+                color={isDark ? Colors.dark.secondary : Colors.light.secondary} 
+              />
+              <Text style={[styles.emptyText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                No Leads Found
+              </Text>
+              <Text style={[styles.emptySubtext, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+                {searchQuery || filterStatus !== 'All' 
+                  ? 'Try adjusting your search or filter criteria'
+                  : 'Create a new lead to get started'}
+              </Text>
+              <TouchableOpacity 
+                style={[styles.createButton, { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }]}
+                onPress={() => router.push('/create-lead')}
+              >
+                <Text style={styles.createButtonText}>Create New Lead</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        />
       )}
     </View>
   );
@@ -179,97 +249,139 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  backButton: {
-    padding: 5,
+  subHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
   },
   addButton: {
-    padding: 5,
+    padding: 8,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
   },
   filterContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-    paddingHorizontal: 20,
+    gap: 8,
   },
   filterButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.light.tint,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#f5f5f5',
   },
   filterButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.light.tint,
+    fontWeight: '500',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollViewContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  listContent: {
+    padding: 16,
   },
   leadCard: {
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 4,
+  },
+  leadCardContent: {
+    gap: 8,
   },
   leadCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
   leadName: {
     fontSize: 18,
-    fontWeight: '700',
-  },
-  leadStatus: {
-    fontSize: 14,
     fontWeight: '600',
+  },
+  statusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  leadDetails: {
+    gap: 4,
   },
   leadContact: {
     fontSize: 14,
-    marginBottom: 4,
+    fontWeight: '400',
   },
   leadAddress: {
     fontSize: 14,
-    marginBottom: 4,
+    fontWeight: '400',
   },
   leadComment: {
     fontSize: 14,
     fontStyle: 'italic',
   },
-  emptyState: {
+  centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  emptyState: {
+    padding: 32,
+    alignItems: 'center',
+    marginTop: 50,
   },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    marginTop: 12,
+    marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
     fontWeight: '400',
-    marginTop: 4,
+    marginTop: 8,
     textAlign: 'center',
+    maxWidth: 300,
+  },
+  createButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

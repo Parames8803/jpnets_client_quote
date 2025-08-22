@@ -32,21 +32,45 @@ export default function RootLayout() {
     setAppReady(true);
   }, []);
 
+  const handleNavigation = useCallback((currentSession: any) => {
+    if (currentSession) {
+      const userRole = currentSession.user?.user_metadata?.role; // Assuming role is in user_metadata
+      if (userRole === 'admin') {
+        router.replace('/(tabs)'); // Navigate to admin dashboard
+      } else if (userRole === 'client') {
+        router.replace('/(clients)'); // Navigate to client dashboard
+      } else if (userRole === 'worker') {
+        router.replace('/(workers)'); // Navigate to client dashboard
+      } else {
+        // Fallback for other roles or if role is not defined
+        router.replace('/landing'); 
+      }
+    } else {
+      router.replace('/(auth)/login'); // No session, go to login
+    }
+  }, [router]);
+
   useEffect(() => {
     if (loaded) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
-        // Always go to landing page initially after Lottie animation finishes
         if (appReady) {
-          router.replace('/landing');
+          handleNavigation(session);
         }
       });
 
-      supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
         setSession(session);
+        if (appReady) {
+          handleNavigation(session);
+        }
       });
+
+      return () => {
+        authListener.subscription?.unsubscribe();
+      };
     }
-  }, [loaded, appReady]); // Depend on appReady
+  }, [loaded, appReady, handleNavigation]); // Depend on appReady and handleNavigation
 
   if (!appReady || !loaded) { // Show custom splash screen until app is ready and fonts are loaded
     return <SplashScreen onAnimationFinish={onLottieAnimationFinish} />;
@@ -56,7 +80,7 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack
         screenOptions={{
-          header: (props) => <CustomHeader title={props.options.title || 'App'} {...props} showLogoutButton={true} />,
+          header: (props) => <CustomHeader title={props.options.title || '. . .'} {...props} showLogoutButton={true} />,
         }}
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />

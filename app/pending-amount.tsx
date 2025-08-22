@@ -3,7 +3,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Client as DBClient } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -36,11 +36,10 @@ export default function PendingAmountPage() {
     setLoading(true);
     setError(null);
     try {
-      // For now, we'll fetch all clients and simulate a pending_amount
-      // In a real scenario, this would involve complex queries or a dedicated column
       const { data: clientsData, error: clientsError } = await supabase
         .from('clients')
-        .select('id, name, contact_number, email, pending_amount'); // Fetch pending_amount from DB
+        .select('id, name, contact_number, email, pending_amount')
+        .order('name', { ascending: true });
 
       if (clientsError) {
         throw clientsError;
@@ -98,7 +97,6 @@ export default function PendingAmountPage() {
         throw updateError;
       }
 
-      // Update local state after successful DB update
       const updatedClients = clients.map(client =>
         client.id === selectedClient.id ? { ...client, pending_amount: amountToSave } : client
       );
@@ -118,7 +116,10 @@ export default function PendingAmountPage() {
     <TouchableOpacity 
       style={[
         styles.clientCard, 
-        { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }
+        { 
+          backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          borderColor: isDark ? Colors.dark.border : Colors.light.border
+        }
       ]}
       onPress={() => {
         setSelectedClient(item);
@@ -126,14 +127,30 @@ export default function PendingAmountPage() {
       }}
     >
       <View style={styles.clientInfo}>
-        <Ionicons name="person-circle-outline" size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
-        <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-          {item.name}
+        <Ionicons 
+          name="person-circle-outline" 
+          size={28} 
+          color={isDark ? Colors.dark.text : Colors.light.text} 
+        />
+        <View style={styles.clientDetails}>
+          <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            {item.name}
+          </Text>
+          <Text style={[styles.clientContact, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+            {item.email || item.contact_number || 'No contact info'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.pendingAmountContainer}>
+        <Text style={[
+          styles.pendingAmount, 
+          { 
+            color: item.pending_amount ? '#F57C00' : (isDark ? Colors.dark.secondary : Colors.light.secondary)
+          }
+        ]}>
+          {item.pending_amount !== null ? `$${item.pending_amount.toFixed(2)}` : 'No Pending'}
         </Text>
       </View>
-      <Text style={[styles.pendingAmount, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-        Pending: {item.pending_amount !== null ? `$${item.pending_amount.toFixed(2)}` : 'N/A'}
-      </Text>
     </TouchableOpacity>
   );
 
@@ -141,7 +158,7 @@ export default function PendingAmountPage() {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
         <ActivityIndicator size="large" color={isDark ? Colors.dark.tint : Colors.light.tint} />
-        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
           Loading clients...
         </Text>
       </View>
@@ -151,9 +168,13 @@ export default function PendingAmountPage() {
   if (error) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-        <Text style={{ color: 'red' }}>Error: {error}</Text>
-        <TouchableOpacity onPress={fetchClientsWithPendingAmount} style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>Retry</Text>
+        <Ionicons name="alert-circle-outline" size={40} color="#D32F2F" />
+        <Text style={styles.errorText}>Error: {error}</Text>
+        <TouchableOpacity 
+          onPress={fetchClientsWithPendingAmount} 
+          style={[styles.retryButton, { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }]}
+        >
+          <Text style={styles.retryButtonText}>Try Again</Text>
         </TouchableOpacity>
       </View>
     );
@@ -161,59 +182,85 @@ export default function PendingAmountPage() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-      <Stack.Screen options={{ title: 'Pending Amount' }} />
+      <Stack.Screen 
+        options={{ 
+          title: 'Pending Amounts',
+          headerStyle: { backgroundColor: isDark ? Colors.dark.background : Colors.light.background },
+          headerTintColor: isDark ? Colors.dark.text : Colors.light.text,
+        }} 
+      />
       
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={isDark ? Colors.dark.secondary : Colors.light.secondary} style={styles.searchIcon} />
-        <TextInput
-          style={[
-            styles.searchInput,
-            { 
-              color: isDark ? Colors.dark.text : Colors.light.text,
-              backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
-            }
-          ]}
-          placeholder="Search clients..."
-          placeholderTextColor={isDark ? Colors.dark.secondary : Colors.light.secondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
+      <View style={styles.header}>
+        <View style={[styles.searchContainer, { 
+          backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+          borderColor: isDark ? Colors.dark.border : Colors.light.border
+        }]}>
+          <Ionicons 
+            name="search-outline" 
+            size={20} 
+            color={isDark ? Colors.dark.secondary : Colors.light.secondary} 
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={[styles.searchInput, { color: isDark ? Colors.dark.text : Colors.light.text }]}
+            placeholder="Search by name, email, or phone..."
+            placeholderTextColor={isDark ? Colors.dark.secondary : Colors.light.secondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
       </View>
 
       {selectedClient && (
-        <View style={[styles.updateForm, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
+        <View style={[
+          styles.updateForm, 
+          { 
+            backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground,
+            borderColor: isDark ? Colors.dark.border : Colors.light.border
+          }
+        ]}>
           <Text style={[styles.updateFormTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
             Update Pending Amount for {selectedClient.name}
           </Text>
-          <TextInput
-            style={[
-              styles.amountInput,
-              { 
-                color: isDark ? Colors.dark.text : Colors.light.text,
-                backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
-              }
-            ]}
-            placeholder="Enter new amount"
-            placeholderTextColor={isDark ? Colors.dark.secondary : Colors.light.secondary}
-            keyboardType="numeric"
-            value={newPendingAmount}
-            onChangeText={setNewPendingAmount}
-          />
-          <TouchableOpacity 
-            style={[styles.saveButton, { backgroundColor: Colors.light.tint }]}
-            onPress={handleUpdatePendingAmount}
-          >
-            <Text style={styles.saveButtonText}>Save Amount</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.cancelButton}
-            onPress={() => {
-              setSelectedClient(null);
-              setNewPendingAmount('');
-            }}
-          >
-            <Text style={[styles.cancelButtonText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>Cancel</Text>
-          </TouchableOpacity>
+          <View style={styles.inputContainer}>
+            <Text style={[styles.inputLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              Amount ($)
+            </Text>
+            <TextInput
+              style={[
+                styles.amountInput,
+                { 
+                  color: isDark ? Colors.dark.text : Colors.light.text,
+                  borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                  backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
+                }
+              ]}
+              placeholder="Enter amount (e.g., 100.00)"
+              placeholderTextColor={isDark ? Colors.dark.secondary : Colors.light.secondary}
+              keyboardType="decimal-pad"
+              value={newPendingAmount}
+              onChangeText={setNewPendingAmount}
+            />
+          </View>
+          <View style={styles.formButtons}>
+            <TouchableOpacity 
+              style={[styles.saveButton, { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }]}
+              onPress={handleUpdatePendingAmount}
+            >
+              <Text style={styles.saveButtonText}>Save Amount</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              onPress={() => {
+                setSelectedClient(null);
+                setNewPendingAmount('');
+              }}
+            >
+              <Text style={[styles.cancelButtonText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -226,12 +273,21 @@ export default function PendingAmountPage() {
           <View style={styles.emptyState}>
             <Ionicons 
               name="people-outline" 
-              size={48} 
+              size={60} 
               color={isDark ? Colors.dark.secondary : Colors.light.secondary} 
             />
-            <Text style={[styles.emptyText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-              No clients with pending amounts found.
+            <Text style={[styles.emptyText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              No Clients Found
             </Text>
+            <Text style={[styles.emptySubtext, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+              {searchQuery ? 'Try adjusting your search criteria' : 'Add a new client to get started'}
+            </Text>
+            <TouchableOpacity 
+              style={[styles.createButton, { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }]}
+              onPress={() => router.push('/create-client')}
+            >
+              <Text style={styles.createButtonText}>Add New Client</Text>
+            </TouchableOpacity>
           </View>
         )}
       />
@@ -243,33 +299,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginTop: 10,
-  },
-  retryButton: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: Colors.light.tint,
-    borderRadius: 5,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  header: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 16,
-    paddingHorizontal: 12,
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderRadius: 12,
+    paddingHorizontal: 12,
   },
   searchIcon: {
     marginRight: 8,
@@ -280,87 +320,154 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    padding: 16,
   },
   clientCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
   },
   clientInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+  },
+  clientDetails: {
+    gap: 4,
   },
   clientName: {
     fontSize: 18,
     fontWeight: '600',
   },
+  clientContact: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  pendingAmountContainer: {
+    alignItems: 'flex-end',
+  },
   pendingAmount: {
     fontSize: 16,
-    fontWeight: '500',
-    color: 'orange',
+    fontWeight: '600',
   },
   emptyState: {
     padding: 32,
-    borderRadius: 12,
     alignItems: 'center',
     marginTop: 50,
   },
   emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    fontWeight: '400',
+    marginTop: 8,
+    textAlign: 'center',
+    maxWidth: 300,
+  },
+  createButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    marginTop: 12,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#D32F2F',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   updateForm: {
     margin: 16,
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
+    borderWidth: 1,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 4,
   },
   updateFormTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
   },
   amountInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
     borderRadius: 8,
-    padding: 10,
+    padding: 12,
     fontSize: 16,
-    marginBottom: 12,
+  },
+  formButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
   },
   saveButton: {
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 8,
   },
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   cancelButton: {
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 8,
-    alignItems: 'center',
   },
   cancelButtonText: {
     fontSize: 16,
+    fontWeight: '500',
   },
 });

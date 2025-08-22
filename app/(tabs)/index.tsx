@@ -1,18 +1,19 @@
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Dimensions,
+  Image,
   Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
 const { width } = Dimensions.get("window");
 
@@ -113,30 +114,6 @@ export default function HomeScreen() {
     </View>
   );
 
-  const RecentActivity = () => (
-    <View style={styles.recentContainer}>
-      <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-        Recent Activity
-      </Text>
-      <View style={[
-        styles.emptyState,
-        { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }
-      ]}>
-        <Ionicons 
-          name="document-outline" 
-          size={48} 
-          color={isDark ? Colors.dark.secondary : Colors.light.secondary} 
-        />
-        <Text style={[styles.emptyText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-          No recent activity
-        </Text>
-        <Text style={[styles.emptySubtext, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-          Your recent actions will appear here
-        </Text>
-      </View>
-    </View>
-  );
-
   /** ==========================
    *  Render
    *  ========================== */
@@ -150,7 +127,18 @@ export default function HomeScreen() {
         <Header />
         <View style={styles.content}>
           <QuickActions />
-          <RecentActivity />
+        </View>
+
+        {/* Footer Section */}
+        <View style={styles.footerContainer}>
+          <Image
+            source={require('../../assets/images/jp_logo.png')} // Replace with your logo path
+            style={styles.logoPlaceholder}
+            resizeMode="contain"
+          />
+          <Text style={[styles.poweredBy, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+            Powered by Hynox
+          </Text>
         </View>
       </ScrollView>
     </View>
@@ -240,23 +228,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  recentContainer: {
-    marginBottom: 32,
+  footerContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+    paddingBottom: 20,
   },
-  emptyState: {
-    padding: 32,
-    borderRadius: 12,
-    alignItems: "center",
+  companyName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 10,
   },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginTop: 12,
+  logoPlaceholder: {
+    width: 300,
+    height: 200,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  emptySubtext: {
+  poweredBy: {
     fontSize: 14,
-    fontWeight: "400",
-    marginTop: 4,
-    textAlign: "center",
+    fontWeight: '500',
   },
 });

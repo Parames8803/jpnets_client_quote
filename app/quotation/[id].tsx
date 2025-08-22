@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Modal, // Added Modal import
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -18,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import WebView from 'react-native-webview'; // Added WebView import
 import {
   Client,
   Product,
@@ -341,6 +343,7 @@ export default function QuotationDetailsScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
+  const [fullPreviewModalVisible, setFullPreviewModalVisible] = useState(false); // New state for full preview modal
 
   const handleDelete = () =>
     Alert.alert("Delete Quotation", "Are you sure?", [
@@ -445,6 +448,9 @@ export default function QuotationDetailsScreen() {
               color={colors.tint}
             />
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => setFullPreviewModalVisible(true)} style={styles.headerButton}>
+            <IconSymbol size={22} name="doc.text.fill" color={colors.tint} />
+          </TouchableOpacity>
           {quotationStatus !== 'Closed' && (
             <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
               <IconSymbol size={22} name="trash.fill" color={colors.error} />
@@ -530,6 +536,31 @@ export default function QuotationDetailsScreen() {
         statusOptions={Object.values(QUOTATION_STATUS_TYPES)}
         colors={colors}
       />
+
+      {/* Full HTML Preview Modal */}
+      <Modal
+        visible={fullPreviewModalVisible}
+        transparent={false}
+        animationType="slide"
+        onRequestClose={() => setFullPreviewModalVisible(false)}
+      >
+        <View style={[styles.fullPreviewModalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.fullPreviewModalHeader, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
+            <Text style={[styles.fullPreviewModalTitle, { color: colors.text }]}>Full Quotation Preview</Text>
+            <TouchableOpacity onPress={() => setFullPreviewModalVisible(false)}>
+              <IconSymbol name="xmark.circle.fill" size={28} color={colors.secondaryText} />
+            </TouchableOpacity>
+          </View>
+          <WebView
+            originWhitelist={['*']}
+            source={{ html: generateQuotationHtml(data) }}
+            style={styles.fullPreviewWebView}
+            scalesPageToFit={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -781,4 +812,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 8,
   },
+  fullPreviewModalContainer: { flex: 1, paddingTop: 50 },
+  fullPreviewModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1 },
+  fullPreviewModalTitle: { fontSize: 22, fontWeight: 'bold' },
+  fullPreviewWebView: { flex: 1 },
 });

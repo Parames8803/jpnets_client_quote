@@ -353,7 +353,7 @@ export default function ClientDetailsScreen() {
           <IconSymbol name="doc.text" size={20} color={isDark ? '#86EFAC' : '#059669'} />
           <View style={styles.rowInfo}>
             <Text style={[styles.rowTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              Quote #{item.id.substring(0, 8)}
+              Quote #{item.quote_id || 'N/A'}
             </Text>
             <Text style={[styles.rowSub, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
               ${(item.total_price || 0).toFixed(2)}
@@ -426,11 +426,6 @@ export default function ClientDetailsScreen() {
         <View style={styles.summaryRow}>
           <SummaryCard title="Rooms" value={rooms.length.toString()} color={isDark ? '#93C5FD' : '#2563EB'} />
           <SummaryCard title="Quotes" value={quotations.length.toString()} color={isDark ? '#86EFAC' : '#059669'} />
-          <SummaryCard
-            title="Total"
-            value={`$${totalValue >= 1000 ? (totalValue / 1000).toFixed(1) + 'k' : totalValue.toFixed(0)}`}
-            color={isDark ? '#FBBF24' : '#D97706'}
-          />
         </View>
 
         {/* Rooms */}
