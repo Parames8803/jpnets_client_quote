@@ -120,6 +120,31 @@ export default function ClientDetailsScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          // Fetch associated room IDs
+          const { data: quotationRooms, error: fetchError } = await supabase
+            .from('quotation_rooms')
+            .select('room_id')
+            .eq('quotation_id', quotationId);
+
+          if (fetchError) {
+            Alert.alert('Error fetching quotation rooms', fetchError.message);
+            return;
+          }
+
+          // Update room statuses to 'Active'
+          if (quotationRooms && quotationRooms.length > 0) {
+            const roomIdsToUpdate = quotationRooms.map(qr => qr.room_id);
+            const { error: updateError } = await supabase
+              .from('rooms')
+              .update({ status: QUOTATION_STATUS_TYPES.ACTIVE })
+              .in('id', roomIdsToUpdate);
+
+            if (updateError) {
+              Alert.alert('Error updating room statuses', updateError.message);
+              return;
+            }
+          }
+
           const { error } = await supabase.from('quotations').delete().eq('id', quotationId);
           if (error) Alert.alert('Error deleting quotation', error.message);
           else onRefresh(); // Auto refresh after deleting
@@ -153,7 +178,35 @@ export default function ClientDetailsScreen() {
             const { error } = await supabase.from('rooms').delete().in('id', Array.from(selectedIds));
             if (error) Alert.alert('Error', error.message);
           } else {
-            const { error } = await supabase.from('quotations').delete().in('id', Array.from(selectedIds));
+            // Batch delete for quotations
+            const quotationIdsToDelete = Array.from(selectedIds);
+
+            // Fetch associated room IDs for all quotations being deleted
+            const { data: quotationRooms, error: fetchError } = await supabase
+              .from('quotation_rooms')
+              .select('room_id')
+              .in('quotation_id', quotationIdsToDelete);
+
+            if (fetchError) {
+              Alert.alert('Error fetching quotation rooms for batch delete', fetchError.message);
+              return;
+            }
+
+            // Update room statuses to 'Active'
+            if (quotationRooms && quotationRooms.length > 0) {
+              const roomIdsToUpdate = Array.from(new Set(quotationRooms.map(qr => qr.room_id))); // Use Set to avoid duplicate room updates
+              const { error: updateError } = await supabase
+                .from('rooms')
+                .update({ status: QUOTATION_STATUS_TYPES.ACTIVE })
+                .in('id', roomIdsToUpdate);
+
+              if (updateError) {
+                Alert.alert('Error updating room statuses for batch delete', updateError.message);
+                return;
+              }
+            }
+
+            const { error } = await supabase.from('quotations').delete().in('id', quotationIdsToDelete);
             if (error) Alert.alert('Error', error.message);
           }
           clearBatch();

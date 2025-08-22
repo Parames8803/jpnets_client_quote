@@ -16,8 +16,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Client, Product, Room, ROOM_STATUS_TYPES, QUOTATION_STATUS_TYPES } from '../../types/db';
+import WebView from 'react-native-webview';
+import { Client, Product, Room, Quotation, ROOM_STATUS_TYPES, QUOTATION_STATUS_TYPES } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
+import { generateQuotationHtml } from '../../utils/quotationPdf';
 
 type EditableProduct = Product & { originalId: string };
 type GroupedProduct = Room & { products: EditableProduct[]; subtotal: number };
@@ -161,6 +163,8 @@ export default function QuotationPreviewScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<EditableProduct | null>(null);
   const [nextQuoteId, setNextQuoteId] = useState<string | null>(null);
+  const [quotationData, setQuotationData] = useState<any>(null); // To store the quotation data for HTML generation
+  const [fullPreviewModalVisible, setFullPreviewModalVisible] = useState(false); // New state for full preview modal
 
   const selectedRoomIds: string[] = JSON.parse(selectedRoomIdsString as string);
   
@@ -196,6 +200,12 @@ export default function QuotationPreviewScreen() {
         setClient(clientRes.data);
         setRooms(roomsRes.data);
         setProducts(productsRes.data.map(p => ({ ...p, originalId: p.id })));
+        // Set initial quotation data for HTML preview
+        setQuotationData({
+          client: clientRes.data,
+          products: productsRes.data.map(p => ({ ...p, originalId: p.id })),
+          rooms: roomsRes.data,
+        });
       } catch (error: any) {
         Alert.alert('Error fetching data', error.message);
       } finally {
@@ -252,6 +262,14 @@ export default function QuotationPreviewScreen() {
       setProducts(prev => prev.map(p => (p.id === data.id ? { ...p, ...data } : p)));
       setModalVisible(false);
       setEditingProduct(null);
+
+      // Update quotationData for HTML preview
+      setQuotationData((prev: any) => {
+        const updatedProducts = prev.products.map((p: EditableProduct) =>
+          p.id === data.id ? { ...p, ...data } : p
+        );
+        return { ...prev, products: updatedProducts };
+      });
     } catch (error: any) {
       Alert.alert('Error updating product', error.message);
     }
@@ -299,19 +317,56 @@ export default function QuotationPreviewScreen() {
     );
   }
 
+  // Prepare data for HTML generation
+  const quotationForHtml: Quotation = {
+    id: 'temp-id', // Placeholder, as it's not yet created in DB
+    client_id: clientId as string, // Assuming clientId is always present here
+    pdf_url: null,
+    excel_url: null,
+    assigned_worker_id: null,
+    quote_id: nextQuoteId || "JP000", // Fallback for quote_id
+    created_at: new Date().toISOString(),
+    total_price: grandTotal,
+    status: QUOTATION_STATUS_TYPES.PENDING,
+  };
+
+  const allProductsForHtml = groupedProducts.flatMap(group =>
+    group.products.map(product => ({
+      ...product,
+      room_type: group.room_type || undefined, // Ensure room_type is string | undefined
+    }))
+  );
+
+  const htmlContent = quotationData && client && nextQuoteId
+    ? generateQuotationHtml({
+        quotation: quotationForHtml,
+        client: client,
+        allProducts: allProductsForHtml,
+      })
+    : '<h1>Loading quotation preview...</h1>';
+
   return (
     <View style={[styles.container, themedStyles.background]}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, themedStyles.text]}>Quotation Details</Text>
+        <Text style={[styles.headerTitle, themedStyles.text]}>Quotation Preview</Text>
         <Text style={[styles.headerSubtitle, themedStyles.subtext]}>Client: {client?.name}</Text>
         <View style={styles.statsRow}>
           <Text style={themedStyles.subtext}>{groupedProducts.length} Rooms</Text>
           <Text style={themedStyles.subtext}>•</Text>
           <Text style={themedStyles.subtext}>{products.length} Items</Text>
         </View>
+        <TouchableOpacity
+          style={[styles.viewFullPreviewButton, { backgroundColor: themedStyles.primary.color }]}
+          onPress={() => setFullPreviewModalVisible(true)}
+        >
+          <Text style={styles.viewFullPreviewButtonText}>View Full Preview</Text>
+          <IconSymbol name="doc.text.fill" size={16} color="#fff" />
+        </TouchableOpacity>
       </View>
       
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Original Room Cards for editing */}
+        <Text style={[styles.editSectionTitle, themedStyles.text]}>Edit Items</Text>
         {groupedProducts.map(group => (
           <RoomCard
             key={group.id}
@@ -328,7 +383,7 @@ export default function QuotationPreviewScreen() {
       <View style={[styles.footer, themedStyles.card, { borderTopColor: themedStyles.separator.backgroundColor }]}>
         <View style={styles.totalRow}>
           <Text style={[styles.totalLabel, themedStyles.text]}>Grand Total</Text>
-          <Text style={[styles.totalAmount, themedStyles.primary]}>${grandTotal.toFixed(2)}</Text>
+          <Text style={[styles.totalAmount, themedStyles.primary]}>₹{grandTotal.toFixed(2)}</Text>
         </View>
         <TouchableOpacity
           style={[styles.submitButton, { backgroundColor: themedStyles.primary.color, opacity: isSubmitting ? 0.7 : 1 }]}
@@ -355,6 +410,31 @@ export default function QuotationPreviewScreen() {
           colors={themedStyles}
         />
       )}
+
+      {/* Full HTML Preview Modal */}
+      <Modal
+        visible={fullPreviewModalVisible}
+        transparent={false}
+        animationType="slide"
+        onRequestClose={() => setFullPreviewModalVisible(false)}
+      >
+        <View style={[styles.fullPreviewModalContainer, themedStyles.background]}>
+          <View style={[styles.fullPreviewModalHeader, { backgroundColor: themedStyles.card.backgroundColor, borderBottomColor: themedStyles.separator.backgroundColor }]}>
+            <Text style={[styles.fullPreviewModalTitle, themedStyles.text]}>Full Quotation Preview</Text>
+            <TouchableOpacity onPress={() => setFullPreviewModalVisible(false)}>
+              <IconSymbol name="xmark.circle.fill" size={28} color={themedStyles.subtext.color} />
+            </TouchableOpacity>
+          </View>
+          <WebView
+            originWhitelist={['*']}
+            source={{ html: htmlContent }}
+            style={styles.fullPreviewWebView}
+            scalesPageToFit={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -368,6 +448,11 @@ const styles = StyleSheet.create({
   headerSubtitle: { fontSize: 16, marginTop: 4 },
   statsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   scrollContainer: { paddingHorizontal: 20, paddingBottom: 180 },
+  webViewContainer: { height: 500, marginBottom: 20, borderWidth: 1, borderColor: '#ddd', borderRadius: 10, overflow: 'hidden' },
+  webView: { flex: 1 },
+  viewFullPreviewButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 10, marginTop: 15, gap: 8 },
+  viewFullPreviewButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  editSectionTitle: { fontSize: 20, fontWeight: 'bold', marginVertical: 15, paddingHorizontal: 20 },
   roomCard: { borderRadius: 16, marginBottom: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 4 },
   roomHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 15 },
   roomName: { fontSize: 18, fontWeight: '600' },
@@ -397,4 +482,8 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', gap: 15 },
   saveButton: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  fullPreviewModalContainer: { flex: 1, paddingTop: 50 },
+  fullPreviewModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1 },
+  fullPreviewModalTitle: { fontSize: 22, fontWeight: 'bold' },
+  fullPreviewWebView: { flex: 1 },
 });
