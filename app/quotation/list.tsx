@@ -3,7 +3,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { QuotationStatus } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -12,6 +12,7 @@ interface QuotationListItem {
   created_at: string;
   total_price: number | null;
   status: QuotationStatus | null;
+  invoice_generated: boolean | null; // Added for invoice filtering
   clients: { name: string | null } | null;
 }
 
@@ -24,13 +25,14 @@ export default function QuotationListPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const { invoiceGenerated } = useLocalSearchParams(); // Get query params
 
   useEffect(() => {
     fetchQuotations();
-  }, []);
+  }, [invoiceGenerated]); // Re-fetch if invoiceGenerated param changes
 
   useEffect(() => {
-    // Filter quotations based on search query and status
+    // Filter quotations based on search query, status, and invoiceGenerated param
     let filtered = quotations;
     if (searchQuery) {
       filtered = filtered.filter(item => 
@@ -40,17 +42,26 @@ export default function QuotationListPage() {
     if (filterStatus) {
       filtered = filtered.filter(item => item.status === filterStatus);
     }
+    if (invoiceGenerated === 'true') {
+      filtered = filtered.filter(item => item.invoice_generated === true);
+    }
     setFilteredQuotations(filtered);
-  }, [searchQuery, filterStatus, quotations]);
+  }, [searchQuery, filterStatus, quotations, invoiceGenerated]);
 
   const fetchQuotations = async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('quotations')
-        .select('id, created_at, total_price, status, clients(name)')
+        .select('id, created_at, total_price, status, invoice_generated, clients(name)') // Select invoice_generated
         .order('created_at', { ascending: false });
+
+      if (invoiceGenerated === 'true') {
+        query = query.eq('invoice_generated', true); // Filter by invoice_generated
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         throw error;
@@ -142,7 +153,7 @@ export default function QuotationListPage() {
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
       <Stack.Screen 
         options={{ 
-          title: 'Quotations',
+          title: invoiceGenerated === 'true' ? 'Invoices' : 'Quotations',
           headerStyle: { backgroundColor: isDark ? Colors.dark.background : Colors.light.background },
           headerTintColor: isDark ? Colors.dark.text : Colors.light.text,
         }} 
