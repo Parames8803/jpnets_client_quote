@@ -1,259 +1,235 @@
-import { Client, Product, Quotation } from '../types/db';
-
 export function generateQuotationHtml({
   quotation,
   client,
   allProducts,
-  type = 'quotation', // 'quotation' or 'invoice'
+  type = "quotation",
 }: {
-  quotation: Quotation;
-  client: Client;
-  allProducts: (Product & { room_type?: string })[];
-  type?: 'quotation' | 'invoice';
+  quotation: any;
+  client: any;
+  allProducts: any[];
+  type?: "quotation" | "invoice";
 }) {
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Quotation for JP Aluminium Kitchen Cupboard interior design and works. Get high-quality kitchen solutions in Mumbai.">
-  <meta name="keywords" content="kitchen cupboard, aluminium kitchen, interior design, Mumbai, quotation, invoice">
-  <title>${type === 'invoice' ? 'Invoice' : 'Quotation'} #${quotation?.quote_id || "QT001234"}</title>
+  <title>${type === "invoice" ? "Invoice" : "Quotation"} #${
+    quotation?.quote_id || "QT001234"
+  }</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
     :root {
-      --font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
-      --color-dark: #222222;
-      --color-medium: #555555;
-      --color-light: #888888;
-      --color-border: #dddddd;
+      --font-family: 'Roboto', 'Helvetica', Arial, sans-serif;
+      --color-dark: #222;
+      --color-medium: #555;
+      --color-light: #888;
+      --color-border: #ddd;
       --color-bg-light: #f9f9f9;
       --color-bg-header: #f1f1f1;
       --color-accent: #007bff;
-      --watermark-opacity: 0.15;
-      --watermark-size: 700px;
-      --watermark-rotation: 0deg;
+      --watermark-opacity: 0.08;
+      --watermark-size: 65%;
       --watermark-url: url('https://curiqqrlajzvidcbcluj.supabase.co/storage/v1/object/public/file-storage/logo/JP-Aluminium-Kitchen-Cupboard-Interior-Works.jpg');
     }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: var(--font-family);
       font-size: 12px;
       line-height: 1.5;
       color: var(--color-dark);
-      background-color: #f0f2f5;
+      background: #f0f2f5;
     }
 
     .page-container {
       max-width: 820px;
-      margin: 40px auto;
-      padding: 20px;
-      background-color: #ffffff;
-      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      margin: 30px auto;
+      padding: 25px;
+      background: #fff;
       border: 1px solid var(--color-border);
       position: relative;
-      z-index: 1;
+      overflow: hidden;
     }
 
-    /* --- Watermark --- */
+    /* Watermark fix */
     .watermark {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: -1;
-      pointer-events: none;
-      opacity: var(--watermark-opacity);
+      transform: translate(-50%, -50%) rotate(-15deg);
       width: var(--watermark-size);
-      height: var(--watermark-size);
+      height: auto;
       background-image: var(--watermark-url);
+      background-size: contain;
       background-repeat: no-repeat;
       background-position: center;
-      background-size: contain;
-      transform: rotate(var(--watermark-rotation)) translate(-50%, -50%);
-      print-color-adjust: exact;
-      -webkit-print-color-adjust: exact;
+      opacity: var(--watermark-opacity);
+      z-index: 0;
+      pointer-events: none;
     }
 
-    /* --- Header --- */
+    /* Header */
     .header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       border-bottom: 2px solid var(--color-dark);
-      padding-bottom: 15px;
+      padding-bottom: 12px;
       margin-bottom: 25px;
+      z-index: 1;
+      position: relative;
     }
+
     .company-logo img {
-      width: 150px;
-      height: 150px;
-      object-fit: contain;
+      width: 120px;
+      height: auto;
     }
-    .company-details { text-align: left; }
+
+    .company-details {
+      flex: 1;
+      padding-left: 15px;
+    }
     .company-details h1 {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 700;
-      color: var(--color-dark);
+      margin-bottom: 4px;
     }
     .company-details p {
       font-size: 11px;
       color: var(--color-medium);
-    }
-    .quote-title-section { text-align: right; }
-    .quote-title-section h2 {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--color-dark);
-      text-transform: uppercase;
-    }
-    .quote-title-section p {
-      font-size: 12px;
-      color: var(--color-medium);
+      margin-bottom: 2px;
     }
 
-    /* --- Details Section (Client/Quote) --- */
+    .quote-title-section {
+      text-align: right;
+    }
+    .quote-title-section h2 {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    /* Details Grid */
     .details-grid {
       display: flex;
       justify-content: space-between;
-      gap: 20px;
-      margin-bottom: 25px;
-      padding-bottom: 15px;
+      margin-bottom: 20px;
       border-bottom: 1px solid var(--color-border);
+      padding-bottom: 10px;
     }
-    .details-column { width: 48%; }
+
+    .details-column {
+      width: 48%;
+    }
+
     .details-column h3 {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding-bottom: 5px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       border-bottom: 1px solid var(--color-border);
+      padding-bottom: 4px;
     }
+
     .detail-line {
       display: flex;
       justify-content: space-between;
-      padding: 4px 0;
-    }
-    .detail-line .label { font-weight: 500; color: var(--color-medium); }
-    .detail-line .value { font-weight: 500; color: var(--color-dark); }
-
-    /* --- Products Table --- */
-    .products-table-container { margin-bottom: 25px; }
-    .products-table { width: 100%; border-collapse: collapse; }
-    .products-table thead th {
-      background-color: var(--color-bg-header);
-      border: 1px solid var(--color-border);
-      padding: 10px;
-      text-align: left;
       font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
+      margin: 2px 0;
     }
-    .products-table tbody td {
-      border: 1px solid var(--color-border);
-      padding: 10px;
-      vertical-align: top;
-    }
-    .products-table tbody tr:nth-child(even) { background-color: var(--color-bg-light); }
 
-    /* --- Summary Rows in Table --- */
-    .summary-row td {
+    /* Table */
+    .products-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    .products-table th {
+      background: var(--color-bg-header);
+      font-weight: 700;
+      font-size: 11px;
+      padding: 8px;
       border: 1px solid var(--color-border);
-      border-top: 2px solid var(--color-dark);
-      font-weight: 700;
     }
+
+    .products-table td {
+      border: 1px solid var(--color-border);
+      padding: 8px;
+      font-size: 11px;
+    }
+
+    .products-table tbody tr:nth-child(even) {
+      background: var(--color-bg-light);
+    }
+
+    .summary-row td {
+      font-weight: 600;
+      padding: 8px;
+    }
+
     .grand-total-row td {
-      background-color: var(--color-dark);
-      color: #ffffff;
-      font-size: 14px;
+      background: var(--color-dark);
+      color: #fff;
+      font-size: 13px;
       font-weight: 700;
-      border: 1px solid var(--color-dark);
     }
+
     .align-right { text-align: right; }
     .align-center { text-align: center; }
 
-    /* --- Terms & Signature --- */
+    /* Terms + Signature */
     .terms-signature-grid {
       display: flex;
       justify-content: space-between;
-      gap: 30px;
-      margin-top: 25px;
-      padding-top: 20px;
-      border-top: 1px solid var(--color-border);
+      margin-top: 20px;
     }
-    .terms-section { width: 65%; }
-    .terms-section h4, .signature-section h4 {
-      font-size: 13px;
-      font-weight: 700;
-      margin-bottom: 10px;
-      text-transform: uppercase;
-    }
-    .terms-section ul {
-      list-style-type: none;
+
+    .terms-section {
+      width: 65%;
       font-size: 11px;
       color: var(--color-medium);
     }
-    .terms-section li { margin-bottom: 5px; }
-    .signature-section { width: 35%; text-align: center; }
+    .terms-section h4 {
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .signature-section {
+      width: 30%;
+      text-align: center;
+    }
+
     .signature-box {
       border-bottom: 1px solid var(--color-dark);
-      height: 70px;
-      margin-bottom: 5px;
+      height: 50px;
+      margin: 12px 0;
     }
 
-    /* --- Footer --- */
+    /* Footer */
     .footer {
       text-align: center;
-      margin-top: 30px;
-      padding-top: 15px;
-      border-top: 2px solid var(--color-dark);
+      border-top: 1px solid var(--color-border);
       font-size: 10px;
       color: var(--color-light);
+      padding-top: 8px;
+      margin-top: 25px;
     }
 
-    /* Mobile Adjustments */
-    @media (max-width: 640px) {
-      .page-container { margin: 10px; padding: 20px; }
-      .details-grid { flex-direction: column; gap: 15px; }
-      .details-column { width: 100%; }
-      .header { flex-direction: column; align-items: center; text-align: center; }
-      .company-logo img { width: 100px; height: 100px; }
-      .quote-title-section { text-align: center; margin-top: 15px; }
-      .terms-signature-grid { flex-direction: column; gap: 15px; }
-      .terms-section, .signature-section { width: 100%; }
-      .watermark { width: 400px; height: 400px; }
-    }
-
-    /* Print Adjustments */
     @media print {
-      body { background-color: #ffffff; }
-      .page-container {
-        margin: 10mm;
-        padding: 15mm;
-        box-shadow: none;
-        border: none;
-      }
-      .products-table th, .products-table td { border: 1px solid #000; }
-      .summary-row td, .grand-total-row td { border: 1px solid #000; }
-      .grand-total-row td { border: 1px solid #000; }
-      .watermark {
-        opacity: var(--watermark-opacity);
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
-      }
+      body { background: #fff; }
+      .page-container { box-shadow: none; border: none; }
+      .watermark { opacity: 0.08; }
     }
   </style>
 </head>
 <body>
   <div class="page-container">
-    <div class="watermark" aria-hidden="true"></div>
+    <div class="watermark"></div>
     <header class="header">
       <div class="company-logo">
-        <img src="https://curiqqrlajzvidcbcluj.supabase.co/storage/v1/object/public/file-storage/logo/JP-Aluminium-Kitchen-Cupboard-Interior-Works.jpg" alt="JP Aluminium Kitchen Cupboard Logo" onerror="this.style.display='none'">
+        <img src="https://curiqqrlajzvidcbcluj.supabase.co/storage/v1/object/public/file-storage/logo/JP-Aluminium-Kitchen-Cupboard-Interior-Works.jpg" />
       </div>
       <div class="company-details">
         <h1>JP Aluminium Kitchen Cupboard</h1>
@@ -261,108 +237,116 @@ export function generateQuotationHtml({
         <p>Mumbai, MH 400001 | +91 98765 43210 | info@jpaluminium.com</p>
       </div>
       <div class="quote-title-section">
-        <h2>${type === 'invoice' ? 'Invoice' : 'Quotation'}</h2>
+        <h2>${type === "invoice" ? "Invoice" : "Quotation"}</h2>
         <p>#${quotation?.quote_id || "QT001234"}</p>
       </div>
     </header>
+
     <main>
+      <!-- DETAILS -->
       <section class="details-grid">
         <div class="details-column">
-          <h3>Bill To:</h3>
-          <div class="detail-line">
-            <span class="label">Client:</span>
-            <span class="value">${client?.name || "N/A"}</span>
-          </div>
-          <div class="detail-line">
-            <span class="label">Contact:</span>
-            <span class="value">${client?.contact_number || "N/A"}</span>
-          </div>
-          <div class="detail-line">
-            <span class="label">Address:</span>
-            <span class="value">${client?.address || "N/A"}</span>
-          </div>
+          <h3>Bill To</h3>
+          <div class="detail-line"><span>Client:</span><span>${
+            client?.name || "N/A"
+          }</span></div>
+          <div class="detail-line"><span>Contact:</span><span>${
+            client?.contact_number || "N/A"
+          }</span></div>
+          <div class="detail-line"><span>Address:</span><span>${
+            client?.address || "N/A"
+          }</span></div>
         </div>
         <div class="details-column">
-          <h3>Details:</h3>
-          <div class="detail-line">
-            <span class="label">Date of Issue:</span>
-            <span class="value">${new Date(quotation?.created_at || Date.now()).toLocaleDateString("en-GB")}</span>
-          </div>
-          <div class="detail-line">
-            <span class="label">Valid Until:</span>
-            <span class="value">${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB")}</span>
-          </div>
-          <div class="detail-line">
-            <span class="label">Project Type:</span>
-            <span class="value">Kitchen Interior</span>
-          </div>
+          <h3>Details</h3>
+          <div class="detail-line"><span>Date:</span><span>${new Date(
+            quotation?.created_at || Date.now()
+          ).toLocaleDateString("en-GB")}</span></div>
+          <div class="detail-line"><span>Valid Until:</span><span>${new Date(
+            Date.now() + 30 * 24 * 60 * 60 * 1000
+          ).toLocaleDateString("en-GB")}</span></div>
+          <div class="detail-line"><span>Project Type:</span><span>Kitchen Interior</span></div>
         </div>
       </section>
-      <section class="products-table-container">
-        <table class="products-table">
-          <thead>
-            <tr>
-              <th class="align-center" style="width: 8%;">S.No</th>
-              <th style="width: 42%;">Item Description</th>
-              <th class="align-center" style="width: 15%;">Quantity</th>
-              <th class="align-right" style="width: 15%;">Unit Price</th>
-              <th class="align-right" style="width: 20%;">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              allProducts
-                ?.map(
-                  (product, index) => `
-            <tr>
-              <td class="align-center">${index + 1}</td>
-              <td><strong>${product?.name || "N/A"}</strong><br><small>${product?.room_type || ""}</small></td>
-              <td class="align-center">${product?.quantity || 0} ${product?.unit_type || ""}</td>
-              <td class="align-right">₹${(product?.price || 0).toFixed(2)}</td>
-              <td class="align-right">₹${((product?.quantity || 0) * (product?.price || 0)).toFixed(2)}</td>
-            </tr>
+
+      <!-- PRODUCTS TABLE -->
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th class="align-center">S.No</th>
+            <th>Item Description</th>
+            <th class="align-center">Qty</th>
+            <th class="align-right">Unit Price</th>
+            <th class="align-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            allProducts
+              ?.map(
+                (product, i) => `
+              <tr>
+                <td class="align-center">${i + 1}</td>
+                <td><strong>${product?.name || "N/A"}</strong><br><small>${
+                  product?.room_type || ""
+                }</small></td>
+                <td class="align-center">${product?.quantity || 0} ${
+                  product?.unit_type || ""
+                }</td>
+                <td class="align-right">₹${(product?.price || 0).toFixed(
+                  2
+                )}</td>
+                <td class="align-right">₹${(
+                  (product?.price || 0) * (product?.quantity || 0)
+                ).toFixed(2)}</td>
+              </tr>
             `
-                )
-                .join("") ||
-              '<tr><td colspan="5" class="align-center">No items listed.</td></tr>'
-            }
-            <tr class="summary-row">
-              <td colspan="4" class="align-right">Subtotal</td>
-              <td class="align-right">₹${(quotation?.total_price || 0).toFixed(2)}</td>
-            </tr>
-            ${
-              type === 'invoice'
-                ? `
-            <tr class="summary-row">
-              <td colspan="4" class="align-right">CGST (9%)</td>
-              <td class="align-right">₹${((quotation?.total_price || 0) * 0.09).toFixed(2)}</td>
-            </tr>
-            <tr class="summary-row">
-              <td colspan="4" class="align-right">SGST (9%)</td>
-              <td class="align-right">₹${((quotation?.total_price || 0) * 0.09).toFixed(2)}</td>
-            </tr>
-            <tr class="summary-row">
-              <td colspan="4" class="align-right">Total GST (18%)</td>
-              <td class="align-right">₹${((quotation?.total_price || 0) * 0.18).toFixed(2)}</td>
-            </tr>
-            `
-                : ''
-            }
-            <tr class="grand-total-row">
-              <td colspan="4" class="align-right">GRAND TOTAL</td>
-              <td class="align-right">₹${((quotation?.total_price || 0) * 1.18).toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+              )
+              .join("") ||
+            `<tr><td colspan="5" class="align-center">No items.</td></tr>`
+          }
+
+          <tr class="summary-row">
+            <td colspan="4" class="align-right">Subtotal</td>
+            <td class="align-right">₹${(quotation?.total_price || 0).toFixed(
+              2
+            )}</td>
+          </tr>
+          ${
+            type === "invoice"
+              ? `
+          <tr class="summary-row">
+            <td colspan="4" class="align-right">CGST (9%)</td>
+            <td class="align-right">₹${(
+              (quotation?.total_price || 0) * 0.09
+            ).toFixed(2)}</td>
+          </tr>
+          <tr class="summary-row">
+            <td colspan="4" class="align-right">SGST (9%)</td>
+            <td class="align-right">₹${(
+              (quotation?.total_price || 0) * 0.09
+            ).toFixed(2)}</td>
+          </tr>`
+              : ""
+          }
+          <tr class="grand-total-row">
+            <td colspan="4" class="align-right">GRAND TOTAL</td>
+            <td class="align-right">₹${(
+              (quotation?.total_price || 0) * (type === "invoice" ? 1.18 : 1)
+            ).toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- TERMS + SIGNATURE -->
       <section class="terms-signature-grid">
         <div class="terms-section">
           <h4>Terms & Conditions</h4>
           <ul>
-            <li><strong>Payment:</strong> 50% advance, 40% on material delivery, 10% on completion.</li>
-            <li><strong>Delivery:</strong> Approx. 15-20 working days from advance payment.</li>
-            <li><strong>Warranty:</strong> 1-year warranty on manufacturing defects.</li>
-            <li><strong>Validity:</strong> This quotation is valid for 30 days.</li>
+            <li><strong>Payment:</strong> 50% advance, 40% delivery, 10% completion.</li>
+            <li><strong>Delivery:</strong> 15-20 working days from advance.</li>
+            <li><strong>Warranty:</strong> 1-year manufacturing warranty.</li>
+            <li><strong>Validity:</strong> Quotation valid 30 days.</li>
           </ul>
         </div>
         <div class="signature-section">
@@ -372,9 +356,10 @@ export function generateQuotationHtml({
         </div>
       </section>
     </main>
+
     <footer class="footer">
-      <p>Thank you for considering our quotation. We look forward to working with you.</p>
-      <p>JP Aluminium Kitchen Cupboard | GST: 27XXXXX1234X1ZX</p>
+      <p>Thank you for considering our quotation. We look forward to serving you.</p>
+      <p>GST: 27XXXXX1234X1ZX</p>
     </footer>
   </div>
 </body>
