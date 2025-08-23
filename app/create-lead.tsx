@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert, ScrollView } from 'react-native';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { supabase } from '@/utils/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
-import { LeadStatus, LEAD_STATUS_TYPES } from '@/types/db';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { LEAD_STATUS_TYPES, LeadStatus } from '@/types/db';
+import { supabase } from '@/utils/supabaseClient';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateLeadScreen() {
   const router = useRouter();
@@ -63,16 +62,6 @@ export default function CreateLeadScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-          Create New Lead
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
-
       <ScrollView contentContainerStyle={styles.formContainer}>
         <Text style={[styles.label, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Lead Name:</Text>
         <TextInput

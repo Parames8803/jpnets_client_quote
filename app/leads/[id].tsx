@@ -108,16 +108,6 @@ export default function LeadDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-          Lead Details
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
-
       <ScrollView contentContainerStyle={styles.contentContainer}>
         <View style={[styles.card, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
           <Text style={[styles.label, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>Name:</Text>

@@ -105,8 +105,9 @@ export default function RootLayout() {
         <Stack.Screen name="pending-works" options={{ title: 'Pending Works' }} />
         <Stack.Screen name="ongoing-works" options={{ title: 'Ongoing Works' }} />
         <Stack.Screen name="leads" options={{ title: 'Pending Measurements' }} />
-      <Stack.Screen name="create-lead" options={{ headerShown: false }} />
-      <Stack.Screen name="leads/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="create-lead" options={{ title: 'Manage Leads' }} />
+        <Stack.Screen name="leads/[id]" options={{ title: 'Leads' }} />
+        <Stack.Screen name="raw-materials/update-stock" options={{ title: 'Update Stock' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
