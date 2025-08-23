@@ -705,14 +705,40 @@ export default function QuotationDetailsScreen() {
               { backgroundColor: colors.cardBackground },
             ]}
           >
-            <Text
+            <View style={styles.previewSelectionModalHeader}>
+              <Text
+                style={[
+                  styles.previewSelectionModalTitle,
+                  { color: colors.text },
+                ]}
+              >
+                Select Action
+              </Text>
+              <TouchableOpacity
+                onPress={() => setIsActionSelectionModalVisible(false)}
+              >
+                <IconSymbol
+                  name="xmark.circle.fill"
+                  size={28}
+                  color={colors.secondaryText}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                setIsActionSelectionModalVisible(false);
+                setQuotationPreviewModalVisible(true);
+              }}
               style={[
-                styles.previewSelectionModalTitle,
-                { color: colors.text },
+                styles.previewSelectionButton,
+                { backgroundColor: colors.tint },
               ]}
             >
-              Select Document Type
-            </Text>
+              <Text style={styles.previewSelectionButtonText}>
+                Preview Quotation
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
                 setIsActionSelectionModalVisible(false);
@@ -744,20 +770,36 @@ export default function QuotationDetailsScreen() {
               </TouchableOpacity>
             )}
             {data.quotation.invoice_generated && (
-              <TouchableOpacity
-                onPress={() => {
-                  setIsActionSelectionModalVisible(false);
-                  handleSharePdf("invoice");
-                }}
-                style={[
-                  styles.previewSelectionButton,
-                  { backgroundColor: colors.primary },
-                ]}
-              >
-                <Text style={styles.previewSelectionButtonText}>
-                  Share Invoice
-                </Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsActionSelectionModalVisible(false);
+                    setInvoicePreviewModalVisible(true);
+                  }}
+                  style={[
+                    styles.previewSelectionButton,
+                    { backgroundColor: colors.primary },
+                  ]}
+                >
+                  <Text style={styles.previewSelectionButtonText}>
+                    Preview Invoice
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsActionSelectionModalVisible(false);
+                    handleSharePdf("invoice");
+                  }}
+                  style={[
+                    styles.previewSelectionButton,
+                    { backgroundColor: colors.primary },
+                  ]}
+                >
+                  <Text style={styles.previewSelectionButtonText}>
+                    Share Invoice
+                  </Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>
@@ -1078,6 +1120,12 @@ const styles = StyleSheet.create({
   previewSelectionModalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  previewSelectionModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
     marginBottom: 10,
   },
   previewSelectionButton: {
