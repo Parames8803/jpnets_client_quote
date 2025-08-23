@@ -107,6 +107,7 @@ export default function RootLayout() {
         <Stack.Screen name="leads" options={{ title: 'Pending Measurements' }} />
         <Stack.Screen name="create-lead" options={{ title: 'Manage Leads' }} />
         <Stack.Screen name="leads/[id]" options={{ title: 'Leads' }} />
+        <Stack.Screen name="orders/list" options={{ title: 'Purchased Orders' }} />
         <Stack.Screen name="raw-materials/update-stock" options={{ title: 'Update Stock' }} />
       </Stack>
       <StatusBar style="auto" />

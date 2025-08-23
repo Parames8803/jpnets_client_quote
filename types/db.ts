@@ -140,6 +140,23 @@ export interface RawMaterial {
   unit_type: string; // text
 }
 
+// Interface for the 'vendors' table
+export interface Vendor {
+  id: string; // uuid, primary key
+  name: string; // text
+  contact: string | null; // text (phone/email), nullable
+  address: string | null; // text, nullable
+  created_at: string; // timestamp with time zone
+}
+
+// Interface for the 'purchased_orders' table
+export interface PurchasedOrder {
+  id: string; // uuid, primary key
+  vendor_id: string; // uuid (foreign key to vendors.id)
+  raw_materials: Array<{ name: string; quantity: number; unit_type: string; order_quantity: number; order_unit_type: string }> | null; // JSONB, array of objects
+  created_at: string; // timestamp with time zone
+}
+
 export interface ProductType {
   name: string;
   default_price: number;

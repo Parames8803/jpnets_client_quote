@@ -96,6 +96,7 @@ export default function HomeScreen() {
           { icon: "receipt-outline", title: "Invoices", color: "#00BCD4", onPress: () => router.push('/quotation/list?invoiceGenerated=true') },
           { icon: "cube-outline", title: "Raw Materials", color: "#607D8B", onPress: () => router.push('/raw-materials') },
           { icon: "sync-outline", title: "Update Stock", color: "#FF00FF", onPress: () => router.push('/raw-materials/update-stock') },
+          { icon: "cart-outline", title: "Purchased Orders", color: "#28A745", onPress: () => router.push('/orders/list') },
         ].map((action, index) => (
           <TouchableOpacity 
             key={index} 
