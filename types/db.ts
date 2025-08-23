@@ -63,6 +63,7 @@ export interface Quotation {
   total_price: number | null; // numeric, nullable
   pdf_url: string | null; // text, nullable
   excel_url: string | null; // text, nullable
+  invoice_generated: boolean | null; // boolean, indicates if an invoice has been generated for this quotation
   assigned_worker_id: string | null; // uuid, nullable (references workers.id)
   status: string | null; // text, nullable (e.g., 'Pending', 'Assigned', 'In Progress', 'Completed')
   clients?: Client | null; // Joined client data

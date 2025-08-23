@@ -358,6 +358,7 @@ export default function QuotationDetailsScreen() {
     deleteQuotation,
     updateQuotationStatus,
     quotationStatus,
+    refetch,
   } = useQuotationDetails(quotationId);
 
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -367,7 +368,6 @@ export default function QuotationDetailsScreen() {
     useState(false);
   const [invoicePreviewModalVisible, setInvoicePreviewModalVisible] =
     useState(false);
-  const [showPreviewSelectionModal, setShowPreviewSelectionModal] = useState(false);
 
   const handleDelete = () =>
     Alert.alert("Delete Quotation", "Are you sure?", [
@@ -392,17 +392,56 @@ export default function QuotationDetailsScreen() {
       },
     ]);
 
-  const handleGeneratePdf = async (type: "quotation" | "invoice") => {
-    if (!data) return Alert.alert("Error", "Data not loaded.");
+  const generatePdfUri = useCallback(async (type: "quotation" | "invoice") => {
+    if (!data) {
+      Alert.alert("Error", "Data not loaded.");
+      return null;
+    }
     try {
       const htmlContent = generateQuotationHtml({ ...data, type });
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      return uri;
+    } catch (err: any) {
+      Alert.alert("PDF Generation Error", err.message);
+      return null;
+    }
+  }, [data]);
+
+  const handleGenerateInvoice = async () => {
+    if (!data || !data.quotation.id) return Alert.alert("Error", "Quotation data not loaded.");
+
+    const uri = await generatePdfUri("invoice");
+    if (!uri) return;
+
+    try {
+      const { error: updateError } = await supabase
+        .from("quotations")
+        .update({ invoice_generated: true })
+        .eq("id", data.quotation.id);
+
+      if (updateError) {
+        console.error("Failed to update invoice_generated status:", updateError.message);
+        Alert.alert("Error", "Failed to mark quotation as invoice generated.");
+      } else {
+        Alert.alert("Success", "Invoice generated and quotation updated!");
+        refetch(); // Refetch data to update the UI
+      }
+    } catch (err: any) {
+      Alert.alert("Invoice Generation Error", err.message);
+    }
+  };
+
+  const handleSharePdf = async (type: "quotation" | "invoice") => {
+    const uri = await generatePdfUri(type);
+    if (!uri) return;
+
+    try {
       await Sharing.shareAsync(uri, {
         UTI: ".pdf",
         mimeType: "application/pdf",
       });
     } catch (err: any) {
-      Alert.alert("PDF Error", err.message);
+      Alert.alert("Share Error", err.message);
     }
   };
 
@@ -478,11 +517,29 @@ export default function QuotationDetailsScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => setShowPreviewSelectionModal(true)}
+            onPress={() => handleSharePdf("quotation")}
             style={styles.headerButton}
           >
-            <IconSymbol size={22} name="eye" color={colors.tint} />
+            <IconSymbol size={22} name="square.and.arrow.up.fill" color={colors.tint} />
           </TouchableOpacity>
+
+          {!data.quotation.invoice_generated && (
+            <TouchableOpacity
+              onPress={handleGenerateInvoice}
+              style={styles.headerButton}
+            >
+              <IconSymbol size={22} name="doc.text.fill" color={colors.tint} />
+            </TouchableOpacity>
+          )}
+
+          {data.quotation.invoice_generated && (
+            <TouchableOpacity
+              onPress={() => handleSharePdf("invoice")}
+              style={styles.headerButton}
+            >
+            <IconSymbol size={22} name="square.and.arrow.up.fill" color={colors.tint} />
+            </TouchableOpacity>
+          )}
 
           {quotationStatus !== "Closed" && (
             <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
@@ -607,43 +664,6 @@ export default function QuotationDetailsScreen() {
         </View>
       </Modal>
 
-      {/* Preview Selection Modal */}
-      <Modal
-        visible={showPreviewSelectionModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowPreviewSelectionModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={() => setShowPreviewSelectionModal(false)}
-        >
-          <View style={[styles.previewSelectionModal, { backgroundColor: colors.cardBackground }]}>
-            <Text style={[styles.previewSelectionModalTitle, { color: colors.text }]}>
-              Select Preview Type
-            </Text>
-            <TouchableOpacity
-              style={[styles.previewSelectionButton, { backgroundColor: colors.primary }]}
-              onPress={() => {
-                setShowPreviewSelectionModal(false);
-                setQuotationPreviewModalVisible(true);
-              }}
-            >
-              <Text style={styles.previewSelectionButtonText}>Quotation Preview</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.previewSelectionButton, { backgroundColor: colors.primary }]}
-              onPress={() => {
-                setShowPreviewSelectionModal(false);
-                setInvoicePreviewModalVisible(true);
-              }}
-            >
-              <Text style={styles.previewSelectionButtonText}>Invoice Preview</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
 
       {/* Invoice Preview Modal */}
       <Modal
