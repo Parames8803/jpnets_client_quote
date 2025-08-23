@@ -2,383 +2,522 @@ import { PurchasedOrder, RawMaterial, Vendor } from '@/types/db';
 import { AntDesign } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
-import { FlatList, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { supabase } from '../../utils/supabaseClient'; // Import Supabase client
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from "react-native";
+import { supabase } from '../../utils/supabaseClient';
 
-export default function OrdersScreen() { // Keeping OrdersScreen name as per file path, but content is for vendors
+interface ExtendedRawMaterial extends RawMaterial {
+  order_quantity: number;
+  order_unit_type: string;
+}
+
+export default function OrdersScreen() {
+  // State management
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalVisible, setModalVisible] = useState(false);
-  const [vendorSelectionMode, setVendorSelectionMode] = useState<'existing' | 'new'>('existing'); // 'existing' or 'new'
-  const [selectedExistingVendor, setSelectedExistingVendor] = useState<string | undefined>(undefined);
-  const [newVendorName, setNewVendorName] = useState("");
-  const [newVendorContact, setNewVendorContact] = useState("");
-  const [newVendorAddress, setNewVendorAddress] = useState("");
-  const [selectedRawMaterials, setSelectedRawMaterials] = useState<Array<RawMaterial & { order_quantity: number; order_unit_type: string }>>([]);
-  const [orders, setOrders] = useState<PurchasedOrder[]>([]); // State to store fetched orders
-  const [vendors, setVendors] = useState<Vendor[]>([]); // State to store fetched vendors
-  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]); // State to store fetched raw materials
+  const [isLoading, setIsLoading] = useState(false);
+  const [orders, setOrders] = useState<PurchasedOrder[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  
+  // Vendor selection state
+  const [vendorSelectionMode, setVendorSelectionMode] = useState<'existing' | 'new'>('existing');
+  const [selectedExistingVendor, setSelectedExistingVendor] = useState<string | null>(null);
+  const [newVendorForm, setNewVendorForm] = useState({
+    name: "",
+    contact: "",
+    address: ""
+  });
+  
+  // Material selection state
+  const [selectedRawMaterials, setSelectedRawMaterials] = useState<ExtendedRawMaterial[]>([]);
   const [isUnitTypePickerVisible, setUnitTypePickerVisible] = useState(false);
-  const [currentMaterialForUnitType, setCurrentMaterialForUnitType] = useState<RawMaterial & { order_quantity: number; order_unit_type: string } | null>(null);
+  const [currentMaterialForUnitType, setCurrentMaterialForUnitType] = useState<ExtendedRawMaterial | null>(null);
 
   const predefinedUnitTypes = ['pcs', 'kg', 'meter', 'liter', 'unit', 'sq.ft', 'm²'];
 
+  // Computed values
   const filteredVendors = vendors.filter(vendor =>
     vendor.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const fetchVendors = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('vendors')
-      .select('*')
-      .order('created_at', { ascending: false });
+  const selectedVendor = vendors.find(v => v.id === selectedExistingVendor);
 
-    if (error) {
-      console.error("Error fetching vendors:", error);
-    } else {
-      setVendors(data || []);
+  // Data fetching functions
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [vendorsResult, ordersResult, materialsResult] = await Promise.all([
+        supabase.from('vendors').select('*').order('created_at', { ascending: false }),
+        supabase.from('purchased_orders').select('*').order('created_at', { ascending: false }),
+        supabase.from('raw_materials').select('*').order('created_at', { ascending: false })
+      ]);
+
+      if (vendorsResult.error) throw vendorsResult.error;
+      if (ordersResult.error) throw ordersResult.error;
+      if (materialsResult.error) throw materialsResult.error;
+
+      setVendors(vendorsResult.data || []);
+      setOrders(ordersResult.data || []);
+      setRawMaterials(materialsResult.data || []);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      Alert.alert("Error", "Failed to load data. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      fetchVendors();
-    }, [fetchVendors])
+      fetchData();
+    }, [fetchData])
   );
 
-  const fetchOrders = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('purchased_orders')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error("Error fetching orders:", error);
-    } else {
-      setOrders(data || []);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchOrders();
-    }, [fetchOrders])
-  );
-
-  const fetchRawMaterials = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('raw_materials')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error("Error fetching raw materials:", error);
-    } else {
-      setRawMaterials(data || []);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchRawMaterials();
-    }, [fetchRawMaterials])
-  );
-
+  // Modal management
   const openModal = () => {
-    setVendorSelectionMode('existing'); // Reset to existing when opening modal
-    setSelectedExistingVendor(undefined);
-    setNewVendorName("");
-    setNewVendorContact("");
-    setNewVendorAddress("");
-    setSelectedRawMaterials([]); // Reset selected raw materials
+    resetForm();
     setModalVisible(true);
   };
-  const closeModal = () => setModalVisible(false);
 
+  const closeModal = () => {
+    setModalVisible(false);
+    resetForm();
+  };
+
+  const resetForm = () => {
+    setVendorSelectionMode('existing');
+    setSelectedExistingVendor(null);
+    setNewVendorForm({ name: "", contact: "", address: "" });
+    setSelectedRawMaterials([]);
+  };
+
+  // Vendor management
+  const updateNewVendorForm = (field: keyof typeof newVendorForm, value: string) => {
+    setNewVendorForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const createNewVendor = async (): Promise<string | null> => {
+    const { name, contact, address } = newVendorForm;
+    
+    if (!name.trim() || !contact.trim() || !address.trim()) {
+      Alert.alert("Validation Error", "Please fill all vendor details.");
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .insert([{ name: name.trim(), contact: contact.trim(), address: address.trim() }])
+        .select();
+
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Failed to retrieve new vendor ID");
+
+      return data[0].id;
+    } catch (error) {
+      console.error("Error creating vendor:", error);
+      Alert.alert("Error", "Failed to create new vendor.");
+      return null;
+    }
+  };
+
+  // Material management
   const toggleRawMaterialSelection = (material: RawMaterial) => {
     setSelectedRawMaterials(prev => {
-      if (prev.some(m => m.id === material.id)) {
+      const exists = prev.find(m => m.id === material.id);
+      if (exists) {
         return prev.filter(m => m.id !== material.id);
       } else {
-        return [...prev, { ...material, order_quantity: 1, order_unit_type: material.unit_type || 'unit' }];
+        return [...prev, {
+          ...material,
+          order_quantity: 1,
+          order_unit_type: material.unit_type || 'unit'
+        }];
       }
     });
   };
 
-  const updateRawMaterialDetails = (materialId: string, key: 'order_quantity' | 'order_unit_type', value: any) => {
+  const updateMaterialProperty = (materialId: string, property: 'order_quantity' | 'order_unit_type', value: any) => {
     setSelectedRawMaterials(prev =>
-      prev.map(m =>
-        m.id === materialId
-          ? { ...m, [key]: value }
-          : m
+      prev.map(material =>
+        material.id === materialId
+          ? { ...material, [property]: property === 'order_quantity' ? Number(value) || 1 : value }
+          : material
       )
     );
   };
 
-  const handleSubmitOrder = async () => {
-    let vendorIdToUse: string | undefined = selectedExistingVendor;
+  const removeMaterialFromSelection = (materialId: string) => {
+    setSelectedRawMaterials(prev => prev.filter(m => m.id !== materialId));
+  };
 
-    if (vendorSelectionMode === 'new') {
-      if (!newVendorName || !newVendorContact || !newVendorAddress) {
-        alert("Please fill all new vendor details.");
-        return;
-      }
-      // Create new vendor in Supabase
-      const { data: newVendor, error: vendorError } = await supabase
-        .from('vendors')
-        .insert([{
-          name: newVendorName,
-          contact: newVendorContact, // Use 'contact' as per types/db.ts
-          address: newVendorAddress,
-        }])
-        .select();
-
-      if (vendorError) {
-        console.error("Error creating new vendor:", vendorError);
-        alert("Failed to create new vendor.");
-        return;
-      }
-      if (newVendor && newVendor.length > 0) {
-        vendorIdToUse = newVendor[0].id;
-      } else {
-        alert("Failed to retrieve new vendor ID.");
-        return;
-      }
+  // Order submission
+  const validateOrderForm = (): boolean => {
+    if (vendorSelectionMode === 'existing' && !selectedExistingVendor) {
+      Alert.alert("Validation Error", "Please select a vendor.");
+      return false;
     }
 
-    if (!vendorIdToUse) {
-      alert("No vendor selected or created.");
-      return;
+    if (vendorSelectionMode === 'new') {
+      const { name, contact, address } = newVendorForm;
+      if (!name.trim() || !contact.trim() || !address.trim()) {
+        Alert.alert("Validation Error", "Please fill all vendor details.");
+        return false;
+      }
     }
 
     if (selectedRawMaterials.length === 0) {
-      alert("Please select at least one raw material.");
-      return;
+      Alert.alert("Validation Error", "Please select at least one raw material.");
+      return false;
     }
 
-    // Create order record in Supabase
-    const { data: order, error: orderError } = await supabase
-      .from('purchased_orders')
-      .insert([{
-        vendor_id: vendorIdToUse,
-        raw_materials: selectedRawMaterials, // Store as JSON array
-        // Add other order-related fields as needed
-      }])
-      .select();
+    return true;
+  };
 
-    if (orderError) {
-      console.error("Error creating order:", orderError);
-      alert("Failed to create order.");
-      return;
-    }
+  const handleSubmitOrder = async () => {
+    if (!validateOrderForm()) return;
 
-    // Find the vendor details for the WhatsApp message
-    const vendor = vendors.find(v => v.id === vendorIdToUse);
-    if (!vendor) {
-      console.error("Vendor not found for WhatsApp sharing.");
-      alert("Order created successfully, but failed to find vendor for WhatsApp sharing.");
-      fetchOrders();
+    setIsLoading(true);
+    try {
+      let vendorIdToUse: string;
+
+      if (vendorSelectionMode === 'new') {
+        const newVendorId = await createNewVendor();
+        if (!newVendorId) return;
+        vendorIdToUse = newVendorId;
+      } else {
+        // validateOrderForm ensures selectedExistingVendor is not null here
+        vendorIdToUse = selectedExistingVendor!;
+      }
+
+      // Create order
+      const { data: order, error: orderError } = await supabase
+        .from('purchased_orders')
+        .insert([{
+          vendor_id: vendorIdToUse!,
+          raw_materials: selectedRawMaterials,
+        }])
+        .select();
+
+      if (orderError) throw orderError;
+
+      await sendWhatsAppMessage(vendorIdToUse!);
+      
+      Alert.alert("Success", "Order created successfully!");
+      fetchData(); // Refresh data
       closeModal();
-      return;
+      
+    } catch (error) {
+      console.error("Error submitting order:", error);
+      Alert.alert("Error", "Failed to create order. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    // Construct the WhatsApp message with quantities and unit types
-    const materialDetails = selectedRawMaterials.map(m => `${m.name} (${m.order_quantity} ${m.order_unit_type})`).join(', ');
+  const sendWhatsAppMessage = async (vendorId: string) => {
+    const vendor = vendors.find(v => v.id === vendorId) || 
+                  (vendorSelectionMode === 'new' ? { name: newVendorForm.name, contact: newVendorForm.contact } : null);
+    
+    if (!vendor) return;
+
+    const materialDetails = selectedRawMaterials
+      .map(m => `${m.name} (${m.order_quantity} ${m.order_unit_type})`)
+      .join(', ');
+    
     const whatsappMessage = `New Order Details:\n\nVendor: ${vendor.name}\nMaterials: ${materialDetails}`;
     const whatsappUrl = `whatsapp://send?phone=${vendor.contact}&text=${encodeURIComponent(whatsappMessage)}`;
 
-    // Open WhatsApp chat
     try {
       const supported = await Linking.canOpenURL(whatsappUrl);
       if (supported) {
         await Linking.openURL(whatsappUrl);
-        alert("Order created successfully and WhatsApp chat opened!");
       } else {
-        alert("Order created successfully, but WhatsApp is not installed or cannot be opened.");
+        Alert.alert("Info", "WhatsApp is not available on this device.");
       }
     } catch (error) {
       console.error("Error opening WhatsApp:", error);
-      alert("Order created successfully, but an error occurred while opening WhatsApp.");
     }
-
-    fetchOrders(); // Refresh orders list after successful creation
-    closeModal();
   };
 
-  const isRawMaterialSelected = (material: RawMaterial) => {
-    return selectedRawMaterials.some(m => m.id === material.id);
-  };
-
+  // Render functions
   const renderVendorItem = ({ item }: { item: Vendor }) => (
     <TouchableOpacity
-      style={[styles.vendorItem, selectedExistingVendor === item.id && styles.selectedVendorItem]}
+      style={[
+        styles.itemCard,
+        selectedExistingVendor === item.id && styles.selectedItem
+      ]}
       onPress={() => setSelectedExistingVendor(item.id)}
     >
-      <Text style={styles.vendorName}>{item.name}</Text>
-      <Text>Contact: {item.contact}</Text>
-      <Text>Address: {item.address}</Text>
+      <View style={styles.itemHeader}>
+        <Text style={styles.itemTitle}>{item.name}</Text>
+        {selectedExistingVendor === item.id && (
+          <AntDesign name="checkcircle" size={20} color="#007bff" />
+        )}
+      </View>
+      <Text style={styles.itemSubtext}>📞 {item.contact}</Text>
+      <Text style={styles.itemSubtext} numberOfLines={2}>📍 {item.address}</Text>
     </TouchableOpacity>
   );
 
-  const renderOrderItem = ({ item }: { item: PurchasedOrder }) => (
-    <View style={styles.orderItem}>
-      <Text style={styles.orderTitle}>Order ID: {item.id}</Text>
-      <Text>Vendor ID: {item.vendor_id}</Text>
-      <Text>Materials: {item.raw_materials?.map(m => `${m.name} (${m.order_quantity} ${m.order_unit_type})`).join(', ') || 'N/A'}</Text>
-      <Text>Created: {new Date(item.created_at).toLocaleString()}</Text>
+  const renderOrderItem = ({ item }: { item: PurchasedOrder }) => {
+    const vendor = vendors.find(v => v.id === item.vendor_id);
+    const materialCount = item.raw_materials?.length || 0;
+    
+    return (
+      <View style={styles.itemCard}>
+        <View style={styles.itemHeader}>
+          <Text style={styles.itemTitle}>Order #{item.id.slice(-8)}</Text>
+          <Text style={styles.badge}>{materialCount} items</Text>
+        </View>
+        <Text style={styles.itemSubtext}>🏢 {vendor?.name || 'Unknown Vendor'}</Text>
+        <Text style={styles.itemSubtext}>
+          📅 {new Date(item.created_at).toLocaleDateString()}
+        </Text>
+        {item.raw_materials && item.raw_materials.length > 0 && (
+          <Text style={styles.itemSubtext} numberOfLines={2}>
+            📦 {item.raw_materials.map(m => `${m.name} (${m.order_quantity} ${m.order_unit_type})`).join(', ')}
+          </Text>
+        )}
+      </View>
+    );
+  };
+
+  const renderMaterialItem = (material: RawMaterial) => {
+    const isSelected = selectedRawMaterials.some(m => m.id === material.id);
+    
+    return (
+      <TouchableOpacity
+        key={material.id}
+        style={[styles.materialItem, isSelected && styles.selectedMaterialItem]}
+        onPress={() => toggleRawMaterialSelection(material)}
+      >
+        <View style={styles.materialInfo}>
+          <Text style={styles.materialName}>{material.name}</Text>
+          <Text style={styles.materialUnit}>({material.unit_type})</Text>
+        </View>
+        {isSelected && <AntDesign name="checkcircle" size={20} color="#007bff" />}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderSelectedMaterial = (material: ExtendedRawMaterial) => (
+    <View key={material.id} style={styles.selectedMaterialTag}>
+      <Text style={styles.selectedMaterialName}>{material.name}</Text>
+      
+      <View style={styles.quantityContainer}>
+        <TextInput
+          style={styles.quantityInput}
+          value={String(material.order_quantity)}
+          onChangeText={(text) => updateMaterialProperty(material.id, 'order_quantity', text)}
+          keyboardType="numeric"
+          selectTextOnFocus
+        />
+        
+        <TouchableOpacity
+          style={styles.unitTypeButton}
+          onPress={() => {
+            setCurrentMaterialForUnitType(material);
+            setUnitTypePickerVisible(true);
+          }}
+        >
+          <Text style={styles.unitTypeText}>{material.order_unit_type}</Text>
+          <AntDesign name="caretdown" size={10} color="#666" />
+        </TouchableOpacity>
+      </View>
+      
+      <TouchableOpacity
+        onPress={() => removeMaterialFromSelection(material.id)}
+        style={styles.removeButton}
+      >
+        <AntDesign name="close" size={16} color="#ff4444" />
+      </TouchableOpacity>
     </View>
   );
 
+  if (isLoading && vendors.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
+      {/* Search Bar */}
       <TextInput
         style={styles.searchBar}
         placeholder="Search vendors..."
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
-      <FlatList
-        data={filteredVendors}
-        renderItem={renderVendorItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={<Text style={styles.sectionTitle}>Vendors</Text>}
-      />
 
-      <Text style={styles.sectionTitle}>Recent Orders</Text>
-      <FlatList
-        data={orders}
-        renderItem={renderOrderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={<Text>No orders found.</Text>}
-      />
+      {/* Content */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Vendors Section */}
+        <Text style={styles.sectionTitle}>Vendors ({filteredVendors.length})</Text>
+        <FlatList
+          data={filteredVendors}
+          renderItem={renderVendorItem}
+          keyExtractor={(item) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalList}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No vendors found</Text>
+          }
+        />
 
+        {/* Orders Section */}
+        <Text style={styles.sectionTitle}>Recent Orders ({orders.length})</Text>
+        <FlatList
+          data={orders}
+          renderItem={renderOrderItem}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+          contentContainerStyle={styles.verticalList}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No orders found</Text>
+          }
+        />
+      </ScrollView>
+
+      {/* FAB */}
       <TouchableOpacity style={styles.fab} onPress={openModal}>
         <AntDesign name="plus" size={24} color="white" />
       </TouchableOpacity>
 
+      {/* Create Order Modal */}
       <Modal
         animationType="slide"
-        transparent={true}
+        transparent={false}
         visible={isModalVisible}
         onRequestClose={closeModal}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Vendor Selection</Text>
+        <View style={styles.modalContainer}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={closeModal} style={styles.backButton}>
+              <AntDesign name="arrowleft" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Create New Order</Text>
+            <View style={styles.placeholder} />
+          </View>
 
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {/* Vendor Selection Toggle */}
             <View style={styles.toggleContainer}>
               <TouchableOpacity
                 style={[styles.toggleButton, vendorSelectionMode === 'existing' && styles.toggleButtonActive]}
                 onPress={() => setVendorSelectionMode('existing')}
               >
-                <Text style={[styles.toggleButtonText, vendorSelectionMode === 'existing' && styles.toggleButtonTextActive]}>Select Existing Vendor</Text>
+                <Text style={[styles.toggleButtonText, vendorSelectionMode === 'existing' && styles.toggleButtonTextActive]}>
+                  Select Existing
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.toggleButton, vendorSelectionMode === 'new' && styles.toggleButtonActive]}
                 onPress={() => setVendorSelectionMode('new')}
               >
-                <Text style={[styles.toggleButtonText, vendorSelectionMode === 'new' && styles.toggleButtonTextActive]}>Create New Vendor</Text>
+                <Text style={[styles.toggleButtonText, vendorSelectionMode === 'new' && styles.toggleButtonTextActive]}>
+                  Create New
+                </Text>
               </TouchableOpacity>
             </View>
 
+            {/* Vendor Selection Content */}
             {vendorSelectionMode === 'existing' ? (
-              <View style={styles.formContainer}>
-                <Text style={styles.sectionTitle}>Select an Existing Vendor</Text>
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Select Vendor</Text>
                 <FlatList
-                  data={vendors} // Use fetched vendors
+                  data={vendors}
                   renderItem={renderVendorItem}
                   keyExtractor={(item) => item.id}
-                  contentContainerStyle={styles.vendorListInModal}
-                  ListEmptyComponent={<Text>No vendors available.</Text>}
+                  scrollEnabled={false}
+                  contentContainerStyle={styles.vendorList}
+                  ListEmptyComponent={<Text style={styles.emptyText}>No vendors available</Text>}
                 />
-                {selectedExistingVendor && (
-                  <View style={styles.selectedVendorDetails}>
-                    <Text style={styles.selectedVendorTitle}>Selected Vendor Details:</Text>
-                    <Text>Name: {vendors.find(v => v.id === selectedExistingVendor)?.name}</Text>
-                    <Text>Contact: {vendors.find(v => v.id === selectedExistingVendor)?.contact}</Text>
-                    <Text>Address: {vendors.find(v => v.id === selectedExistingVendor)?.address}</Text>
+                
+                {selectedVendor && (
+                  <View style={styles.selectedVendorPreview}>
+                    <Text style={styles.previewTitle}>Selected Vendor:</Text>
+                    <Text style={styles.previewText}>{selectedVendor.name}</Text>
+                    <Text style={styles.previewSubtext}>{selectedVendor.contact}</Text>
                   </View>
                 )}
               </View>
             ) : (
-              <ScrollView style={styles.formContainer}>
-                <Text style={styles.sectionTitle}>Create New Vendor</Text>
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>New Vendor Details</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="Vendor Name"
-                  value={newVendorName}
-                  onChangeText={setNewVendorName}
+                  value={newVendorForm.name}
+                  onChangeText={(text) => updateNewVendorForm('name', text)}
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="Contact Person (Phone/Email)"
-                  value={newVendorContact}
-                  onChangeText={setNewVendorContact}
+                  placeholder="Contact (Phone/Email)"
+                  value={newVendorForm.contact}
+                  onChangeText={(text) => updateNewVendorForm('contact', text)}
+                  keyboardType="phone-pad"
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, styles.textArea]}
                   placeholder="Address"
-                  value={newVendorAddress}
-                  onChangeText={setNewVendorAddress}
+                  value={newVendorForm.address}
+                  onChangeText={(text) => updateNewVendorForm('address', text)}
                   multiline
+                  numberOfLines={3}
                 />
-              </ScrollView>
+              </View>
             )}
 
-            <View style={styles.rawMaterialsSection}>
-              <Text style={styles.sectionTitle}>Select Raw Materials</Text>
-              <ScrollView style={styles.rawMaterialList}>
-                {rawMaterials.map(material => (
-                  <TouchableOpacity
-                    key={material.id}
-                    style={[
-                      styles.rawMaterialItem,
-                      isRawMaterialSelected(material) && styles.selectedRawMaterialItem,
-                    ]}
-                    onPress={() => toggleRawMaterialSelection(material)}
-                  >
-                    <Text style={styles.rawMaterialText}>{material.name} ({material.unit_type})</Text>
-                    {isRawMaterialSelected(material) && (
-                      <AntDesign name="checkcircle" size={20} color="#007bff" />
-                    )}
-                  </TouchableOpacity>
-                ))}
+            {/* Raw Materials Selection */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Select Materials</Text>
+              <ScrollView style={styles.materialsList} nestedScrollEnabled>
+                {rawMaterials.map(renderMaterialItem)}
               </ScrollView>
-              {selectedRawMaterials.length > 0 && (
-                <View style={styles.selectedRawMaterialsContainer}>
-                  <Text style={styles.selectedRawMaterialsTitle}>Selected Materials:</Text>
-                  {selectedRawMaterials.map(material => (
-                    <View key={material.id} style={styles.selectedRawMaterialTag}>
-                      <Text style={{ color: 'white' }}>{material.name}</Text>
-                      <TextInput
-                        style={styles.quantityInput}
-                        value={String(material.order_quantity)}
-                        onChangeText={(text) => updateRawMaterialDetails(material.id, 'order_quantity', Number(text))}
-                        keyboardType="numeric"
-                      />
-                      <TouchableOpacity
-                        style={styles.unitTypeDropdown}
-                        onPress={() => {
-                          setCurrentMaterialForUnitType(material);
-                          setUnitTypePickerVisible(true);
-                        }}
-                      >
-                        <Text>{material.order_unit_type}</Text>
-                        <AntDesign name="caretdown" size={12} color="black" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              )}
             </View>
 
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmitOrder}>
-              <Text style={styles.submitButtonText}>Submit Order</Text>
-            </TouchableOpacity>
+            {/* Selected Materials */}
+            {selectedRawMaterials.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Selected Materials ({selectedRawMaterials.length})</Text>
+                <View style={styles.selectedMaterialsContainer}>
+                  {selectedRawMaterials.map(renderSelectedMaterial)}
+                </View>
+              </View>
+            )}
+          </ScrollView>
 
-            <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
-              <Text style={styles.closeButtonText}>Close</Text>
+          {/* Submit Button */}
+          <View style={styles.modalFooter}>
+            <TouchableOpacity 
+              style={[styles.submitButton, isLoading && styles.submitButtonDisabled]} 
+              onPress={handleSubmitOrder}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.submitButtonText}>Create Order & Send WhatsApp</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -386,14 +525,14 @@ export default function OrdersScreen() { // Keeping OrdersScreen name as per fil
 
       {/* Unit Type Picker Modal */}
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={isUnitTypePickerVisible}
         onRequestClose={() => setUnitTypePickerVisible(false)}
       >
-        <View style={styles.pickerModalOverlay}>
-          <View style={styles.pickerModalContent}>
-            <Text style={styles.pickerModalTitle}>Select Unit Type</Text>
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerContent}>
+            <Text style={styles.pickerTitle}>Select Unit Type</Text>
             <FlatList
               data={predefinedUnitTypes}
               keyExtractor={(item) => item}
@@ -402,7 +541,7 @@ export default function OrdersScreen() { // Keeping OrdersScreen name as per fil
                   style={styles.pickerItem}
                   onPress={() => {
                     if (currentMaterialForUnitType) {
-                      updateRawMaterialDetails(currentMaterialForUnitType.id, 'order_unit_type', item);
+                      updateMaterialProperty(currentMaterialForUnitType.id, 'order_unit_type', item);
                     }
                     setUnitTypePickerVisible(false);
                   }}
@@ -412,10 +551,10 @@ export default function OrdersScreen() { // Keeping OrdersScreen name as per fil
               )}
             />
             <TouchableOpacity
-              style={styles.pickerCloseButton}
+              style={styles.pickerCancelButton}
               onPress={() => setUnitTypePickerVisible(false)}
             >
-              <Text style={styles.pickerCloseButtonText}>Cancel</Text>
+              <Text style={styles.pickerCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -427,41 +566,105 @@ export default function OrdersScreen() { // Keeping OrdersScreen name as per fil
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 10,
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#f8f9fa",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: "#f8f9fa",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
   },
   searchBar: {
-    height: 40,
-    borderColor: "#ccc",
+    margin: 16,
+    marginBottom: 8,
+    height: 44,
+    borderColor: "#e1e5e9",
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 10,
+    borderRadius: 22,
+    paddingHorizontal: 16,
     backgroundColor: "#fff",
+    fontSize: 16,
   },
-  listContent: {
-    paddingBottom: 10,
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
   },
-  vendorItem: {
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: 16,
+    marginBottom: 12,
+    color: "#2c3e50",
+  },
+  horizontalList: {
+    paddingBottom: 8,
+  },
+  verticalList: {
+    paddingBottom: 16,
+  },
+  itemCard: {
     backgroundColor: "#fff",
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    marginRight: 12,
+    minWidth: 280,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
   },
-  vendorName: {
+  selectedItem: {
+    borderColor: "#007bff",
+    borderWidth: 2,
+    backgroundColor: "#f8f9ff",
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  itemTitle: {
     fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 5,
+    fontWeight: "600",
+    color: "#2c3e50",
+    flex: 1,
+  },
+  itemSubtext: {
+    fontSize: 14,
+    color: "#7f8c8d",
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  badge: {
+    backgroundColor: "#e9ecef",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#495057",
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: "#95a5a6",
+    fontSize: 16,
+    fontStyle: 'italic',
+    paddingVertical: 32,
   },
   fab: {
     position: 'absolute',
-    bottom: 20,
-    left: 20,
+    bottom: 24,
+    right: 24,
     backgroundColor: '#007bff',
     width: 56,
     height: 56,
@@ -469,47 +672,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  modalOverlay: {
+  modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: '#fff',
   },
-  modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    width: '80%',
+  modalHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e1e5e9',
+    backgroundColor: '#fff',
+  },
+  backButton: {
+    padding: 8,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
+    fontWeight: '600',
+    color: '#2c3e50',
   },
-  closeButton: {
-    marginTop: 20,
-    backgroundColor: '#dc3545',
-    padding: 10,
-    borderRadius: 5,
+  placeholder: {
+    width: 40,
   },
-  closeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 16,
   },
   toggleContainer: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginVertical: 16,
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
@@ -517,215 +716,221 @@ const styles = StyleSheet.create({
   },
   toggleButton: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f8f9fa',
   },
   toggleButtonActive: {
     backgroundColor: '#007bff',
   },
   toggleButtonText: {
     color: '#007bff',
-    fontWeight: 'bold',
+    fontWeight: '600',
+    fontSize: 16,
   },
   toggleButtonTextActive: {
     color: 'white',
   },
-  formContainer: {
-    width: '100%',
-    maxHeight: 300, // Limit height for scrollability
-    marginBottom: 20,
+  section: {
+    marginBottom: 24,
   },
-  sectionTitle: {
+  sectionLabel: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    alignSelf: 'flex-start',
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#2c3e50',
   },
   input: {
-    width: '100%',
-    height: 40,
-    borderColor: '#ccc',
+    height: 48,
+    borderColor: '#e1e5e9',
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12,
     backgroundColor: '#fff',
-  },
-  vendorListInModal: {
-    width: '100%',
-    paddingBottom: 10,
-  },
-  selectedVendorItem: {
-    borderColor: '#007bff',
-    borderWidth: 2,
-  },
-  selectedVendorDetails: {
-    marginTop: 15,
-    padding: 10,
-    backgroundColor: '#e9f7ef',
-    borderRadius: 8,
-    width: '100%',
-    alignSelf: 'flex-start',
-  },
-  selectedVendorTitle: {
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  submitButton: {
-    marginTop: 15,
-    backgroundColor: '#28a745',
-    padding: 12,
-    borderRadius: 5,
-    width: '100%',
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
     fontSize: 16,
   },
-  rawMaterialsSection: {
-    width: '100%',
-    marginTop: 20,
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+    paddingTop: 12,
   },
-  rawMaterialList: {
-    maxHeight: 150,
-    borderWidth: 1,
-    borderColor: '#ccc',
+  vendorList: {
+    paddingBottom: 8,
+  },
+  selectedVendorPreview: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#e8f5e8',
     borderRadius: 8,
-    padding: 5,
-    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#28a745',
   },
-  rawMaterialItem: {
+  previewTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#155724',
+    marginBottom: 4,
+  },
+  previewText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#155724',
+  },
+  previewSubtext: {
+    fontSize: 14,
+    color: '#155724',
+    opacity: 0.8,
+  },
+  materialsList: {
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: '#e1e5e9',
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  materialItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 5,
-    marginBottom: 5,
-    borderWidth: 1,
-    borderColor: '#eee',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f8f9fa',
   },
-  selectedRawMaterialItem: {
-    borderColor: '#007bff',
-    backgroundColor: '#e6f2ff',
+  selectedMaterialItem: {
+    backgroundColor: '#e8f4fd',
   },
-  rawMaterialText: {
+  materialInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  materialName: {
     fontSize: 16,
+    fontWeight: '500',
+    color: '#2c3e50',
+    marginRight: 8,
   },
-  selectedRawMaterialsContainer: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#e9f7ef',
-    borderRadius: 8,
-    width: '100%',
-    alignSelf: 'flex-start',
+  materialUnit: {
+    fontSize: 14,
+    color: '#7f8c8d',
+  },
+  selectedMaterialsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'center',
+    gap: 8,
   },
-  selectedRawMaterialsTitle: {
-    fontWeight: 'bold',
-    marginRight: 10,
-    marginBottom: 5,
-  },
-  selectedRawMaterialTag: {
+  selectedMaterialTag: {
     backgroundColor: '#007bff',
-    color: 'white',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 15,
-    marginRight: 5,
-    marginBottom: 5,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+  },
+  selectedMaterialName: {
+    color: 'white',
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
   },
   quantityInput: {
     backgroundColor: 'white',
     color: 'black',
-    marginLeft: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
     width: 50,
     textAlign: 'center',
+    marginRight: 4,
+    fontSize: 14,
   },
-  unitTypeInput: {
+  unitTypeButton: {
     backgroundColor: 'white',
-    color: 'black',
-    marginLeft: 5,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 5,
-    width: 60,
-    textAlign: 'center',
-  },
-  unitTypeDropdown: {
-    backgroundColor: 'white',
-    marginLeft: 5,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 5,
-    width: 80,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    minWidth: 60,
   },
-  pickerModalOverlay: {
+  unitTypeText: {
+    color: 'black',
+    fontSize: 12,
+    marginRight: 4,
+  },
+  removeButton: {
+    padding: 4,
+  },
+  modalFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e1e5e9',
+    backgroundColor: '#fff',
+  },
+  submitButton: {
+    backgroundColor: '#28a745',
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#95a5a6',
+  },
+  submitButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  pickerOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  pickerModalContent: {
+  pickerContent: {
     backgroundColor: 'white',
+    borderRadius: 12,
     padding: 20,
-    borderRadius: 10,
-    width: '70%',
+    width: '80%',
     maxHeight: '70%',
-    alignItems: 'center',
   },
-  pickerModalTitle: {
+  pickerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: '#2c3e50',
   },
   pickerItem: {
-    padding: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    width: '100%',
-    alignItems: 'center',
+    borderBottomColor: '#f8f9fa',
   },
   pickerItemText: {
     fontSize: 16,
+    textAlign: 'center',
+    color: '#2c3e50',
   },
-  pickerCloseButton: {
-    marginTop: 15,
+  pickerCancelButton: {
+    marginTop: 16,
     backgroundColor: '#dc3545',
-    padding: 10,
-    borderRadius: 5,
-  },
-  pickerCloseButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  orderItem: {
-    backgroundColor: "#fff",
-    padding: 15,
+    paddingVertical: 12,
     borderRadius: 8,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
+    alignItems: 'center',
   },
-  orderTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 5,
+  pickerCancelText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
