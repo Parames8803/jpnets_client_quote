@@ -129,6 +129,17 @@ export interface Lead {
   status: LeadStatus; // 'Approved' | 'Rejected' | 'Pending'
 }
 
+// Interface for the 'raw_materials' table
+export interface RawMaterial {
+  id: string; // uuid
+  created_at: string; // timestamp with time zone
+  name: string; // text
+  category: string; // text
+  subcategories: string[] | null; // text[], nullable
+  quantity: number; // numeric
+  unit_type: string; // text
+}
+
 export interface ProductType {
   name: string;
   default_price: number;

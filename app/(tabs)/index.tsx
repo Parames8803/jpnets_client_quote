@@ -94,6 +94,7 @@ export default function HomeScreen() {
           { icon: "wallet-outline", title: "Pending Amount", color: "#FFC107", onPress: () => router.push('/pending-amount') },
           { icon: "hourglass-outline", title: "Pending Measurement", color: "#4CAF50", onPress: () => router.push('/leads') },
           { icon: "receipt-outline", title: "Invoices", color: "#00BCD4", onPress: () => router.push('/quotation/list?invoiceGenerated=true') },
+          { icon: "cube-outline", title: "Raw Materials", color: "#607D8B", onPress: () => router.push('/raw-materials') },
         ].map((action, index) => (
           <TouchableOpacity 
             key={index} 
