@@ -1,7 +1,6 @@
 import { IconSymbol, IconSymbolName } from "@/components/ui/IconSymbol";
 import { StatusUpdateModal } from "@/components/ui/StatusUpdateModal";
 import { Colors } from "@/constants/Colors";
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { generateQuotationHtml } from "@/utils/quotationPdf";
 import * as Print from "expo-print";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -11,7 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  Modal, // Added Modal import
+  Modal,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -19,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import WebView from 'react-native-webview'; // Added WebView import
+import WebView from "react-native-webview";
 import {
   Client,
   Product,
@@ -34,7 +33,7 @@ import { supabase } from "../../utils/supabaseClient";
 
 const { width } = Dimensions.get("window");
 
-// --- Custom Hook for Data Fetching and Logic (Unchanged) ---
+// --- Custom Hook for Data Fetching and Logic (unchanged logic) ---
 interface QuotationDetailsData {
   quotation: Quotation;
   client: Client;
@@ -75,9 +74,7 @@ function useQuotationDetails(quotationId: string | string[] | undefined) {
 
       const rooms = rawData.quotation_rooms
         .map((qr: any) =>
-          qr.rooms
-            ? { ...qr.rooms, room_total_price: qr.room_total_price }
-            : null
+          qr.rooms ? { ...qr.rooms, room_total_price: qr.room_total_price } : null
         )
         .filter(
           (room: any): room is Room & { products: Product[] } => room !== null
@@ -142,7 +139,6 @@ function useQuotationDetails(quotationId: string | string[] | undefined) {
       if (!id_str) throw new Error("Cannot update: Quotation ID is missing.");
       setLoading(true);
       try {
-        // Ensure newStatus is a QuotationStatus before proceeding with quotation update
         if (
           !Object.values(QUOTATION_STATUS_TYPES).includes(
             newStatus as QuotationStatus
@@ -153,7 +149,7 @@ function useQuotationDetails(quotationId: string | string[] | undefined) {
 
         const { error: updateError } = await supabase
           .from("quotations")
-          .update({ status: newStatus as QuotationStatus }) // Cast here for supabase
+          .update({ status: newStatus as QuotationStatus })
           .eq("id", id_str);
         if (updateError) throw updateError;
 
@@ -208,8 +204,31 @@ function useQuotationDetails(quotationId: string | string[] | undefined) {
   };
 }
 
-// --- Tab Content Components ---
+// --- Helper UI: Labeled button with icon ---
+const LabeledActionButton = ({
+  label,
+  icon,
+  backgroundColor,
+  onPress,
+}: {
+  label: string;
+  icon: IconSymbolName;
+  backgroundColor: string;
+  onPress: () => void;
+}) => {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={[styles.labeledButton, { backgroundColor }]}
+    >
+      <IconSymbol name={icon} size={18} color="#FFF" />
+      <Text style={styles.labeledButtonText}>{label}</Text>
+    </TouchableOpacity>
+  );
+};
 
+// --- Tab Content Components (unchanged content) ---
 const OverviewTab = ({
   data,
   colors,
@@ -238,6 +257,7 @@ const OverviewTab = ({
         colors={colors}
       />
     </InfoSection>
+
     <InfoSection icon="doc.text.fill" title="Quotation Details" colors={colors}>
       <InfoItem
         icon="doc.text"
@@ -339,11 +359,15 @@ export default function QuotationDetailsScreen() {
     updateQuotationStatus,
     quotationStatus,
   } = useQuotationDetails(quotationId);
+
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
-  const [quotationPreviewModalVisible, setQuotationPreviewModalVisible] = useState(false); // State for quotation preview modal
-  const [invoicePreviewModalVisible, setInvoicePreviewModalVisible] = useState(false); // State for invoice preview modal
+  const [quotationPreviewModalVisible, setQuotationPreviewModalVisible] =
+    useState(false);
+  const [invoicePreviewModalVisible, setInvoicePreviewModalVisible] =
+    useState(false);
+  const [showPreviewSelectionModal, setShowPreviewSelectionModal] = useState(false);
 
   const handleDelete = () =>
     Alert.alert("Delete Quotation", "Are you sure?", [
@@ -368,7 +392,7 @@ export default function QuotationDetailsScreen() {
       },
     ]);
 
-  const handleGeneratePdf = async (type: 'quotation' | 'invoice') => {
+  const handleGeneratePdf = async (type: "quotation" | "invoice") => {
     if (!data) return Alert.alert("Error", "Data not loaded.");
     try {
       const htmlContent = generateQuotationHtml({ ...data, type });
@@ -385,10 +409,7 @@ export default function QuotationDetailsScreen() {
   if (loading || isDeleting) {
     return (
       <View
-        style={[
-          styles.loadingContainer,
-          { backgroundColor: colors.background },
-        ]}
+        style={[styles.loadingContainer, { backgroundColor: colors.background }]}
       >
         <ActivityIndicator size="large" color={colors.tint} />
         <Text style={[styles.loadingText, { color: colors.text }]}>
@@ -401,10 +422,7 @@ export default function QuotationDetailsScreen() {
   if (error || !data) {
     return (
       <View
-        style={[
-          styles.loadingContainer,
-          { backgroundColor: colors.background },
-        ]}
+        style={[styles.loadingContainer, { backgroundColor: colors.background }]}
       >
         <Text style={[styles.errorText, { color: colors.error }]}>
           {error?.message || "Quotation not found."}
@@ -430,15 +448,27 @@ export default function QuotationDetailsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="dark-content" />
 
+      {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Quotation
-        </Text>
+        <View>
+          <Text style={[styles.headerEyebrow, { color: colors.secondaryText }]}>
+            Quotation
+          </Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {data.quotation.quote_id
+              ? `#${data.quotation.quote_id}`
+              : "Details"}
+          </Text>
+        </View>
+
         <View style={styles.headerButtons}>
           <TouchableOpacity
             onPress={() => setIsStatusModalVisible(true)}
-            style={[styles.headerButton, quotationStatus === 'Closed' && { opacity: 0.4 }]}
-            disabled={quotationStatus === 'Closed'}
+            style={[
+              styles.headerButton,
+              quotationStatus === "Closed" && { opacity: 0.45 },
+            ]}
+            disabled={quotationStatus === "Closed"}
           >
             <IconSymbol
               size={22}
@@ -446,13 +476,15 @@ export default function QuotationDetailsScreen() {
               color={colors.tint}
             />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setQuotationPreviewModalVisible(true)} style={styles.headerButton}>
-            <IconSymbol size={22} name="doc.text.fill" color={colors.tint} />
+
+          <TouchableOpacity
+            onPress={() => setShowPreviewSelectionModal(true)}
+            style={styles.headerButton}
+          >
+            <IconSymbol size={22} name="eye" color={colors.tint} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setInvoicePreviewModalVisible(true)} style={styles.headerButton}>
-            <IconSymbol size={22} name="dollarsign.circle.fill" color={colors.tint} />
-          </TouchableOpacity>
-          {quotationStatus !== 'Closed' && (
+
+          {quotationStatus !== "Closed" && (
             <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
               <IconSymbol size={22} name="trash.fill" color={colors.error} />
             </TouchableOpacity>
@@ -460,6 +492,7 @@ export default function QuotationDetailsScreen() {
         </View>
       </View>
 
+      {/* Stats */}
       <View
         style={[
           styles.summaryHeader,
@@ -469,11 +502,7 @@ export default function QuotationDetailsScreen() {
           },
         ]}
       >
-        <StatItem
-          label="Status"
-          value={quotationStatus || "N/A"}
-          colors={colors}
-        />
+        <StatItem label="Status" value={quotationStatus || "N/A"} colors={colors} />
         <StatItem
           label="Total Value"
           value={`₹${data.quotation.total_price?.toFixed(2)}`}
@@ -484,13 +513,10 @@ export default function QuotationDetailsScreen() {
           value={data.allProducts.length.toString()}
           colors={colors}
         />
-        <StatItem
-          label="Rooms"
-          value={data.rooms.length.toString()}
-          colors={colors}
-        />
+        <StatItem label="Rooms" value={data.rooms.length.toString()} colors={colors} />
       </View>
 
+      {/* Tabs */}
       <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
         <TabButton
           id="overview"
@@ -515,25 +541,11 @@ export default function QuotationDetailsScreen() {
         />
       </View>
 
+      {/* Content */}
       {renderTabContent()}
 
-      <View style={styles.fabContainer}>
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: "#3B82F6" }]}
-          onPress={() => handleGeneratePdf('quotation')}
-          activeOpacity={0.8}
-        >
-          <IconSymbol name="doc.richtext" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: Colors.light.success, right: 100 }]}
-          onPress={() => handleGeneratePdf('invoice')}
-          activeOpacity={0.8}
-        >
-          <IconSymbol name="dollarsign.circle.fill" size={24} color="#FFF" />
-        </TouchableOpacity>
-      </View>
 
+      {/* Status Update Modal */}
       <StatusUpdateModal
         visible={isStatusModalVisible}
         onClose={() => setIsStatusModalVisible(false)}
@@ -547,53 +559,136 @@ export default function QuotationDetailsScreen() {
         colors={colors}
       />
 
-      {/* Full HTML Preview Modal */}
-      {/* Quotation HTML Preview Modal */}
+      {/* Quotation Preview Modal */}
       <Modal
         visible={quotationPreviewModalVisible}
         transparent={false}
         animationType="slide"
         onRequestClose={() => setQuotationPreviewModalVisible(false)}
       >
-        <View style={[styles.fullPreviewModalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.fullPreviewModalHeader, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
-            <Text style={[styles.fullPreviewModalTitle, { color: colors.text }]}>Quotation Preview</Text>
-            <TouchableOpacity onPress={() => setQuotationPreviewModalVisible(false)}>
-              <IconSymbol name="xmark.circle.fill" size={28} color={colors.secondaryText} />
+        <View
+          style={[
+            styles.fullPreviewModalContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <View
+            style={[
+              styles.fullPreviewModalHeader,
+              {
+                backgroundColor: colors.cardBackground,
+                borderBottomColor: colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.fullPreviewModalTitle, { color: colors.text }]}
+            >
+              Quotation Preview
+            </Text>
+            <TouchableOpacity
+              onPress={() => setQuotationPreviewModalVisible(false)}
+            >
+              <IconSymbol
+                name="xmark.circle.fill"
+                size={28}
+                color={colors.secondaryText}
+              />
             </TouchableOpacity>
           </View>
           <WebView
-            originWhitelist={['*']}
-            source={{ html: generateQuotationHtml({ ...data, type: 'quotation' }) }}
+            originWhitelist={["*"]}
+            source={{ html: generateQuotationHtml({ ...data, type: "quotation" }) }}
             style={styles.fullPreviewWebView}
-            scalesPageToFit={true}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
+            scalesPageToFit
+            javaScriptEnabled
+            domStorageEnabled
           />
         </View>
       </Modal>
 
-      {/* Invoice HTML Preview Modal */}
+      {/* Preview Selection Modal */}
+      <Modal
+        visible={showPreviewSelectionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPreviewSelectionModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPressOut={() => setShowPreviewSelectionModal(false)}
+        >
+          <View style={[styles.previewSelectionModal, { backgroundColor: colors.cardBackground }]}>
+            <Text style={[styles.previewSelectionModalTitle, { color: colors.text }]}>
+              Select Preview Type
+            </Text>
+            <TouchableOpacity
+              style={[styles.previewSelectionButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                setShowPreviewSelectionModal(false);
+                setQuotationPreviewModalVisible(true);
+              }}
+            >
+              <Text style={styles.previewSelectionButtonText}>Quotation Preview</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.previewSelectionButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                setShowPreviewSelectionModal(false);
+                setInvoicePreviewModalVisible(true);
+              }}
+            >
+              <Text style={styles.previewSelectionButtonText}>Invoice Preview</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Invoice Preview Modal */}
       <Modal
         visible={invoicePreviewModalVisible}
         transparent={false}
         animationType="slide"
         onRequestClose={() => setInvoicePreviewModalVisible(false)}
       >
-        <View style={[styles.fullPreviewModalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.fullPreviewModalHeader, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
-            <Text style={[styles.fullPreviewModalTitle, { color: colors.text }]}>Invoice Preview</Text>
-            <TouchableOpacity onPress={() => setInvoicePreviewModalVisible(false)}>
-              <IconSymbol name="xmark.circle.fill" size={28} color={colors.secondaryText} />
+        <View
+          style={[
+            styles.fullPreviewModalContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <View
+            style={[
+              styles.fullPreviewModalHeader,
+              {
+                backgroundColor: colors.cardBackground,
+                borderBottomColor: colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.fullPreviewModalTitle, { color: colors.text }]}
+            >
+              Invoice Preview
+            </Text>
+            <TouchableOpacity
+              onPress={() => setInvoicePreviewModalVisible(false)}
+            >
+              <IconSymbol
+                name="xmark.circle.fill"
+                size={28}
+                color={colors.secondaryText}
+              />
             </TouchableOpacity>
           </View>
           <WebView
-            originWhitelist={['*']}
-            source={{ html: generateQuotationHtml({ ...data, type: 'invoice' }) }}
+            originWhitelist={["*"]}
+            source={{ html: generateQuotationHtml({ ...data, type: "invoice" }) }}
             style={styles.fullPreviewWebView}
-            scalesPageToFit={true}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
+            scalesPageToFit
+            javaScriptEnabled
+            domStorageEnabled
           />
         </View>
       </Modal>
@@ -601,7 +696,7 @@ export default function QuotationDetailsScreen() {
   );
 }
 
-// --- Helper UI Components ---
+// --- Helper UI Components (unchanged from your version) ---
 const InfoSection = ({
   icon,
   title,
@@ -757,9 +852,10 @@ const EmptyState = ({
   </View>
 );
 
-// --- Stylesheet (Redesigned) ---
+// --- Styles (tweaked) ---
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -768,27 +864,41 @@ const styles = StyleSheet.create({
   },
   loadingText: { fontSize: 16, fontWeight: "500" },
   errorText: { fontSize: 16, fontWeight: "500", textAlign: "center" },
+
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 15,
+    paddingBottom: 14,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-end",
     borderBottomWidth: 1,
   },
+  headerEyebrow: {
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
   headerTitle: { fontSize: 28, fontWeight: "bold" },
+
   headerButtons: { flexDirection: "row", gap: 10 },
-  headerButton: { padding: 5 },
+  headerButton: {
+    padding: 6,
+    borderRadius: 8,
+  },
+
   summaryHeader: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   statItem: { alignItems: "center", gap: 4 },
   statValue: { fontSize: 18, fontWeight: "bold" },
   statLabel: { fontSize: 12, textTransform: "uppercase" },
+
   tabBar: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -802,7 +912,9 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
   },
   tabButtonText: { fontSize: 16, fontWeight: "600" },
+
   tabContentContainer: { padding: 20, gap: 16 },
+
   infoSection: { borderRadius: 12, borderWidth: 1, padding: 16 },
   sectionHeader: {
     flexDirection: "row",
@@ -816,6 +928,7 @@ const styles = StyleSheet.create({
   infoItemIcon: { marginRight: 10 },
   infoLabel: { fontSize: 14, marginRight: 6 },
   infoValue: { fontSize: 14, fontWeight: "600", flex: 1 },
+
   productCard: { borderRadius: 12, borderWidth: 1, padding: 16, gap: 8 },
   productName: { fontSize: 16, fontWeight: "bold" },
   productRoom: { fontSize: 12, fontStyle: "italic" },
@@ -825,6 +938,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   productMeta: { fontSize: 14 },
+
   emptyState: {
     flex: 1,
     justifyContent: "center",
@@ -833,30 +947,69 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   emptyStateText: { fontSize: 16, textAlign: "center" },
-  fab: {
+
+  // New labeled action bar
+  actionBar: {
     position: "absolute",
-    bottom: 30,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  fabContainer: {
-    position: "absolute",
-    bottom: 30,
-    right: 30,
+    right: 20,
+    bottom: 28,
     flexDirection: "row",
     gap: 10,
   },
+  labeledButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 28,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  labeledButtonText: { color: "#FFF", fontWeight: "700", fontSize: 14 },
+
   fullPreviewModalContainer: { flex: 1, paddingTop: 50 },
-  fullPreviewModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1 },
-  fullPreviewModalTitle: { fontSize: 22, fontWeight: 'bold' },
+  fullPreviewModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 15,
+    borderBottomWidth: 1,
+  },
+  fullPreviewModalTitle: { fontSize: 22, fontWeight: "bold" },
   fullPreviewWebView: { flex: 1 },
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  previewSelectionModal: {
+    padding: 20,
+    borderRadius: 12,
+    width: '80%',
+    alignItems: 'center',
+    gap: 15,
+  },
+  previewSelectionModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  previewSelectionButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  previewSelectionButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
 });

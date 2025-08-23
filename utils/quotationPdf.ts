@@ -9,6 +9,47 @@ export function generateQuotationHtml({
   allProducts: any[];
   type?: "quotation" | "invoice";
 }) {
+  const numberToWords = (num: number) => {
+    const a = ['', 'one ', 'two ', 'three ', 'four ', 'five ', 'six ', 'seven ', 'eight ', 'nine ', 'ten ', 'eleven ', 'twelve ', 'thirteen ', 'fourteen ', 'fifteen ', 'sixteen ', 'seventeen ', 'eighteen ', 'nineteen '];
+    const b = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+    const g = ['', 'thousand', 'million', 'billion', 'trillion'];
+
+    const n = num.toString().split('.');
+    let num_int = parseInt(n[0]);
+    let num_dec = parseInt(n[1]);
+
+    if (num_int === 0) return 'Zero Only';
+
+    let str = '';
+    let i = 0;
+    while (num_int > 0) {
+      const d = num_int % 1000;
+      num_int = Math.floor(num_int / 1000);
+      let h = Math.floor(d / 100);
+      let t = Math.floor(d % 100 / 10);
+      let o = d % 10;
+
+      let s = '';
+      if (h > 0) s += a[h] + 'hundred ';
+      if (t > 1) s += b[t] + ' ' + a[o];
+      else s += a[d % 100];
+
+      if (s !== '') str = s + ' ' + g[i] + ' ' + str;
+      i++;
+    }
+
+    str = str.replace(/\s+/g, ' ').trim();
+    if (str.endsWith('Only')) str = str.slice(0, -4); // Remove "Only" if it's not the only word
+
+    if (num_dec > 0) {
+      str += ' and ' + numberToWords(num_dec) + ' paise';
+    }
+    return str.trim() + ' Only';
+  };
+
+  const grandTotal = (quotation?.total_price || 0) * (type === "invoice" ? 1.18 : 1);
+  const grandTotalInWords = numberToWords(grandTotal);
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -30,8 +71,8 @@ export function generateQuotationHtml({
       --color-bg-header: #f1f1f1;
       --color-accent: #007bff;
       --watermark-opacity: 0.08;
-      --watermark-size: 65%;
-      --watermark-url: url('https://curiqqrlajzvidcbcluj.supabase.co/storage/v1/object/public/file-storage/logo/JP-Aluminium-Kitchen-Cupboard-Interior-Works.jpg');
+      --watermark-size: 100%;
+      --watermark-src: "https://curiqqrlajzvidcbcluj.supabase.co/storage/v1/object/public/file-storage/logo/JP-Aluminium-Kitchen-Cupboard-Interior-Works.jpg";
     }
 
     body {
@@ -40,6 +81,8 @@ export function generateQuotationHtml({
       line-height: 1.5;
       color: var(--color-dark);
       background: #f0f2f5;
+      margin: 0;
+      padding: 0;
     }
 
     .page-container {
@@ -48,25 +91,28 @@ export function generateQuotationHtml({
       padding: 25px;
       background: #fff;
       border: 1px solid var(--color-border);
-      position: relative;
+      position: relative; /* required for watermark absolute positioning */
       overflow: hidden;
     }
 
-    /* Watermark fix */
+    /* Watermark as an image for broad compatibility */
     .watermark {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) rotate(-15deg);
+      transform: translate(-50%, -50%);
       width: var(--watermark-size);
       height: auto;
-      background-image: var(--watermark-url);
-      background-size: contain;
-      background-repeat: no-repeat;
-      background-position: center;
       opacity: var(--watermark-opacity);
       z-index: 0;
       pointer-events: none;
+      user-select: none;
+    }
+
+    /* Ensure content appears above the watermark */
+    .header, main, .footer {
+      position: relative;
+      z-index: 1;
     }
 
     /* Header */
@@ -77,8 +123,6 @@ export function generateQuotationHtml({
       border-bottom: 2px solid var(--color-dark);
       padding-bottom: 12px;
       margin-bottom: 25px;
-      z-index: 1;
-      position: relative;
     }
 
     .company-logo img {
@@ -136,6 +180,7 @@ export function generateQuotationHtml({
       justify-content: space-between;
       font-size: 11px;
       margin: 2px 0;
+      gap: 8px;
     }
 
     /* Table */
@@ -157,6 +202,7 @@ export function generateQuotationHtml({
       border: 1px solid var(--color-border);
       padding: 8px;
       font-size: 11px;
+      vertical-align: top;
     }
 
     .products-table tbody tr:nth-child(even) {
@@ -178,19 +224,22 @@ export function generateQuotationHtml({
     .align-right { text-align: right; }
     .align-center { text-align: center; }
 
-    /* Terms + Signature */
-    .terms-signature-grid {
+    /* Amount in words + Signature */
+    .amount-words-signature-grid {
       display: flex;
       justify-content: space-between;
       margin-top: 20px;
+      gap: 16px;
+      align-items: flex-end; /* Align items to the bottom */
     }
 
-    .terms-section {
-      width: 65%;
+    .amount-words-section {
+      flex: 1; /* Take up available space */
       font-size: 11px;
-      color: var(--color-medium);
+      color: var(--color-dark);
+      padding-right: 10px; /* Add some padding to separate from signature */
     }
-    .terms-section h4 {
+    .amount-words-section h4 {
       font-size: 12px;
       font-weight: 700;
       margin-bottom: 6px;
@@ -220,21 +269,33 @@ export function generateQuotationHtml({
     @media print {
       body { background: #fff; }
       .page-container { box-shadow: none; border: none; }
-      .watermark { opacity: 0.08; }
+      .watermark { opacity: var(--watermark-opacity); }
     }
   </style>
 </head>
 <body>
   <div class="page-container">
-    <div class="watermark"></div>
+    <!-- Watermark image -->
+    <img
+      class="watermark"
+      src=${`${
+        // keep as a raw attribute; quotes around URL handled by CSS var above if needed elsewhere
+        "https://curiqqrlajzvidcbcluj.supabase.co/storage/v1/object/public/file-storage/logo/JP-Aluminium-Kitchen-Cupboard-Interior-Works.jpg"
+      }`}
+      alt=""
+    />
+
     <header class="header">
       <div class="company-logo">
         <img src="https://curiqqrlajzvidcbcluj.supabase.co/storage/v1/object/public/file-storage/logo/JP-Aluminium-Kitchen-Cupboard-Interior-Works.jpg" />
       </div>
       <div class="company-details">
-        <h1>JP Aluminium Kitchen Cupboard</h1>
-        <p>Interior Works & Design Solutions</p>
-        <p>Mumbai, MH 400001 | +91 98765 43210 | info@jpaluminium.com</p>
+        <h1>JP Aluminium Kitchen & Cupboard</h1>
+        <h1>Interior Works</h1>
+        <p>335/2, ST-3,
+ SRINIVASAPURAM , COIMBATORE MAIN ROAD ,
+ AVINASHI , TIRUPPUR , 641654</p>
+        <p>+91 98765 43210 | jpinteriordecors1@gmail.com</p>
       </div>
       <div class="quote-title-section">
         <h2>${type === "invoice" ? "Invoice" : "Quotation"}</h2>
@@ -282,50 +343,37 @@ export function generateQuotationHtml({
         </thead>
         <tbody>
           ${
-            allProducts
-              ?.map(
-                (product, i) => `
+            allProducts?.length
+              ? allProducts
+                  .map(
+                    (product, i) => `
               <tr>
                 <td class="align-center">${i + 1}</td>
-                <td><strong>${product?.name || "N/A"}</strong><br><small>${
-                  product?.room_type || ""
-                }</small></td>
-                <td class="align-center">${product?.quantity || 0} ${
-                  product?.unit_type || ""
-                }</td>
-                <td class="align-right">₹${(product?.price || 0).toFixed(
-                  2
-                )}</td>
-                <td class="align-right">₹${(
-                  (product?.price || 0) * (product?.quantity || 0)
-                ).toFixed(2)}</td>
+                <td><strong>${product?.name || "N/A"}</strong><br><small>${product?.description || ""}</small></td>
+                <td class="align-center">${product?.quantity || 0} ${product?.unit_type || ""}</td>
+                <td class="align-right">₹${(product?.price || 0).toFixed(2)}</td>
+                <td class="align-right">₹${(((product?.price || 0) * (product?.quantity || 0)) || 0).toFixed(2)}</td>
               </tr>
             `
-              )
-              .join("") ||
-            `<tr><td colspan="5" class="align-center">No items.</td></tr>`
+                  )
+                  .join("")
+              : `<tr><td colspan="5" class="align-center">No items.</td></tr>`
           }
 
           <tr class="summary-row">
             <td colspan="4" class="align-right">Subtotal</td>
-            <td class="align-right">₹${(quotation?.total_price || 0).toFixed(
-              2
-            )}</td>
+            <td class="align-right">₹${(quotation?.total_price || 0).toFixed(2)}</td>
           </tr>
           ${
             type === "invoice"
               ? `
           <tr class="summary-row">
             <td colspan="4" class="align-right">CGST (9%)</td>
-            <td class="align-right">₹${(
-              (quotation?.total_price || 0) * 0.09
-            ).toFixed(2)}</td>
+            <td class="align-right">₹${(((quotation?.total_price || 0) * 0.09) || 0).toFixed(2)}</td>
           </tr>
           <tr class="summary-row">
             <td colspan="4" class="align-right">SGST (9%)</td>
-            <td class="align-right">₹${(
-              (quotation?.total_price || 0) * 0.09
-            ).toFixed(2)}</td>
+            <td class="align-right">₹${(((quotation?.total_price || 0) * 0.09) || 0).toFixed(2)}</td>
           </tr>`
               : ""
           }
@@ -338,16 +386,11 @@ export function generateQuotationHtml({
         </tbody>
       </table>
 
-      <!-- TERMS + SIGNATURE -->
-      <section class="terms-signature-grid">
-        <div class="terms-section">
-          <h4>Terms & Conditions</h4>
-          <ul>
-            <li><strong>Payment:</strong> 50% advance, 40% delivery, 10% completion.</li>
-            <li><strong>Delivery:</strong> 15-20 working days from advance.</li>
-            <li><strong>Warranty:</strong> 1-year manufacturing warranty.</li>
-            <li><strong>Validity:</strong> Quotation valid 30 days.</li>
-          </ul>
+      <!-- AMOUNT IN WORDS + SIGNATURE -->
+      <section class="amount-words-signature-grid">
+        <div class="amount-words-section">
+          <h4>Amount in Words:</h4>
+          <p>${grandTotalInWords}</p>
         </div>
         <div class="signature-section">
           <h4>Authorized Signature</h4>

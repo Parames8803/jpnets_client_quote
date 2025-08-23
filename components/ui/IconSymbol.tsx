@@ -53,6 +53,7 @@ const MAPPING = {
   'list.clipboard.fill': 'assignment', // Added mapping for list.clipboard.fill
   'pencil.and.outline': 'edit', // Added mapping for pencil.and.outline
   'dollarsign.circle.fill': 'monetization-on',
+  'dollarsign.square.fill': 'attach-money', // Added mapping for dollarsign.square.fill
   'calendar': 'event',
   'doc.richtext': 'description',
   'table': 'table-chart',
@@ -96,6 +97,7 @@ const MAPPING = {
   'sum': 'functions', // Added mapping for sum
   'square': 'square-foot', // Added mapping for square
   'tag': 'label', // Added mapping for tag
+  'eye': 'visibility', // Added mapping for eye
 } as const;
 
 /**
