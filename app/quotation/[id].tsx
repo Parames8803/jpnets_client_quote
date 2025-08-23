@@ -342,7 +342,8 @@ export default function QuotationDetailsScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
-  const [fullPreviewModalVisible, setFullPreviewModalVisible] = useState(false); // New state for full preview modal
+  const [quotationPreviewModalVisible, setQuotationPreviewModalVisible] = useState(false); // State for quotation preview modal
+  const [invoicePreviewModalVisible, setInvoicePreviewModalVisible] = useState(false); // State for invoice preview modal
 
   const handleDelete = () =>
     Alert.alert("Delete Quotation", "Are you sure?", [
@@ -367,10 +368,10 @@ export default function QuotationDetailsScreen() {
       },
     ]);
 
-  const generatePdf = async () => {
+  const handleGeneratePdf = async (type: 'quotation' | 'invoice') => {
     if (!data) return Alert.alert("Error", "Data not loaded.");
     try {
-      const htmlContent = generateQuotationHtml(data);
+      const htmlContent = generateQuotationHtml({ ...data, type });
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
       await Sharing.shareAsync(uri, {
         UTI: ".pdf",
@@ -445,8 +446,11 @@ export default function QuotationDetailsScreen() {
               color={colors.tint}
             />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setFullPreviewModalVisible(true)} style={styles.headerButton}>
+          <TouchableOpacity onPress={() => setQuotationPreviewModalVisible(true)} style={styles.headerButton}>
             <IconSymbol size={22} name="doc.text.fill" color={colors.tint} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setInvoicePreviewModalVisible(true)} style={styles.headerButton}>
+            <IconSymbol size={22} name="dollarsign.circle.fill" color={colors.tint} />
           </TouchableOpacity>
           {quotationStatus !== 'Closed' && (
             <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
@@ -513,13 +517,22 @@ export default function QuotationDetailsScreen() {
 
       {renderTabContent()}
 
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: "#3B82F6" }]}
-        onPress={generatePdf}
-        activeOpacity={0.8}
-      >
-        <IconSymbol name="doc.richtext" size={24} color="#FFF" />
-      </TouchableOpacity>
+      <View style={styles.fabContainer}>
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: "#3B82F6" }]}
+          onPress={() => handleGeneratePdf('quotation')}
+          activeOpacity={0.8}
+        >
+          <IconSymbol name="doc.richtext" size={24} color="#FFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: Colors.light.success, right: 100 }]}
+          onPress={() => handleGeneratePdf('invoice')}
+          activeOpacity={0.8}
+        >
+          <IconSymbol name="dollarsign.circle.fill" size={24} color="#FFF" />
+        </TouchableOpacity>
+      </View>
 
       <StatusUpdateModal
         visible={isStatusModalVisible}
@@ -535,22 +548,48 @@ export default function QuotationDetailsScreen() {
       />
 
       {/* Full HTML Preview Modal */}
+      {/* Quotation HTML Preview Modal */}
       <Modal
-        visible={fullPreviewModalVisible}
+        visible={quotationPreviewModalVisible}
         transparent={false}
         animationType="slide"
-        onRequestClose={() => setFullPreviewModalVisible(false)}
+        onRequestClose={() => setQuotationPreviewModalVisible(false)}
       >
         <View style={[styles.fullPreviewModalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.fullPreviewModalHeader, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
-            <Text style={[styles.fullPreviewModalTitle, { color: colors.text }]}>Full Quotation Preview</Text>
-            <TouchableOpacity onPress={() => setFullPreviewModalVisible(false)}>
+            <Text style={[styles.fullPreviewModalTitle, { color: colors.text }]}>Quotation Preview</Text>
+            <TouchableOpacity onPress={() => setQuotationPreviewModalVisible(false)}>
               <IconSymbol name="xmark.circle.fill" size={28} color={colors.secondaryText} />
             </TouchableOpacity>
           </View>
           <WebView
             originWhitelist={['*']}
-            source={{ html: generateQuotationHtml(data) }}
+            source={{ html: generateQuotationHtml({ ...data, type: 'quotation' }) }}
+            style={styles.fullPreviewWebView}
+            scalesPageToFit={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+          />
+        </View>
+      </Modal>
+
+      {/* Invoice HTML Preview Modal */}
+      <Modal
+        visible={invoicePreviewModalVisible}
+        transparent={false}
+        animationType="slide"
+        onRequestClose={() => setInvoicePreviewModalVisible(false)}
+      >
+        <View style={[styles.fullPreviewModalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.fullPreviewModalHeader, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
+            <Text style={[styles.fullPreviewModalTitle, { color: colors.text }]}>Invoice Preview</Text>
+            <TouchableOpacity onPress={() => setInvoicePreviewModalVisible(false)}>
+              <IconSymbol name="xmark.circle.fill" size={28} color={colors.secondaryText} />
+            </TouchableOpacity>
+          </View>
+          <WebView
+            originWhitelist={['*']}
+            source={{ html: generateQuotationHtml({ ...data, type: 'invoice' }) }}
             style={styles.fullPreviewWebView}
             scalesPageToFit={true}
             javaScriptEnabled={true}
@@ -808,6 +847,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 8,
+  },
+  fabContainer: {
+    position: "absolute",
+    bottom: 30,
+    right: 30,
+    flexDirection: "row",
+    gap: 10,
   },
   fullPreviewModalContainer: { flex: 1, paddingTop: 50 },
   fullPreviewModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1 },

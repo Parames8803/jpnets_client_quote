@@ -6,7 +6,7 @@ import { supabase } from '@/utils/supabaseClient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, RefreshControl, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function LeadsScreen() {
   const router = useRouter();
@@ -40,7 +40,6 @@ export default function LeadsScreen() {
       let query = supabase
         .from('leads')
         .select('*')
-        .eq('user_id', user?.id);
 
       if (filterStatus !== 'All') {
         query = query.eq('status', filterStatus);

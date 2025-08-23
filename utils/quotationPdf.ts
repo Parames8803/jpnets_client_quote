@@ -4,10 +4,12 @@ export function generateQuotationHtml({
   quotation,
   client,
   allProducts,
+  type = 'quotation', // 'quotation' or 'invoice'
 }: {
   quotation: Quotation;
   client: Client;
   allProducts: (Product & { room_type?: string })[];
+  type?: 'quotation' | 'invoice';
 }) {
   return `<!DOCTYPE html>
 <html>
@@ -15,8 +17,8 @@ export function generateQuotationHtml({
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Quotation for JP Aluminium Kitchen Cupboard interior design and works. Get high-quality kitchen solutions in Mumbai.">
-  <meta name="keywords" content="kitchen cupboard, aluminium kitchen, interior design, Mumbai, quotation">
-  <title>Quotation #${quotation?.quote_id || "QT001234"}</title>
+  <meta name="keywords" content="kitchen cupboard, aluminium kitchen, interior design, Mumbai, quotation, invoice">
+  <title>${type === 'invoice' ? 'Invoice' : 'Quotation'} #${quotation?.quote_id || "QT001234"}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
@@ -259,7 +261,7 @@ export function generateQuotationHtml({
         <p>Mumbai, MH 400001 | +91 98765 43210 | info@jpaluminium.com</p>
       </div>
       <div class="quote-title-section">
-        <h2>Quotation</h2>
+        <h2>${type === 'invoice' ? 'Invoice' : 'Quotation'}</h2>
         <p>#${quotation?.quote_id || "QT001234"}</p>
       </div>
     </header>
@@ -328,10 +330,24 @@ export function generateQuotationHtml({
               <td colspan="4" class="align-right">Subtotal</td>
               <td class="align-right">₹${(quotation?.total_price || 0).toFixed(2)}</td>
             </tr>
+            ${
+              type === 'invoice'
+                ? `
             <tr class="summary-row">
-              <td colspan="4" class="align-right">GST (18%)</td>
+              <td colspan="4" class="align-right">CGST (9%)</td>
+              <td class="align-right">₹${((quotation?.total_price || 0) * 0.09).toFixed(2)}</td>
+            </tr>
+            <tr class="summary-row">
+              <td colspan="4" class="align-right">SGST (9%)</td>
+              <td class="align-right">₹${((quotation?.total_price || 0) * 0.09).toFixed(2)}</td>
+            </tr>
+            <tr class="summary-row">
+              <td colspan="4" class="align-right">Total GST (18%)</td>
               <td class="align-right">₹${((quotation?.total_price || 0) * 0.18).toFixed(2)}</td>
             </tr>
+            `
+                : ''
+            }
             <tr class="grand-total-row">
               <td colspan="4" class="align-right">GRAND TOTAL</td>
               <td class="align-right">₹${((quotation?.total_price || 0) * 1.18).toFixed(2)}</td>
