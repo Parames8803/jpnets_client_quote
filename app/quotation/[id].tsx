@@ -368,6 +368,8 @@ export default function QuotationDetailsScreen() {
     useState(false);
   const [invoicePreviewModalVisible, setInvoicePreviewModalVisible] =
     useState(false);
+  const [isActionSelectionModalVisible, setIsActionSelectionModalVisible] =
+    useState(false);
 
   const handleDelete = () =>
     Alert.alert("Delete Quotation", "Are you sure?", [
@@ -516,30 +518,6 @@ export default function QuotationDetailsScreen() {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => handleSharePdf("quotation")}
-            style={styles.headerButton}
-          >
-            <IconSymbol size={22} name="square.and.arrow.up.fill" color={colors.tint} />
-          </TouchableOpacity>
-
-          {!data.quotation.invoice_generated && (
-            <TouchableOpacity
-              onPress={handleGenerateInvoice}
-              style={styles.headerButton}
-            >
-              <IconSymbol size={22} name="doc.text.fill" color={colors.tint} />
-            </TouchableOpacity>
-          )}
-
-          {data.quotation.invoice_generated && (
-            <TouchableOpacity
-              onPress={() => handleSharePdf("invoice")}
-              style={styles.headerButton}
-            >
-            <IconSymbol size={22} name="square.and.arrow.up.fill" color={colors.tint} />
-            </TouchableOpacity>
-          )}
 
           {quotationStatus !== "Closed" && (
             <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
@@ -712,6 +690,88 @@ export default function QuotationDetailsScreen() {
           />
         </View>
       </Modal>
+
+      {/* Action Selection Modal */}
+      <Modal
+        visible={isActionSelectionModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsActionSelectionModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.previewSelectionModal,
+              { backgroundColor: colors.cardBackground },
+            ]}
+          >
+            <Text
+              style={[
+                styles.previewSelectionModalTitle,
+                { color: colors.text },
+              ]}
+            >
+              Select Document Type
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setIsActionSelectionModalVisible(false);
+                handleSharePdf("quotation");
+              }}
+              style={[
+                styles.previewSelectionButton,
+                { backgroundColor: colors.tint },
+              ]}
+            >
+              <Text style={styles.previewSelectionButtonText}>
+                Share Quotation
+              </Text>
+            </TouchableOpacity>
+            {!data.quotation.invoice_generated && (
+              <TouchableOpacity
+                onPress={() => {
+                  setIsActionSelectionModalVisible(false);
+                  handleGenerateInvoice();
+                }}
+                style={[
+                  styles.previewSelectionButton,
+                  { backgroundColor: colors.primary },
+                ]}
+              >
+                <Text style={styles.previewSelectionButtonText}>
+                  Generate Invoice
+                </Text>
+              </TouchableOpacity>
+            )}
+            {data.quotation.invoice_generated && (
+              <TouchableOpacity
+                onPress={() => {
+                  setIsActionSelectionModalVisible(false);
+                  handleSharePdf("invoice");
+                }}
+                style={[
+                  styles.previewSelectionButton,
+                  { backgroundColor: colors.primary },
+                ]}
+              >
+                <Text style={styles.previewSelectionButtonText}>
+                  Share Invoice
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Floating Action Button */}
+      <View style={styles.actionBar}>
+        <LabeledActionButton
+          label="Actions"
+          icon="plus.circle.fill"
+          backgroundColor={colors.tint}
+          onPress={() => setIsActionSelectionModalVisible(true)}
+        />
+      </View>
     </View>
   );
 }
