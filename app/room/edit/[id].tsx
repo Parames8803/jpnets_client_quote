@@ -36,6 +36,7 @@ export default function EditRoomScreen() {
   const { id: roomId } = useLocalSearchParams();
   const isDark = colorScheme === 'dark';
 
+  const [roomName, setRoomName] = useState('');
   const [roomType, setRoomType] = useState('');
   const [description, setDescription] = useState('');
   
@@ -83,10 +84,10 @@ export default function EditRoomScreen() {
       setTotalSqFt(null);
     }
     
-    const fields = [roomType, description, hasDimensions, products.length > 0, images.length > 0 || existingImageUrls.length > 0];
+    const fields = [roomName, roomType, description, hasDimensions, products.length > 0, images.length > 0 || existingImageUrls.length > 0];
     const completedFields = fields.filter(f => f).length;
     setProgress(completedFields / fields.length);
-  }, [roomType, description, length, width, lengthUnit, widthUnit, products, images, existingImageUrls]);
+  }, [roomName, roomType, description, length, width, lengthUnit, widthUnit, products, images, existingImageUrls]);
   
   useEffect(() => {
     ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -115,6 +116,7 @@ export default function EditRoomScreen() {
           return;
         }
 
+        setRoomName(room.room_name || '');
         setRoomType(room.room_type);
         setDescription(room.description || '');
         setTotalSqFt(room.total_sq_ft);
@@ -192,6 +194,10 @@ export default function EditRoomScreen() {
         wages: lastSelected.wages,
         default_wages: lastSelected.wages,
         description: newProductDescription,
+        length_value: null, // Added missing property
+        length_unit_type: null, // Added missing property
+        width_value: null, // Added missing property
+        width_unit_type: null, // Added missing property
       };
       setProducts(prev => [...prev, newProduct]);
       resetProductForm();
@@ -237,6 +243,7 @@ export default function EditRoomScreen() {
       // Update room details
       const { data: roomData, error: roomError } = await supabase
         .from('rooms').update({
+          room_name: roomName.trim(),
           room_type: roomType.trim(),
           description: description.trim(),
           total_sq_ft: totalSqFt,
@@ -371,6 +378,7 @@ export default function EditRoomScreen() {
         
         <View style={[styles.card, themedStyles.card]}>
           <Text style={[styles.cardTitle, themedStyles.text]}>Room Details</Text>
+          <TextInput style={[styles.input, themedStyles.input]} placeholder="Room Name *" placeholderTextColor={themedStyles.subtext.color} value={roomName} onChangeText={setRoomName} />
           <TouchableOpacity style={[styles.selector, themedStyles.input]} onPress={() => openModal('roomType')}>
             <Text style={themedStyles.text}>{roomType || 'Select Room Type *'}</Text>
             <IconSymbol name="chevron.down" size={16} color={themedStyles.subtext.color} />
@@ -476,7 +484,6 @@ export default function EditRoomScreen() {
       </ScrollView>
 
       <SelectionModal />
-      <ProductDimensionModal visible={isDimensionModalVisible} onClose={() => setDimensionModalVisible(false)} onSetQuantity={setNewProductQuantity} />
     </KeyboardAvoidingView>
   );
 }

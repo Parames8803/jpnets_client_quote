@@ -14,13 +14,13 @@ import { IconSymbol } from './ui/IconSymbol';
 interface ProductDimensionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSetDimensions: (dimensions: { length: number; width: number; lengthUnit: string; widthUnit: string; totalSqFt: number }) => void;
+  onSetQuantity: (quantity: string) => void;
 }
 
 export const ProductDimensionModal: React.FC<ProductDimensionModalProps> = ({
   visible,
   onClose,
-  onSetDimensions,
+  onSetQuantity,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -40,13 +40,8 @@ export const ProductDimensionModal: React.FC<ProductDimensionModalProps> = ({
     const length = parseFloat(productLength);
     const width = parseFloat(productWidth);
     if (!isNaN(length) && !isNaN(width)) {
-      onSetDimensions({
-        length: length,
-        width: width,
-        lengthUnit: 'ft', // Assuming 'ft' as the unit for now based on current implementation
-        widthUnit: 'ft',  // Assuming 'ft' as the unit for now based on current implementation
-        totalSqFt: length * width,
-      });
+      const totalSqFt = length * width;
+      onSetQuantity(totalSqFt.toFixed(2)); // Pass the calculated totalSqFt as a string
       onClose();
     } else {
       Alert.alert('Invalid Input', 'Please enter valid numbers for length and width.');

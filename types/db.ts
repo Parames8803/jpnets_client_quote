@@ -84,6 +84,7 @@ export interface Room {
   id: string; // uuid
   created_at: string; // timestamp with time zone
   client_id: string | null; // uuid, nullable (references clients.id)
+  room_name: string | null; // text, nullable
   room_type: string | null; // text, nullable
   description: string | null; // text, nullable
   status: string | null; // text, nullable (default 'Not Active')

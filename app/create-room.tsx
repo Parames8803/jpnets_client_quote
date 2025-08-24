@@ -38,6 +38,7 @@ export default function CreateRoomScreen() {
   const isDark = colorScheme === 'dark';
 
 
+  const [roomName, setRoomName] = useState('');
   const [roomType, setRoomType] = useState('');
   const [description, setDescription] = useState('');
   
@@ -90,10 +91,10 @@ export default function CreateRoomScreen() {
       setTotalSqFt(null);
     }
     
-    const fields = [roomType, description, hasDimensions, products.length > 0, images.length > 0];
+    const fields = [roomName, roomType, description, hasDimensions, products.length > 0, images.length > 0];
     const completedFields = fields.filter(f => f).length;
     setProgress(completedFields / fields.length);
-  }, [roomType, description, length, width, lengthUnit, widthUnit, products, images]);
+  }, [roomName, roomType, description, length, width, lengthUnit, widthUnit, products, images]);
   
   useEffect(() => {
     ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -195,6 +196,7 @@ export default function CreateRoomScreen() {
       const { data: roomData, error: roomError } = await supabase
         .from('rooms').insert({
           client_id: client_id_str,
+          room_name: roomName.trim(),
           room_type: roomType.trim(),
           description: description.trim(),
           status: ROOM_STATUS_TYPES.ACTIVE, // Default to Active
@@ -333,9 +335,9 @@ export default function CreateRoomScreen() {
         </View>
       </View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
-        
         <View style={[styles.card, themedStyles.card]}>
           <Text style={[styles.cardTitle, themedStyles.text]}>Room Details</Text>
+          <TextInput style={[styles.input, themedStyles.input]} placeholder="Room Name *" placeholderTextColor={themedStyles.subtext.color} value={roomName} onChangeText={setRoomName} />
           <TouchableOpacity style={[styles.selector, themedStyles.input]} onPress={() => openModal('roomType')}>
             <Text style={[themedStyles.text, !roomType && themedStyles.subtext]}>{roomType || 'Select Room Type *'}</Text>
             <IconSymbol name="chevron.down" size={16} color={themedStyles.subtext.color} />
@@ -443,12 +445,15 @@ export default function CreateRoomScreen() {
       <ProductDimensionModal
         visible={isDimensionModalVisible}
         onClose={() => setDimensionModalVisible(false)}
-        onSetDimensions={({ length, width, lengthUnit, widthUnit, totalSqFt }) => {
-          setNewProductQuantity(totalSqFt.toFixed(2));
-          setProductLengthValue(length);
-          setProductLengthUnitType(lengthUnit);
-          setProductWidthValue(width);
-          setProductWidthUnitType(widthUnit);
+        onSetQuantity={(quantity) => {
+          setNewProductQuantity(quantity);
+          // Since ProductDimensionModal now only returns quantity, we can't set individual dimensions here.
+          // If individual dimensions are still needed, ProductDimensionModal would need to be refactored
+          // to return an object with all dimension properties.
+          setProductLengthValue(null); // Reset or handle as needed
+          setProductLengthUnitType(null); // Reset or handle as needed
+          setProductWidthValue(null); // Reset or handle as needed
+          setProductWidthUnitType(null); // Reset or handle as needed
         }}
       />
     </KeyboardAvoidingView>
