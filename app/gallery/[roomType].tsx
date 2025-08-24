@@ -1,5 +1,5 @@
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { ROOM_TYPES } from '@/types/db';
+import { RoomType } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import * as base64js from 'base64-js';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,18 +45,37 @@ export default function RoomGalleryScreen() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
+  const [roomType, setRoomType] = useState<RoomType | null>(null); // State to store fetched room type
 
-  const roomType = ROOM_TYPES.find((rt) => rt.slug === roomTypeSlug);
   const role: Role = session?.user?.user_metadata?.role;
 
   useEffect(() => {
     const init = async () => {
       const { data } = await supabase.auth.getSession();
       setSession(data.session ?? null);
-      if (roomTypeSlug) await fetchImages();
+      if (roomTypeSlug) {
+        await fetchRoomType(); // Fetch room type
+        await fetchImages();
+      }
     };
     init();
   }, [roomTypeSlug]);
+
+  const fetchRoomType = async () => {
+    if (!roomTypeSlug) return;
+    try {
+      const { data, error } = await supabase
+        .from('room_types')
+        .select('*')
+        .eq('slug', roomTypeSlug)
+        .single();
+
+      if (error) throw error;
+      setRoomType(data);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to fetch room type.');
+    }
+  };
 
   const fetchImages = async () => {
     if (!roomTypeSlug) return;

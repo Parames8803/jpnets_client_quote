@@ -23,12 +23,13 @@ import {
 } from 'react-native';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
-import { Product, ProductType, ROOM_STATUS_TYPES, ROOM_TYPES } from '../types/db';
+import { Product, ProductType, ROOM_STATUS_TYPES, RoomType } from '../types/db';
 import { supabase } from '../utils/supabaseClient';
 
 
 const SUPABASE_IMAGE_BUCKET = process.env.EXPO_PUBLIC_SUPABASE_IMAGE_BUCKET || 'file-storage';
 const UNIT_OPTIONS = ['ft', 'inches', 'cm', 'm'];
+const DEFAULT_PRODUCT_UNIT_OPTIONS = ['sq.ft', 'running ft', 'nos']; // Default unit types for products
 
 
 export default function CreateRoomScreen() {
@@ -41,6 +42,7 @@ export default function CreateRoomScreen() {
   const [roomName, setRoomName] = useState('');
   const [roomType, setRoomType] = useState('');
   const [description, setDescription] = useState('');
+  const [roomTypesFromDB, setRoomTypesFromDB] = useState<RoomType[]>([]);
   
   const [length, setLength] = useState('');
   const [lengthUnit, setLengthUnit] = useState<'ft' | 'inches' | 'cm' | 'm'>('ft');
@@ -63,7 +65,7 @@ export default function CreateRoomScreen() {
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<ProductType[]>([]);
   const [newProductQuantity, setNewProductQuantity] = useState('');
-  const [newProductUnitType, setNewProductUnitType] = useState('');
+  const [newProductUnitType, setNewProductUnitType] = useState<string | null>(null);
   const [newProductDescription, setNewProductDescription] = useState('');
   const [availableProductUnits, setAvailableProductUnits] = useState<string[]>([]);
   const [currentUnitField, setCurrentUnitField] = useState<'length' | 'width' | null>(null);
@@ -98,7 +100,19 @@ export default function CreateRoomScreen() {
   
   useEffect(() => {
     ImagePicker.requestMediaLibraryPermissionsAsync();
+    fetchRoomTypes();
   }, []);
+
+  const fetchRoomTypes = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('room_types').select('*');
+    if (error) {
+      Alert.alert('Error fetching room types', error.message);
+    } else {
+      setRoomTypesFromDB(data || []);
+    }
+    setLoading(false);
+  };
 
 
   const openModal = (type: typeof modalContent) => {
@@ -119,7 +133,7 @@ export default function CreateRoomScreen() {
     setIsAddingProduct(false);
     setSelectedProducts([]);
     setNewProductQuantity('');
-    setNewProductUnitType('');
+    setNewProductUnitType(null);
     setNewProductDescription('');
     setAvailableProductUnits([]);
     setProductLengthValue(null);
@@ -137,7 +151,7 @@ export default function CreateRoomScreen() {
         product_category: selectedProducts[0].name,
         product_subcategory: selectedProducts.slice(1).map(p => p.name).join(' / ') || null,
         quantity: parseFloat(newProductQuantity),
-        unit_type: newProductUnitType.trim(),
+        unit_type: newProductUnitType || lastSelected.default_unit_type || 'nos', // Use selected or default unit type
         price: lastSelected.default_price,
         default_price: lastSelected.default_price,
         wages: lastSelected.wages,
@@ -249,7 +263,7 @@ export default function CreateRoomScreen() {
     switch (modalContent) {
         case 'roomType':
             title = 'Select Room Type';
-            options = ROOM_TYPES;
+            options = roomTypesFromDB;
             onSelect = (option) => { setRoomType(option.name); setSelectedProducts([]); setModalVisible(false); };
             break;
         case 'unit':
@@ -259,13 +273,25 @@ export default function CreateRoomScreen() {
             break;
         case 'product':
             title = 'Select Product';
-            options = ROOM_TYPES.find(rt => rt.name === roomType)?.products || [];
-            onSelect = (product) => { setSelectedProducts([product]); setAvailableProductUnits(product.units || []); if (product.sub_products) openModal('subProduct'); else setModalVisible(false); };
+            options = roomTypesFromDB.find(rt => rt.name === roomType)?.products || [];
+            onSelect = (product) => {
+              setSelectedProducts([product]);
+              setAvailableProductUnits(product.units && product.units.length > 0 ? product.units : DEFAULT_PRODUCT_UNIT_OPTIONS); // Use product.units or fallback
+              setNewProductUnitType(product.default_unit_type || null); // Set default unit type
+              if (product.sub_products) openModal('subProduct');
+              else setModalVisible(false);
+            };
             break;
         case 'subProduct':
             title = 'Select Option';
             options = selectedProducts.length > 0 ? selectedProducts[selectedProducts.length - 1].sub_products || [] : [];
-            onSelect = (product) => { setSelectedProducts(prev => [...prev, product]); if (product.sub_products) {} else setModalVisible(false); };
+            onSelect = (product) => {
+              setSelectedProducts(prev => [...prev, product]);
+              setAvailableProductUnits(product.units && product.units.length > 0 ? product.units : DEFAULT_PRODUCT_UNIT_OPTIONS); // Use product.units or fallback
+              setNewProductUnitType(product.default_unit_type || null); // Set default unit type
+              if (product.sub_products) {}
+              else setModalVisible(false);
+            };
             break;
         case 'productUnit':
             title = 'Select Unit Type';
@@ -386,7 +412,7 @@ export default function CreateRoomScreen() {
                 <View style={{flexDirection: 'row', gap: 10}}>
                     <TextInput style={[styles.input, themedStyles.input, {flex: 1}]} placeholder="Qty" placeholderTextColor={themedStyles.subtext.color} value={newProductQuantity} onChangeText={setNewProductQuantity} keyboardType="numeric" />
                     <TouchableOpacity style={[styles.selector, themedStyles.input, {flex: 1}]} onPress={() => openModal('productUnit')}>
-                        <Text style={[themedStyles.text, !newProductUnitType && themedStyles.subtext]}>{newProductUnitType || 'Unit'}</Text>
+                        <Text style={[themedStyles.text, !newProductUnitType && themedStyles.subtext]}>{newProductUnitType || 'Select Unit'}</Text>
                     </TouchableOpacity>
                 </View>
                 <TextInput style={[styles.input, themedStyles.input]} placeholder="Description" placeholderTextColor={themedStyles.subtext.color} value={newProductDescription} onChangeText={setNewProductDescription} />
@@ -442,20 +468,6 @@ export default function CreateRoomScreen() {
 
 
       <SelectionModal />
-      <ProductDimensionModal
-        visible={isDimensionModalVisible}
-        onClose={() => setDimensionModalVisible(false)}
-        onSetQuantity={(quantity) => {
-          setNewProductQuantity(quantity);
-          // Since ProductDimensionModal now only returns quantity, we can't set individual dimensions here.
-          // If individual dimensions are still needed, ProductDimensionModal would need to be refactored
-          // to return an object with all dimension properties.
-          setProductLengthValue(null); // Reset or handle as needed
-          setProductLengthUnitType(null); // Reset or handle as needed
-          setProductWidthValue(null); // Reset or handle as needed
-          setProductWidthUnitType(null); // Reset or handle as needed
-        }}
-      />
     </KeyboardAvoidingView>
   );
 }

@@ -161,84 +161,27 @@ export interface PurchasedOrder {
 export interface ProductType {
   name: string;
   default_price: number;
-  units?: string[];
+  default_unit_type?: string | null; // Added for selected unit type
+  units?: string[]; // Array of available unit types for this product
   wages: number;
   sub_products?: ProductType[];
 }
 
-export const ROOM_TYPES: { name: string; slug: string; products: ProductType[] }[] = [
-  {
-    name: 'Living Room',
-    slug: 'living-room',
-    products: [
-      { name: 'Sofa', default_price: 500, units: ['pcs', 'm'], wages: 50 },
-      { name: 'Coffee Table', default_price: 150, units: ['pcs'], wages: 20 },
-      { name: 'TV Stand', default_price: 200, units: ['pcs'], wages: 25 },
-    ],
-  },
-  {
-    name: 'Kitchen',
-    slug: 'kitchen',
-    products: [
-      { name: 'Counter Top Bottom', default_price: 100, units: ['sq.ft', 'm²'], wages: 15,sub_products: [
-          {
-            name: 'Front Door',
-            default_price: 0,
-            wages: 0,
-            sub_products: [
-              { name: 'Single Sheet', default_price: 50, wages: 10 },
-              { name: 'Double Sheet', default_price: 75, wages: 15 },
-            ],
-          },
-          {
-            name: 'Inner Shelve',
-            default_price: 0,
-            wages: 0,
-            sub_products: [
-              { name: 'Single Sheet', default_price: 25, wages: 5 },
-              { name: 'Double Sheet', default_price: 25, wages: 5 },
-            ],
-          },
-     ] },
-      { name: 'Cabinets', default_price: 300, units: ['sq.ft', 'm²'], wages: 40 },
-      { name: 'Sink', default_price: 120, units: ['pcs'], wages: 30 },
-    ],
-  },
-  {
-    name: 'Bedroom',
-    slug: 'bedroom',
-    products: [
-      { name: 'Bed Frame', default_price: 400, units: ['pcs'], wages: 60 },
-      {
-        name: 'Wardrobe',
-        default_price: 350,
-        units: ['sq.ft', 'm²', 'pcs'],
-        wages: 70,
-        sub_products: [
-          {
-            name: 'Front Door',
-            default_price: 0,
-            wages: 0,
-            sub_products: [
-              { name: 'Single Sheet', default_price: 50, wages: 10 },
-              { name: 'Double Sheet', default_price: 75, wages: 15 },
-            ],
-          },
-          {
-            name: 'Inner Shelve',
-            default_price: 0,
-            wages: 0,
-            sub_products: [
-              { name: 'Single Sheet', default_price: 25, wages: 5 },
-              { name: 'Double Sheet', default_price: 25, wages: 5 },
-            ],
-          },
-          { name: 'Back Side Sheet', default_price: 25, wages: 5 },
-          { name: 'Aluminium Drawer', default_price: 25, wages: 5 },
-          { name: 'Saint Gobain Mirror', default_price: 25, wages: 5 },
-        ],
-      },
-      { name: 'Dresser', default_price: 250, units: ['pcs'], wages: 35 },
-    ],
-  },
-];
+export interface WeatherData {
+  temperature: number;
+  condition: string;
+  description: string;
+  humidity: number;
+  windSpeed: number;
+  icon: string;
+  location: string;
+}
+
+// Interface for the 'room_types' table
+export interface RoomType {
+  id: string; // uuid
+  created_at: string; // timestamp with time zone
+  name: string; // text
+  slug: string; // text, unique
+  products: ProductType[]; // jsonb
+}

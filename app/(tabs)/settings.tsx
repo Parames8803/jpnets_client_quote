@@ -9,7 +9,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors['light'];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -26,6 +26,13 @@ export default function SettingsScreen() {
           onPress={() => router.push('/register')}
         >
           <Text style={[styles.optionText, { color: colors.text }]}>Create Admin Account</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.optionButton, { borderColor: colors.border, backgroundColor: colors.cardBackground }]}
+          onPress={() => router.push('/settings/manage-room-types')}
+        >
+          <Text style={[styles.optionText, { color: colors.text }]}>Manage Room Types</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

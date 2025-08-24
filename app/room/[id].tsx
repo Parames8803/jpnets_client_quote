@@ -214,7 +214,8 @@ export default function RoomDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const isDark = colorScheme === 'dark';
+  const colors = isDark ? Colors.dark : Colors.light;
   const { data, loading, error, refetch } = useRoomDetails(id);
   const { userRole } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('details');

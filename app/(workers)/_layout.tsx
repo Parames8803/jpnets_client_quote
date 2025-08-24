@@ -11,7 +11,7 @@ export default function WorkersLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: isDark ? Colors.dark.tint : Colors.light.tint,
         headerShown: false,
         tabBarStyle: {
           backgroundColor: isDark ? Colors.dark.background : Colors.light.background,

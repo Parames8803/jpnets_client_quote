@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/utils/supabaseClient';
-import { ROOM_TYPES } from '@/types/db';
+import { RoomType } from '@/types/db';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 
@@ -25,7 +25,9 @@ type Role = 'admin' | 'client' | 'worker' | 'viewer' | undefined;
 
 export default function GalleryScreen() {
   const router = useRouter();
-
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [roomPreviews, setRoomPreviews] = useState<{ [key: string]: string[] }>({});
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
@@ -36,16 +38,34 @@ export default function GalleryScreen() {
       setSession(data.session ?? null);
     };
 
+    const fetchRoomTypes = async () => {
+      const { data, error } = await supabase.from('room_types').select('*');
+      if (error) {
+        console.error('Error fetching room types:', error);
+        return [];
+      }
+      return data as RoomType[];
+    };
+
     const fetchPreviews = async () => {
       await fetchSession();
+      const fetchedRoomTypes = await fetchRoomTypes();
+      setRoomTypes(fetchedRoomTypes);
+
       const newPreviews: { [key: string]: string[] } = {};
 
-      for (const roomType of ROOM_TYPES) {
+      for (const roomType of fetchedRoomTypes) {
         const { data: files, error } = await supabase.storage
           .from('file-storage')
           .list(roomType.slug, { limit: 6, offset: 0, sortBy: { column: 'name', order: 'asc' } });
 
-        if (error || !files || files.length === 0) {
+        if (error) {
+          console.error(`Error listing files for ${roomType.slug}:`, error);
+          newPreviews[roomType.slug] = [];
+          continue;
+        }
+
+        if (!files || files.length === 0) {
           newPreviews[roomType.slug] = [];
           continue;
         }
@@ -68,12 +88,13 @@ export default function GalleryScreen() {
   }, []);
 
   const role: Role = session?.user?.user_metadata?.role;
+  const styles = getStyles(isDark);
 
   const renderRoomCard = ({
     item: roomType,
     index,
   }: {
-    item: typeof ROOM_TYPES[0];
+    item: RoomType;
     index: number;
   }) => {
     const previews = roomPreviews[roomType.slug] || [];
@@ -84,7 +105,7 @@ export default function GalleryScreen() {
       <TouchableOpacity
         style={[
           styles.card,
-          { marginRight: isEven ? 16 : 0, backgroundColor: Colors.light.cardBackground },
+          { marginRight: isEven ? 16 : 0, backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
         ]}
         onPress={() =>
           router.push({
@@ -104,9 +125,9 @@ export default function GalleryScreen() {
               />
             </>
           ) : (
-            <View style={[styles.placeholderImage, { backgroundColor: Colors.light.cardBackground || '#86888bff' }]}>
-              <Text style={[styles.placeholderText, { color: Colors.light.subtext }]}>📷</Text>
-              <Text style={[styles.placeholderSubtext, { color: Colors.light.subtext }]}>No images</Text>
+            <View style={[styles.placeholderImage, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground || '#86888bff' }]}>
+              <Text style={[styles.placeholderText, { color: isDark ? Colors.dark.subtext : Colors.light.subtext }]}>📷</Text>
+              <Text style={[styles.placeholderSubtext, { color: isDark ? Colors.dark.subtext : Colors.light.subtext }]}>No images</Text>
             </View>
           )}
 
@@ -119,7 +140,7 @@ export default function GalleryScreen() {
 
         <View style={styles.cardContent}>
           <Text
-            style={[styles.cardTitle, { color: Colors.light.text }]}
+            style={[styles.cardTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}
             numberOfLines={2}
           >
             {roomType.name}
@@ -152,26 +173,26 @@ export default function GalleryScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: Colors.light.background }]}>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
         <View style={styles.loadingContent}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
-          <Text style={[styles.loadingText, { color: Colors.light.subtext }]}>Loading gallery...</Text>
+          <ActivityIndicator size="large" color={isDark ? Colors.dark.primary : Colors.light.primary} />
+          <Text style={[styles.loadingText, { color: isDark ? Colors.dark.subtext : Colors.light.subtext }]}>Loading gallery...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors.light.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: Colors.light.text }]}>Gallery</Text>
-        <Text style={[styles.subtitle, { color: Colors.light.subtext }]}>Explore our collections</Text>
+        <Text style={[styles.title, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Gallery</Text>
+        <Text style={[styles.subtitle, { color: isDark ? Colors.dark.subtext : Colors.light.subtext }]}>Explore our collections</Text>
       </View>
 
       {/* Grid */}
       <FlatList
-        data={ROOM_TYPES}
+        data={roomTypes}
         renderItem={renderRoomCard}
         keyExtractor={(item) => item.slug}
         numColumns={2}
@@ -183,7 +204,7 @@ export default function GalleryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -294,7 +315,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 6,
     borderWidth: 2,
-    borderColor: Colors.light.background,
+    borderColor: isDark ? Colors.dark.background : Colors.light.background,
   },
   moreIndicator: {
     width: 32,
