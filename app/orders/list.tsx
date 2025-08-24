@@ -213,7 +213,8 @@ export default function OrdersScreen() {
 
       if (orderError) throw orderError;
 
-      await sendWhatsAppMessage(vendorIdToUse!);
+      // The newly created order is in order[0]
+      await shareOrderViaWhatsApp(order[0]);
       
       Alert.alert("Success", "Order created successfully!");
       fetchData(); // Refresh data
@@ -227,17 +228,18 @@ export default function OrdersScreen() {
     }
   };
 
-  const sendWhatsAppMessage = async (vendorId: string) => {
-    const vendor = vendors.find(v => v.id === vendorId) || 
-                  (vendorSelectionMode === 'new' ? { name: newVendorForm.name, contact: newVendorForm.contact } : null);
-    
-    if (!vendor) return;
+  const shareOrderViaWhatsApp = async (order: PurchasedOrder) => {
+    const vendor = vendors.find(v => v.id === order.vendor_id);
+    if (!vendor || !vendor.contact) {
+      Alert.alert("Error", "Vendor contact information not available for this order.");
+      return;
+    }
 
-    const materialDetails = selectedRawMaterials
-      .map(m => `${m.name} (${m.order_quantity} ${m.order_unit_type})`)
-      .join(', ');
+    const materialDetails = order.raw_materials
+      ?.map(m => `${m.name} (${m.order_quantity} ${m.order_unit_type})`)
+      .join(', ') || 'No materials listed.';
     
-    const whatsappMessage = `New Order Details:\n\nVendor: ${vendor.name}\nMaterials: ${materialDetails}`;
+    const whatsappMessage = `Order Details (Order ID: ${order.id.slice(-8)}):\n\nVendor: ${vendor.name}\nMaterials: ${materialDetails}\nDate: ${new Date(order.created_at).toLocaleDateString()}`;
     const whatsappUrl = `whatsapp://send?phone=${vendor.contact}&text=${encodeURIComponent(whatsappMessage)}`;
 
     try {
@@ -249,6 +251,7 @@ export default function OrdersScreen() {
       }
     } catch (error) {
       console.error("Error opening WhatsApp:", error);
+      Alert.alert("Error", "Failed to open WhatsApp. Please ensure it is installed.");
     }
   };
 
@@ -278,9 +281,14 @@ export default function OrdersScreen() {
     
     return (
       <View style={styles.itemCard}>
-        <View style={styles.itemHeader}>
+        <View style={styles.orderCardHeader}>
           <Text style={styles.itemTitle}>Order #{item.id.slice(-8)}</Text>
-          <Text style={styles.badge}>{materialCount} items</Text>
+          <View style={styles.orderActions}>
+            <Text style={styles.badge}>{materialCount} items</Text>
+            <TouchableOpacity onPress={() => shareOrderViaWhatsApp(item)} style={styles.shareButton}>
+              <AntDesign name="sharealt" size={20} color="#007bff" />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.itemSubtext}>🏢 {vendor?.name || 'Unknown Vendor'}</Text>
         <Text style={styles.itemSubtext}>
@@ -632,6 +640,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  orderCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  orderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  shareButton: {
+    marginLeft: 10,
+    padding: 5,
   },
   itemTitle: {
     fontSize: 18,
