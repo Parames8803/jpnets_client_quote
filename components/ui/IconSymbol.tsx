@@ -98,6 +98,7 @@ const MAPPING = {
   'square': 'square-foot', // Added mapping for square
   'tag': 'label', // Added mapping for tag
   'eye': 'visibility', // Added mapping for eye
+  'magnifyingglass': 'search', // Added mapping for magnifyingglass
 } as const;
 
 /**

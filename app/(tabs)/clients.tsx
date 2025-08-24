@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Dimensions, FlatList, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as XLSX from 'xlsx';
 import { supabase } from '../../utils/supabaseClient';
 
@@ -22,31 +22,49 @@ export default function ClientsScreen() {
   const isDark = colorScheme === 'dark';
   const [clients, setClients] = useState<Client[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     if (userId) {
-      await fetchClients(userId);
+      await fetchClients(userId, searchQuery);
     }
     setRefreshing(false);
-  }, [userId]);
+  }, [userId, searchQuery]);
 
-  const fetchClients = async (currentUserId: string) => {
+  const fetchClients = async (currentUserId: string, query: string = '') => {
     try {
-      const { data, error } = await supabase
+      let queryBuilder = supabase
         .from('clients')
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (query) {
+        queryBuilder = queryBuilder.ilike('name', `%${query}%`);
+      }
+
+      const { data, error } = await queryBuilder;
 
       if (error) {
         Alert.alert('Error', 'Failed to fetch clients: ' + error.message);
       } else {
         setClients(data || []);
+        setFilteredClients(data || []);
       }
     } catch (error: any) {
       Alert.alert('Error', 'An unexpected error occurred while fetching clients: ' + error.message);
     }
   };
+
+  useEffect(() => {
+    const filtered = clients.filter(client =>
+      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (client.email?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (client.contact_number?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+    );
+    setFilteredClients(filtered);
+  }, [searchQuery, clients]);
 
   const handleDeleteClient = async (clientId: string) => {
     Alert.alert(
@@ -89,7 +107,7 @@ export default function ClientsScreen() {
       if (user) {
         setUserEmail(user.email);
         setUserId(user.id);
-        fetchClients(user.id);
+        fetchClients(user.id, searchQuery);
       } else {
         router.replace('/(auth)/login');
       }
@@ -103,21 +121,21 @@ export default function ClientsScreen() {
       } else if (session.user) {
         setUserEmail(session.user.email);
         setUserId(session.user.id);
-        fetchClients(session.user.id);
+        fetchClients(session.user.id, searchQuery);
       }
     });
 
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, []);
+  }, [searchQuery]);
 
   useFocusEffect(
     useCallback(() => {
       if (userId) {
-        fetchClients(userId);
+        fetchClients(userId, searchQuery);
       }
-    }, [userId])
+    }, [userId, searchQuery])
   );
 
   if (userEmail === undefined || userId === null) {
@@ -336,54 +354,73 @@ export default function ClientsScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: Client }) => (
+  const renderTableHeader = () => (
+    <View style={[styles.tableHeader, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground, borderBottomColor: isDark ? Colors.dark.border : Colors.light.border }]}>
+      <View style={styles.serialColumn}>
+        <Text style={[styles.headerText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>#</Text>
+      </View>
+      <View style={styles.nameColumn}>
+        <Text style={[styles.headerText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Name</Text>
+      </View>
+      <View style={styles.phoneColumn}>
+        <Text style={[styles.headerText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Phone</Text>
+      </View>
+      <View style={styles.actionsColumn}>
+        <Text style={[styles.headerText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Actions</Text>
+      </View>
+    </View>
+  );
+
+  const renderTableRow = ({ item, index }: { item: Client; index: number }) => (
     <TouchableOpacity
       style={[
-        styles.clientCard,
-        { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
-        { borderColor: isDark ? Colors.dark.border : Colors.light.border },
+        styles.tableRow,
+        { 
+          backgroundColor: index % 2 === 0 
+            ? (isDark ? Colors.dark.background : Colors.light.background)
+            : (isDark ? Colors.dark.cardBackground : '#f8f9fa'),
+          borderBottomColor: isDark ? Colors.dark.border : Colors.light.border 
+        }
       ]}
       onPress={() => router.push({ pathname: '/client/[id]', params: { id: item.id } })}
-      activeOpacity={0.7}
+      activeOpacity={0.6}
     >
-      <View style={styles.clientHeader}>
-        <View style={[styles.clientAvatar, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}>
-          <Text style={[styles.avatarText, { color: isDark ? "black" : "white" }]}>
-            {item.name.split(' ').map(word => word[0]).join('').substring(0, 2).toUpperCase()}
-          </Text>
-        </View>
-        <View style={styles.clientInfo}>
-          <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.name}</Text>
-          <Text style={[styles.clientEmail, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{item.email}</Text>
-        </View>
-        <View style={styles.clientActions}>
+      <View style={styles.serialColumn}>
+        <Text style={[styles.serialText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+          {index + 1}
+        </Text>
+      </View>
+      <View style={styles.nameColumn}>
+        <Text style={[styles.nameText, { color: isDark ? Colors.dark.text : Colors.light.text }]} numberOfLines={2}>
+          {item.name}
+        </Text>
+      </View>
+      <View style={styles.phoneColumn}>
+        <Text style={[styles.phoneText, { color: isDark ? Colors.dark.text : Colors.light.text }]} numberOfLines={1}>
+          {item.contact_number}
+        </Text>
+      </View>
+      <View style={styles.actionsColumn}>
+        <View style={styles.actionButtons}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}
+            style={[styles.actionButton, { backgroundColor: isDark ? Colors.dark.background : Colors.light.cardBackground }]}
             onPress={(e) => {
               e.stopPropagation();
               router.push({ pathname: '/edit-client', params: { id: item.id } });
             }}
           >
-            <IconSymbol size={18} name="pencil" color={isDark ? Colors.dark.primary : Colors.light.primary} />
+            <IconSymbol size={14} name="pencil" color={isDark ? Colors.dark.primary : Colors.light.primary} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}
+            style={[styles.actionButton, { backgroundColor: isDark ? Colors.dark.background : Colors.light.cardBackground }]}
             onPress={(e) => {
               e.stopPropagation();
               handleDeleteClient(item.id);
             }}
           >
-            <IconSymbol size={18} name="trash.fill" color={isDark ? Colors.dark.error : Colors.light.error} />
+            <IconSymbol size={14} name="trash.fill" color={isDark ? Colors.dark.error : Colors.light.error} />
           </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.clientDetails}>
-        <Text style={[styles.clientPhone, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.contact_number}</Text>
-        <Text style={[styles.clientAddress, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]} numberOfLines={2}>{item.address}</Text>
-        <Text style={[styles.clientDate, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-          Added {new Date(item.created_at).toLocaleDateString()}
-        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -391,65 +428,96 @@ export default function ClientsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={isDark ? Colors.dark.text : Colors.light.text}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.quickActions}>
+      
+      {/* Header Section */}
+      <View style={styles.headerSection}>
+        <View style={styles.titleRow}>
+          <Text style={[styles.pageTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            Clients ({filteredClients.length})
+          </Text>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}
+            onPress={handleCreateNewClient}
+            activeOpacity={0.8}
+          >
+            <IconSymbol size={20} name="plus" color={isDark ? "black" : "white"} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Search and Actions Row */}
+        <View style={styles.controlsRow}>
+          <View style={[styles.searchContainer, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground, borderColor: isDark ? Colors.dark.border : Colors.light.border }]}>
+            <IconSymbol size={16} name="magnifyingglass" color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
+            <TextInput
+              style={[styles.searchInput, { color: isDark ? Colors.dark.text : Colors.light.text }]}
+              placeholder="Search clients..."
+              placeholderTextColor={isDark ? Colors.dark.secondary : Colors.light.secondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
           <TouchableOpacity
             style={[styles.exportButton, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground, borderColor: isDark ? Colors.dark.border : Colors.light.border }]}
             onPress={handleExportClients}
             activeOpacity={0.8}
           >
-            <IconSymbol size={18} name="square.and.arrow.up.fill" color={isDark ? Colors.dark.text : Colors.light.text} />
-            <Text style={[styles.exportButtonText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Export</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.exportButton, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground, borderColor: isDark ? Colors.dark.border : Colors.light.border }]}
-            onPress={handleCreateNewClient}
-            activeOpacity={0.8}
-          >
-            <IconSymbol size={18} name="plus.circle.fill" color={isDark ? Colors.dark.text : Colors.light.text} />
-            <Text style={[styles.exportButtonText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Add Client</Text>
+            <IconSymbol size={16} name="square.and.arrow.up.fill" color={isDark ? Colors.dark.text : Colors.light.text} />
           </TouchableOpacity>
         </View>
+      </View>
 
-        <View style={styles.clientsSection}>
-          {clients.length > 0 ? (
+      {/* Table Section */}
+      <View style={styles.tableContainer}>
+        {filteredClients.length > 0 ? (
+          <ScrollView
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={isDark ? Colors.dark.text : Colors.light.text}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+          >
+            {renderTableHeader()}
             <FlatList
-              data={clients}
-              renderItem={renderItem}
+              data={filteredClients}
+              renderItem={renderTableRow}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
-          ) : (
+          </ScrollView>
+        ) : (
+          <ScrollView
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={isDark ? Colors.dark.text : Colors.light.text}
+              />
+            }
+            contentContainerStyle={styles.emptyContainer}
+          >
             <View style={styles.emptyState}>
               <View style={[styles.emptyIcon, { borderColor: isDark ? Colors.dark.border : Colors.light.border }]}>
-                <IconSymbol size={48} name="person.crop.circle.badge.plus" color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
+                <IconSymbol size={32} name="person.crop.circle.badge.plus" color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
               </View>
-              <Text style={[styles.emptyTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>No clients yet</Text>
+              <Text style={[styles.emptyTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>No clients found</Text>
               <Text style={[styles.emptyMessage, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-                Start building your client base by adding your first client
+                {searchQuery ? 'Try adjusting your search terms' : 'Add your first client to get started'}
               </Text>
-              <TouchableOpacity
-                style={[styles.emptyAction, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}
-                onPress={handleCreateNewClient}
-              >
-                <Text style={[styles.emptyActionText, { color: isDark ? "black" : "white" }]}>Add Your First Client</Text>
-              </TouchableOpacity>
+              {!searchQuery && (
+                <TouchableOpacity
+                  style={[styles.emptyAction, { backgroundColor: isDark ? Colors.dark.primary : Colors.light.primary }]}
+                  onPress={handleCreateNewClient}
+                >
+                  <Text style={[styles.emptyActionText, { color: isDark ? "black" : "white" }]}>Add First Client</Text>
+                </TouchableOpacity>
+              )}
             </View>
-          )}
-        </View>
-      </ScrollView>
+          </ScrollView>
+        )}
+      </View>
     </View>
   );
 }
@@ -457,12 +525,6 @@ export default function ClientsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 32,
   },
   loadingContainer: {
     flex: 1,
@@ -473,158 +535,159 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  addClientButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  headerSection: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  quickActions: {
+  controlsRow: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
-    marginBottom: 20,
-    marginTop: 10,
+    alignItems: 'center',
     gap: 12,
   },
-  exportButton: {
+  searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 48,
-    borderRadius: 12,
-    paddingHorizontal: 20,
+    height: 40,
+    borderRadius: 8,
     borderWidth: 1,
+    paddingHorizontal: 12,
     gap: 8,
   },
-  exportButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
   },
-  clientsSection: {
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 20,
-    letterSpacing: -0.3,
-  },
-  clientCard: {
-    borderRadius: 16,
-    padding: 20,
+  exportButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     borderWidth: 1,
-    marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  clientHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  clientAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-  },
-  clientInfo: {
+  tableContainer: {
     flex: 1,
+    marginHorizontal: 20,
+    marginBottom: 20,
   },
-  clientName: {
-    fontSize: 18,
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 44,
+    borderBottomWidth: 2,
+    paddingHorizontal: 12,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    borderBottomWidth: 0.5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  serialColumn: {
+    width: 40,
+    alignItems: 'center',
+  },
+  nameColumn: {
+    flex: 2,
+    paddingRight: 12,
+  },
+  phoneColumn: {
+    flex: 1.5,
+    paddingRight: 8,
+  },
+  actionsColumn: {
+    width: 80,
+    alignItems: 'center',
+  },
+  headerText: {
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 2,
   },
-  clientEmail: {
+  serialText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  nameText: {
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  phoneText: {
     fontSize: 14,
     fontWeight: '400',
   },
-  clientActions: {
+  actionButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  clientDetails: {
-    gap: 4,
-    marginTop: 8,
-  },
-  clientPhone: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  clientAddress: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  clientDate: {
-    fontSize: 12,
-    marginTop: 8,
-  },
-  separator: {
-    height: 16,
+  emptyContainer: {
+    flex: 1,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 50,
     paddingHorizontal: 24,
   },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyMessage: {
-    fontSize: 16,
+    fontSize: 14,
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
+    marginBottom: 20,
+    lineHeight: 20,
   },
   emptyAction: {
-    height: 52,
-    borderRadius: 12,
-    paddingHorizontal: 24,
+    height: 44,
+    borderRadius: 8,
+    paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 16,
   },
   emptyActionText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
 });
