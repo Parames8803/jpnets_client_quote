@@ -22,6 +22,7 @@ export const Colors = {
     border: '#e0e0e0', // Added border color for light mode
     cardBackground: '#f8f8f8', // Light mode card background
     buttonBackground: '#e0e0e0', // Light mode button background
+    buttonText: '#fff', // Light mode button text
     error: '#FF3B30', // Light mode error color
     inputBackground: '#FAFAFA', // Light mode input background
     placeholder: '#A0A0A0', // Light mode placeholder text
@@ -51,6 +52,7 @@ export const Colors = {
     border: '#303030', // Added border color for dark mode
     cardBackground: '#1e1e1e', // Dark mode card background
     buttonBackground: '#2a2a2a', // Dark mode button background
+    buttonText: '#fff', // Dark mode button text
     error: '#FF3B30', // Dark mode error color
     inputBackground: '#2a2a2a', // Dark mode input background
     placeholder: '#6b7280', // Dark mode placeholder text

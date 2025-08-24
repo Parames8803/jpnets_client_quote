@@ -17,6 +17,8 @@ import { supabase } from '@/utils/supabaseClient';
 import { RoomType } from '@/types/db';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { RoomTypeModal } from '@/app/settings/components/RoomTypeModal';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -31,27 +33,28 @@ export default function GalleryScreen() {
   const [roomPreviews, setRoomPreviews] = useState<{ [key: string]: string[] }>({});
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [editingRoomType, setEditingRoomType] = useState<RoomType | null>(null); // Will be null for adding new room types
+
+  const fetchRoomTypes = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('room_types').select('*');
+    if (error) {
+      console.error('Error fetching room types:', error);
+      setLoading(false);
+      return [];
+    }
+    setRoomTypes(data || []);
+    setLoading(false);
+    return data as RoomType[];
+  };
 
   useEffect(() => {
-    const fetchSession = async () => {
+    const fetchSessionAndPreviews = async () => {
       const { data } = await supabase.auth.getSession();
       setSession(data.session ?? null);
-    };
 
-    const fetchRoomTypes = async () => {
-      const { data, error } = await supabase.from('room_types').select('*');
-      if (error) {
-        console.error('Error fetching room types:', error);
-        return [];
-      }
-      return data as RoomType[];
-    };
-
-    const fetchPreviews = async () => {
-      await fetchSession();
       const fetchedRoomTypes = await fetchRoomTypes();
-      setRoomTypes(fetchedRoomTypes);
-
       const newPreviews: { [key: string]: string[] } = {};
 
       for (const roomType of fetchedRoomTypes) {
@@ -84,8 +87,13 @@ export default function GalleryScreen() {
       setLoading(false);
     };
 
-    fetchPreviews();
+    fetchSessionAndPreviews();
   }, []);
+
+  const openAddRoomTypeModal = () => {
+    setEditingRoomType(null);
+    setModalVisible(true);
+  };
 
   const role: Role = session?.user?.user_metadata?.role;
   const styles = getStyles(isDark);
@@ -152,7 +160,7 @@ export default function GalleryScreen() {
               showsHorizontalScrollIndicator={false}
               style={styles.miniPreviewContainer}
             >
-              {previews.slice(1, 4).map((url, idx) => (
+              {previews.slice(1, 4).map((url: string, idx: number) => (
                 <Image
                   key={`${url}-${idx}`}
                   source={{ uri: url }}
@@ -199,6 +207,22 @@ export default function GalleryScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         columnWrapperStyle={styles.row}
+      />
+
+      <TouchableOpacity onPress={openAddRoomTypeModal} style={[styles.fab, { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }]}>
+        <IconSymbol name="plus.circle.fill" size={28} color={isDark ? Colors.dark.buttonText : Colors.light.buttonText} />
+      </TouchableOpacity>
+
+      <RoomTypeModal
+        isVisible={isModalVisible}
+        onClose={() => setModalVisible(false)}
+        editingRoomType={editingRoomType}
+        onSave={() => {
+          setModalVisible(false);
+          fetchRoomTypes();
+        }}
+        fetchRoomTypes={fetchRoomTypes}
+        hideProducts={true}
       />
     </SafeAreaView>
   );
@@ -329,5 +353,20 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#64748b',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
