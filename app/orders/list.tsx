@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { DropdownPicker } from '../../components/ui/DropdownPicker'; // Import the new DropdownPicker
 import { supabase } from '../../utils/supabaseClient';
 
 interface ExtendedRawMaterial extends RawMaterial {
@@ -34,6 +35,7 @@ export default function OrdersScreen() {
   // Vendor selection state
   const [vendorSelectionMode, setVendorSelectionMode] = useState<'existing' | 'new'>('existing');
   const [selectedExistingVendor, setSelectedExistingVendor] = useState<string | null>(null);
+  const [isVendorDropdownVisible, setVendorDropdownVisible] = useState(false); // New state for vendor dropdown
   const [newVendorForm, setNewVendorForm] = useState({
     name: "",
     contact: "",
@@ -42,6 +44,7 @@ export default function OrdersScreen() {
   
   // Material selection state
   const [selectedRawMaterials, setSelectedRawMaterials] = useState<ExtendedRawMaterial[]>([]);
+  const [isRawMaterialDropdownVisible, setRawMaterialDropdownVisible] = useState(false); // New state for raw material dropdown
   const [isUnitTypePickerVisible, setUnitTypePickerVisible] = useState(false);
   const [currentMaterialForUnitType, setCurrentMaterialForUnitType] = useState<ExtendedRawMaterial | null>(null);
 
@@ -110,9 +113,28 @@ export default function OrdersScreen() {
 
   const createNewVendor = async (): Promise<string | null> => {
     const { name, contact, address } = newVendorForm;
-    
-    if (!name.trim() || !contact.trim() || !address.trim()) {
-      Alert.alert("Validation Error", "Please fill all vendor details.");
+
+    // Basic validation for name
+    if (!name.trim()) {
+      Alert.alert("Validation Error", "Vendor Name cannot be empty.");
+      return null;
+    }
+
+    // Basic validation for contact (email or phone number)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^\+?[0-9]{7,10}$/; // Simple regex for 7-15 digit phone numbers, optional +
+    if (!contact.trim()) {
+      Alert.alert("Validation Error", "Contact information cannot be empty.");
+      return null;
+    }
+    if (!emailRegex.test(contact.trim()) && !phoneRegex.test(contact.trim())) {
+      Alert.alert("Validation Error", "Please enter a valid email or phone number for contact.");
+      return null;
+    }
+
+    // Basic validation for address
+    if (!address.trim()) {
+      Alert.alert("Validation Error", "Address cannot be empty.");
       return null;
     }
 
@@ -256,25 +278,6 @@ export default function OrdersScreen() {
   };
 
   // Render functions
-  const renderVendorItem = ({ item }: { item: Vendor }) => (
-    <TouchableOpacity
-      style={[
-        styles.itemCard,
-        selectedExistingVendor === item.id && styles.selectedItem
-      ]}
-      onPress={() => setSelectedExistingVendor(item.id)}
-    >
-      <View style={styles.itemHeader}>
-        <Text style={styles.itemTitle}>{item.name}</Text>
-        {selectedExistingVendor === item.id && (
-          <AntDesign name="checkcircle" size={20} color="#007bff" />
-        )}
-      </View>
-      <Text style={styles.itemSubtext}>📞 {item.contact}</Text>
-      <Text style={styles.itemSubtext} numberOfLines={2}>📍 {item.address}</Text>
-    </TouchableOpacity>
-  );
-
   const renderOrderItem = ({ item }: { item: PurchasedOrder }) => {
     const vendor = vendors.find(v => v.id === item.vendor_id);
     const materialCount = item.raw_materials?.length || 0;
@@ -300,24 +303,6 @@ export default function OrdersScreen() {
           </Text>
         )}
       </View>
-    );
-  };
-
-  const renderMaterialItem = (material: RawMaterial) => {
-    const isSelected = selectedRawMaterials.some(m => m.id === material.id);
-    
-    return (
-      <TouchableOpacity
-        key={material.id}
-        style={[styles.materialItem, isSelected && styles.selectedMaterialItem]}
-        onPress={() => toggleRawMaterialSelection(material)}
-      >
-        <View style={styles.materialInfo}>
-          <Text style={styles.materialName}>{material.name}</Text>
-          <Text style={styles.materialUnit}>({material.unit_type})</Text>
-        </View>
-        {isSelected && <AntDesign name="checkcircle" size={20} color="#007bff" />}
-      </TouchableOpacity>
     );
   };
 
@@ -380,7 +365,15 @@ export default function OrdersScreen() {
         <Text style={styles.sectionTitle}>Vendors ({filteredVendors.length})</Text>
         <FlatList
           data={filteredVendors}
-          renderItem={renderVendorItem}
+          renderItem={({ item }) => (
+            <View style={styles.itemCard}>
+              <View style={styles.itemHeader}>
+                <Text style={styles.itemTitle}>{item.name}</Text>
+              </View>
+              <Text style={styles.itemSubtext}>📞 {item.contact}</Text>
+              <Text style={styles.itemSubtext} numberOfLines={2}>📍 {item.address}</Text>
+            </View>
+          )}
           keyExtractor={(item) => item.id}
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -451,14 +444,12 @@ export default function OrdersScreen() {
             {vendorSelectionMode === 'existing' ? (
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Select Vendor</Text>
-                <FlatList
-                  data={vendors}
-                  renderItem={renderVendorItem}
-                  keyExtractor={(item) => item.id}
-                  scrollEnabled={false}
-                  contentContainerStyle={styles.vendorList}
-                  ListEmptyComponent={<Text style={styles.emptyText}>No vendors available</Text>}
-                />
+                <TouchableOpacity style={styles.dropdownButton} onPress={() => setVendorDropdownVisible(true)}>
+                  <Text style={styles.dropdownButtonText}>
+                    {selectedVendor ? selectedVendor.name : "Choose a vendor"}
+                  </Text>
+                  <AntDesign name="caretdown" size={12} color="#666" />
+                </TouchableOpacity>
                 
                 {selectedVendor && (
                   <View style={styles.selectedVendorPreview}>
@@ -498,9 +489,12 @@ export default function OrdersScreen() {
             {/* Raw Materials Selection */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Select Materials</Text>
-              <ScrollView style={styles.materialsList} nestedScrollEnabled>
-                {rawMaterials.map(renderMaterialItem)}
-              </ScrollView>
+              <TouchableOpacity style={styles.dropdownButton} onPress={() => setRawMaterialDropdownVisible(true)}>
+                <Text style={styles.dropdownButtonText}>
+                  {selectedRawMaterials.length > 0 ? `${selectedRawMaterials.length} materials selected` : "Choose raw materials"}
+                </Text>
+                <AntDesign name="caretdown" size={12} color="#666" />
+              </TouchableOpacity>
             </View>
 
             {/* Selected Materials */}
@@ -530,6 +524,45 @@ export default function OrdersScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Vendor Dropdown Picker */}
+      <DropdownPicker
+        isVisible={isVendorDropdownVisible}
+        onClose={() => setVendorDropdownVisible(false)}
+        options={vendors}
+        selectedValues={selectedExistingVendor ? [selectedExistingVendor] : []}
+        onSelect={(vendor) => {
+          setSelectedExistingVendor(vendor.id);
+          setVendorDropdownVisible(false);
+        }}
+        keyExtractor={(item) => item.id}
+        renderItem={(item, isSelected) => (
+          <View style={styles.dropdownItemContent}>
+            <Text style={styles.pickerItemText}>{item.name}</Text>
+            {isSelected && <AntDesign name="checkcircle" size={20} color="#007bff" />}
+          </View>
+        )}
+        title="Select Vendor"
+        multiSelect={false}
+      />
+
+      {/* Raw Material Dropdown Picker */}
+      <DropdownPicker
+        isVisible={isRawMaterialDropdownVisible}
+        onClose={() => setRawMaterialDropdownVisible(false)}
+        options={rawMaterials}
+        selectedValues={selectedRawMaterials.map(m => m.id)}
+        onSelect={(material) => toggleRawMaterialSelection(material)}
+        keyExtractor={(item) => item.id}
+        renderItem={(item, isSelected) => (
+          <View style={styles.dropdownItemContent}>
+            <Text style={styles.pickerItemText}>{item.name} ({item.unit_type})</Text>
+            {isSelected && <AntDesign name="checkcircle" size={20} color="#007bff" />}
+          </View>
+        )}
+        title="Select Raw Materials"
+        multiSelect={true}
+      />
 
       {/* Unit Type Picker Modal */}
       <Modal
@@ -954,5 +987,27 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     fontSize: 16,
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 48,
+    borderColor: '#e1e5e9',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
+  dropdownButtonText: {
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  dropdownItemContent: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });
