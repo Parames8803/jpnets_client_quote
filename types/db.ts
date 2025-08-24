@@ -10,6 +10,7 @@ export interface Client {
   address: string | null; // text, nullable
   latitude: number | null; // numeric, nullable
   longitude: number | null; // numeric, nullable
+  pending_amount?: number | null; // numeric, nullable, added for convenience
 }
 
 // Interface for the 'measurements' table
@@ -39,6 +40,10 @@ export interface Product {
   wages: number | null; // numeric, nullable
   default_wages: number | null; // numeric, nullable
   description: string | null; // text, nullable
+  length_value: number | null; // numeric, nullable, for products with sq.ft unit type
+  length_unit_type: string | null; // text, nullable, for products with sq.ft unit type
+  width_value: number | null; // numeric, nullable, for products with sq.ft unit type
+  width_unit_type: string | null; // text, nullable, for products with sq.ft unit type
 }
 
 // Interface for the 'quotation_rooms' table (junction table)
@@ -53,10 +58,12 @@ export interface QuotationRoom {
 export interface Quotation {
   id: string; // uuid
   created_at: string; // timestamp with time zone
+  quote_id: string; // text, unique identifier for the quotation (e.g., JP001)
   client_id: string | null; // uuid, nullable (references clients.id)
   total_price: number | null; // numeric, nullable
   pdf_url: string | null; // text, nullable
   excel_url: string | null; // text, nullable
+  invoice_generated: boolean | null; // boolean, indicates if an invoice has been generated for this quotation
   assigned_worker_id: string | null; // uuid, nullable (references workers.id)
   status: string | null; // text, nullable (e.g., 'Pending', 'Assigned', 'In Progress', 'Completed')
   clients?: Client | null; // Joined client data
@@ -82,6 +89,7 @@ export interface Room {
   status: string | null; // text, nullable (default 'Not Active')
   ref_image_urls: string[] | null; // text[], nullable
   total_sq_ft: string | null; // text, nullable
+  is_in_closed_quotation?: boolean; // Added to indicate if the room is part of a closed quotation
 }
 
 export const ROOM_STATUS_TYPES = {
@@ -96,10 +104,58 @@ export type RoomStatus = typeof ROOM_STATUS_TYPES[keyof typeof ROOM_STATUS_TYPES
 
 export const QUOTATION_STATUS_TYPES = {
   PENDING: 'Pending',
+  ACTIVE: 'Active', // Added Active status
   CLOSED: 'Closed',
 } as const;
 
 export type QuotationStatus = typeof QUOTATION_STATUS_TYPES[keyof typeof QUOTATION_STATUS_TYPES];
+
+export const LEAD_STATUS_TYPES = {
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  PENDING: 'Pending',
+} as const;
+
+export type LeadStatus = typeof LEAD_STATUS_TYPES[keyof typeof LEAD_STATUS_TYPES];
+
+export interface Lead {
+  id: string; // uuid
+  created_at: string; // timestamp with time zone
+  user_id: string; // uuid (references auth.users.id)
+  name: string; // text
+  contact: string | null; // text, nullable
+  address: string | null; // text, nullable
+  comment: string | null; // text, nullable
+  status: LeadStatus; // 'Approved' | 'Rejected' | 'Pending'
+}
+
+// Interface for the 'raw_materials' table
+export interface RawMaterial {
+  id: string; // uuid
+  created_at: string; // timestamp with time zone
+  name: string; // text
+  category: string; // text
+  subcategories: string[] | null; // text[], nullable
+  quantity: number; // numeric
+  unit_type: string; // text
+}
+
+// Interface for the 'vendors' table
+export interface Vendor {
+  id: string; // uuid, primary key
+  name: string; // text
+  contact: string | null; // text (phone/email), nullable
+  address: string | null; // text, nullable
+  created_at: string; // timestamp with time zone
+}
+
+// Interface for the 'purchased_orders' table
+export interface PurchasedOrder {
+  id: string; // uuid, primary key
+  vendor_id: string; // uuid (foreign key to vendors.id)
+  raw_materials: Array<{ name: string; quantity: number; unit_type: string; order_quantity: number; order_unit_type: string }> | null; // JSONB, array of objects
+  created_at: string; // timestamp with time zone
+}
 
 export interface ProductType {
   name: string;
@@ -109,9 +165,10 @@ export interface ProductType {
   sub_products?: ProductType[];
 }
 
-export const ROOM_TYPES: { name: string; products: ProductType[] }[] = [
-    {
+export const ROOM_TYPES: { name: string; slug: string; products: ProductType[] }[] = [
+  {
     name: 'Living Room',
+    slug: 'living-room',
     products: [
       { name: 'Sofa', default_price: 500, units: ['pcs', 'm'], wages: 50 },
       { name: 'Coffee Table', default_price: 150, units: ['pcs'], wages: 20 },
@@ -120,6 +177,7 @@ export const ROOM_TYPES: { name: string; products: ProductType[] }[] = [
   },
   {
     name: 'Kitchen',
+    slug: 'kitchen',
     products: [
       { name: 'Counter Top Bottom', default_price: 100, units: ['sq.ft', 'm²'], wages: 15,sub_products: [
           {
@@ -147,6 +205,7 @@ export const ROOM_TYPES: { name: string; products: ProductType[] }[] = [
   },
   {
     name: 'Bedroom',
+    slug: 'bedroom',
     products: [
       { name: 'Bed Frame', default_price: 400, units: ['pcs'], wages: 60 },
       {

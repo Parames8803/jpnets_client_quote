@@ -3,11 +3,17 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { StatusUpdateModal } from '@/components/ui/StatusUpdateModal';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { Quotation, QUOTATION_STATUS_TYPES, ROOM_STATUS_TYPES, Room } from '@/types/db';
+import { Client, Quotation, Room, ROOM_STATUS_TYPES, Product } from '@/types/db';
 import { supabase } from '@/utils/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+
+interface QuotationRoomWithRoomAndProducts {
+  room_id: string;
+  quotation_id: string;
+  rooms: (Room & { products: Product[] }) | null;
+}
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +31,11 @@ import {
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
+
+interface ClientGroup {
+  client: Client;
+  rooms: (Room & { quotation: Quotation; products: Product[] })[];
+}
 
 const StatusBadge = ({ status, isDark }: { status: string; isDark: boolean }) => {
   const getStatusColor = (status: string) => {
@@ -55,50 +66,67 @@ const StatusBadge = ({ status, isDark }: { status: string; isDark: boolean }) =>
   );
 };
 
-const QuotationCard = ({ item, isDark, onStatusUpdate }: { 
-  item: Quotation; 
-  isDark: boolean; 
-  onStatusUpdate: (quotation: Quotation, roomId: string) => void; 
+const RoomCard = ({ room, isDark, onStatusUpdate }: {
+  room: Room & { quotation: Quotation; products: Product[] };
+  isDark: boolean;
+  onStatusUpdate: (quotation: Quotation, roomId: string) => void;
 }) => {
   const router = useRouter();
+  const navigateToRoomDetails = (roomId: string) => {
+    router.push({ pathname: '/room/[id]', params: { id: roomId } });
+  };
 
+  const totalWage = useMemo(() => {
+    return (room.products || []).reduce((sum, p) => sum + (p.wages || 0), 0);
+  }, [room.products]);
+
+  return (
+    <View style={[styles.roomCard, { borderTopColor: isDark ? Colors.dark.border : Colors.light.border }]}>
+      <TouchableOpacity onPress={() => navigateToRoomDetails(room.id)}>
+        <View style={styles.roomHeader}>
+          <ThemedText style={styles.roomTitle}>{room.room_type}</ThemedText>
+          <ThemedText style={styles.roomWage}>₹{totalWage.toFixed(2)}</ThemedText>
+          <StatusBadge status={room.status || ''} isDark={isDark} />
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.actionButton} onPress={() => onStatusUpdate(room.quotation, room.id)}>
+        <IconSymbol name="arrow.triangle.2.circlepath" size={18} color="#FFFFFF" />
+        <Text style={styles.actionButtonText}>Update Room Status</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const ClientCard = ({ clientGroup, isDark, onStatusUpdate }: {
+  clientGroup: ClientGroup;
+  isDark: boolean;
+  onStatusUpdate: (quotation: Quotation, roomId: string) => void;
+}) => {
   const openMaps = () => {
-    if (item.clients?.latitude && item.clients?.longitude) {
+    if (clientGroup.client.latitude && clientGroup.client.longitude) {
       const url = Platform.select({
-        ios: `maps:0,0?q=${item.clients.latitude},${item.clients.longitude}`,
-        android: `geo:0,0?q=${item.clients.latitude},${item.clients.longitude}`,
+        ios: `maps:0,0?q=${clientGroup.client.latitude},${clientGroup.client.longitude}`,
+        android: `geo:0,0?q=${clientGroup.client.latitude},${clientGroup.client.longitude}`,
       });
       if (url) Linking.openURL(url);
       else Alert.alert('Error', 'Could not open map application.');
     }
   };
 
-  const navigateToRoomDetails = (roomId: string) => {
-    router.push({ pathname: '/room/[id]', params: { id: roomId } });
-  };
-
   return (
     <View style={[styles.card, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground, borderColor: isDark ? Colors.dark.border : Colors.light.border }]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.quotationIdContainer}>
-          <IconSymbol name="doc.text" size={20} color={isDark ? Colors.dark.primary : Colors.light.primary} />
-          <ThemedText style={styles.quotationId}>#{item.id.slice(-8)}</ThemedText>
-        </View>
-        <StatusBadge status={item.status || 'pending'} isDark={isDark} />
-      </View>
-
       <View style={styles.clientSection}>
         <View style={styles.clientRow}>
           <IconSymbol name="person.circle" size={18} color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
-          <ThemedText style={styles.clientName}>{item.clients?.name || 'Unknown Client'}</ThemedText>
+          <ThemedText style={styles.clientName}>{clientGroup.client.name || 'Unknown Client'}</ThemedText>
         </View>
-        {item.clients?.address && (
+        {clientGroup.client.address && (
           <View style={styles.addressRow}>
             <IconSymbol name="location" size={16} color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
-            <ThemedText style={styles.addressText}>{item.clients.address}</ThemedText>
+            <ThemedText style={styles.addressText}>{clientGroup.client.address}</ThemedText>
           </View>
         )}
-        {item.clients?.latitude && item.clients?.longitude && (
+        {clientGroup.client.latitude && clientGroup.client.longitude && (
           <TouchableOpacity style={styles.coordinatesButton} onPress={openMaps}>
             <LinearGradient colors={isDark ? ['#1F2937', '#374151'] : ['#F3F4F6', '#E5E7EB']} style={styles.coordinatesGradient}>
               <IconSymbol name="map" size={16} color={isDark ? '#10B981' : '#059669'} />
@@ -108,28 +136,15 @@ const QuotationCard = ({ item, isDark, onStatusUpdate }: {
         )}
       </View>
 
-      {item.quotation_rooms?.map((qr, index) => (
-        qr.rooms && (
-          <View key={index} style={[styles.roomSection, { borderTopColor: isDark ? Colors.dark.border : Colors.light.border }]}>
-            <TouchableOpacity onPress={() => navigateToRoomDetails(qr.rooms!.id)}>
-              <View style={styles.roomHeader}>
-                <ThemedText style={styles.roomTitle}>{qr.rooms.room_type}</ThemedText>
-                <StatusBadge status={qr.rooms.status || ''} isDark={isDark} />
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => onStatusUpdate(item, qr.rooms!.id)}>
-              <IconSymbol name="arrow.triangle.2.circlepath" size={18} color="#FFFFFF" />
-              <Text style={styles.actionButtonText}>Update Room Status</Text>
-            </TouchableOpacity>
-          </View>
-        )
+      {clientGroup.rooms.map((room, index) => (
+        <RoomCard key={room.id} room={room} isDark={isDark} onStatusUpdate={onStatusUpdate} />
       ))}
     </View>
   );
 };
 
 export default function WorkerDashboardScreen() {
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [groupedClients, setGroupedClients] = useState<ClientGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [workerId, setWorkerId] = useState<string | null>(null);
   const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
@@ -156,15 +171,33 @@ export default function WorkerDashboardScreen() {
 
   const fetchAssignedQuotations = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('quotations')
-      .select('*, clients(*), quotation_rooms!left(rooms!left(*, products!left(*)))')
-      .eq('assigned_worker_id', workerId)
-      .eq('status', QUOTATION_STATUS_TYPES.CLOSED)
-      .order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('quotations')
+        .select('*, clients(*), quotation_rooms!left(rooms!left(*, products!left(*)))')
+        .eq('assigned_worker_id', workerId)
+        .order('created_at', { ascending: false });
 
-    if (error) Alert.alert('Error fetching assigned quotations', error.message);
-    else setQuotations(data || []);
+    if (error) {
+      Alert.alert('Error fetching assigned quotations', error.message);
+      setGroupedClients([]);
+    } else {
+      const grouped = new Map<string, ClientGroup>();
+      (data || []).forEach(quotation => {
+        if (quotation.clients && quotation.quotation_rooms) {
+          let clientGroup = grouped.get(quotation.clients.id);
+          if (!clientGroup) {
+            clientGroup = { client: quotation.clients, rooms: [] };
+            grouped.set(quotation.clients.id, clientGroup);
+          }
+          quotation.quotation_rooms.forEach((qr: QuotationRoomWithRoomAndProducts) => {
+            if (qr.rooms) {
+              clientGroup!.rooms.push({ ...qr.rooms, quotation: quotation });
+            }
+          });
+        }
+      });
+      setGroupedClients(Array.from(grouped.values()));
+    }
     setLoading(false);
   };
 
@@ -200,8 +233,8 @@ export default function WorkerDashboardScreen() {
     }
   };
 
-  const renderQuotationItem = ({ item }: { item: Quotation }) => (
-    <QuotationCard item={item} isDark={isDark} onStatusUpdate={handleStatusUpdatePress} />
+  const renderClientGroupItem = ({ item }: { item: ClientGroup }) => (
+    <ClientCard clientGroup={item} isDark={isDark} onStatusUpdate={handleStatusUpdatePress} />
   );
 
   const renderEmptyState = () => (
@@ -216,8 +249,8 @@ export default function WorkerDashboardScreen() {
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <ThemedText style={styles.title}>My Quotations</ThemedText>
-      <Text style={[styles.subtitle, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{quotations.length} {quotations.length === 1 ? 'assignment' : 'assignments'}</Text>
+      <ThemedText style={styles.title}>My Assignments</ThemedText>
+      <Text style={[styles.subtitle, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{groupedClients.length} {groupedClients.length === 1 ? 'client' : 'clients'} with assignments</Text>
     </View>
   );
 
@@ -225,19 +258,19 @@ export default function WorkerDashboardScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <FlatList
-        data={quotations}
-        keyExtractor={(item) => item.id}
-        renderItem={renderQuotationItem}
+        data={groupedClients}
+        keyExtractor={(item) => item.client.id}
+        renderItem={renderClientGroupItem}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={!loading ? renderEmptyState : null}
-        contentContainerStyle={[styles.listContent, quotations.length === 0 && !loading && styles.emptyContent]}
+        contentContainerStyle={[styles.listContent, groupedClients.length === 0 && !loading && styles.emptyContent]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAssignedQuotations} tintColor={isDark ? Colors.dark.text : Colors.light.text} />}
         showsVerticalScrollIndicator={false}
       />
-      {loading && quotations.length === 0 && (
+      {loading && groupedClients.length === 0 && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={isDark ? Colors.dark.primary : Colors.light.primary} />
-          <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading quotations...</Text>
+          <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading assignments...</Text>
         </View>
       )}
       <StatusUpdateModal
@@ -274,8 +307,14 @@ const styles = StyleSheet.create({
   coordinatesGradient: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
   coordinatesButtonText: { fontSize: 14, fontWeight: '500', marginLeft: 6 },
   roomSection: { marginTop: 16, paddingTop: 16, borderTopWidth: 1 },
+  roomCard: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
   roomHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   roomTitle: { fontSize: 16, fontWeight: 'bold' },
+  roomWage: { fontSize: 14, fontWeight: '600', color: '#059669', marginLeft: 'auto', marginRight: 8 },
   actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, backgroundColor: "#3B82F6" },
   actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginLeft: 8 },
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, marginTop: 80 },

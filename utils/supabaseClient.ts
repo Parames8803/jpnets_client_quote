@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { getItemAsync, setItemAsync, deleteItemAsync } from 'expo-secure-store';
-import { AppState } from 'react-native';
+import { deleteItemAsync, getItemAsync, setItemAsync } from 'expo-secure-store';
 import 'react-native-url-polyfill/auto';
 
 const ExpoSecureStoreAdapter = {
@@ -26,11 +25,3 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 });
-
-AppState.addEventListener('change', (nextAppState) => {
-  if (nextAppState === 'active') {
-    supabase.auth.startAutoRefresh()
-  } else {
-    supabase.auth.stopAutoRefresh()
-  }
-})

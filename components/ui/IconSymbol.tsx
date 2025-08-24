@@ -53,6 +53,7 @@ const MAPPING = {
   'list.clipboard.fill': 'assignment', // Added mapping for list.clipboard.fill
   'pencil.and.outline': 'edit', // Added mapping for pencil.and.outline
   'dollarsign.circle.fill': 'monetization-on',
+  'dollarsign.square.fill': 'attach-money', // Added mapping for dollarsign.square.fill
   'calendar': 'event',
   'doc.richtext': 'description',
   'table': 'table-chart',
@@ -89,6 +90,14 @@ const MAPPING = {
   'desktopcomputer': 'desktop-windows', // Added mapping for desktopcomputer
   'flag.checkered': 'flag', // Added mapping for flag.checkered
   'map': 'map', // Added mapping for map
+  'gearshape.fill': 'settings', // Added mapping for gearshape.fill
+  'gearshape': 'settings', // Added mapping for gearshape
+  'building.2': 'apartment', // Added mapping for building.2
+  'square.stack.3d.down.forward': 'layers', // Added mapping for square.stack.3d.down.forward
+  'sum': 'functions', // Added mapping for sum
+  'square': 'square-foot', // Added mapping for square
+  'tag': 'label', // Added mapping for tag
+  'eye': 'visibility', // Added mapping for eye
 } as const;
 
 /**

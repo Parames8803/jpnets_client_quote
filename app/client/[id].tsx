@@ -1,15 +1,13 @@
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { IconSymbol, IconSymbolName } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Linking,
-  Modal,
   Platform,
   RefreshControl,
   ScrollView,
@@ -19,538 +17,678 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Client, Quotation, Room } from '../../types/db';
+import { Client, Quotation, QUOTATION_STATUS_TYPES, QuotationStatus, Room } from '../../types/db';
 import { supabase } from '../../utils/supabaseClient';
-
-const { width } = Dimensions.get('window');
-
-const QUOTATION_STATUSES = ['Not Active', 'Active', 'Closed'];
 
 export default function ClientDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+
   const [client, setClient] = useState<Client | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
-  const [selectedQuotationForStatus, setSelectedQuotationForStatus] = useState<Quotation | null>(null);
-  const [newQuotationStatus, setNewQuotationStatus] = useState<string>('');
 
+  // UI state
+  const [roomsOpen, setRoomsOpen] = useState(true);
+  const [quotesOpen, setQuotesOpen] = useState(true);
+  const [batchMode, setBatchMode] = useState<'rooms' | 'quotes' | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Fetch data
   const fetchClientData = async (clientId: string, isRefresh = false) => {
     if (!isRefresh) setLoading(true);
-    
     try {
-      // Fetch client details
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clientId)
-        .single();
-
+      const { data: clientData, error: clientError } = await supabase.from('clients').select('*').eq('id', clientId).single();
       if (clientError) {
         Alert.alert('Error fetching client', clientError.message);
         setClient(null);
       } else {
         setClient(clientData);
       }
-
-      // Fetch rooms for the client
       const { data: roomsData, error: roomsError } = await supabase
         .from('rooms')
         .select('*')
         .eq('client_id', clientId)
         .order('created_at', { ascending: false });
+      setRooms(roomsError ? [] : roomsData || []);
 
-      if (roomsError) {
-        Alert.alert('Error fetching rooms', roomsError.message);
-        setRooms([]);
-      } else {
-        setRooms(roomsData || []);
-      }
-
-      // Fetch quotations for the client
       const { data: quotationsData, error: quotationsError } = await supabase
         .from('quotations')
-        .select('*')
+        .select('*, quotation_rooms(room_id)') // Fetch quotation_rooms to link to rooms
         .eq('client_id', clientId)
         .order('created_at', { ascending: false });
-
-      if (quotationsError) {
-        Alert.alert('Error fetching quotations', quotationsError.message);
-        setQuotations([]);
-      } else {
-        setQuotations(quotationsData || []);
-      }
-
-    } catch (error: any) {
-      Alert.alert('An unexpected error occurred', error.message);
+      setQuotations(quotationsError ? [] : quotationsData || []);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    if (id) {
-      fetchClientData(id as string, true);
-    }
-  };
-
   useEffect(() => {
-    if (id) {
-      fetchClientData(id as string);
-    }
+    if (id) fetchClientData(id as string);
   }, [id]);
 
-  const handleCreateRoom = () => {
-    router.push({ pathname: '/create-room', params: { clientId: client?.id } });
+  const onRefresh = () => {
+    setRefreshing(true);
+    if (id) fetchClientData(id as string, true);
   };
 
-  const handleGenerateQuotation = () => {
-    router.push({ pathname: '/client/generate-quotation', params: { clientId: client?.id } });
-  };
-
-  const handleEditClient = () => {
-    router.push({ pathname: '/edit-client', params: { id: client?.id } });
-  };
+  // Actions
+  const handleCreateRoom = () => router.push({ pathname: '/create-room', params: { clientId: client?.id } });
+  const handleGenerateQuotation = () => router.push({ pathname: '/client/generate-quotation', params: { clientId: client?.id } });
+  const handleEditClient = () => router.push({ pathname: '/edit-client', params: { id: client?.id } });
 
   const handleOpenMap = () => {
-    if (client && client.latitude !== null && client.longitude !== null) {
+    if (client && client.latitude != null && client.longitude != null) {
       const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
       const latLng = `${client.latitude},${client.longitude}`;
-      const label = 'Client Location';
       const url = Platform.select({
-        ios: `${scheme}${label}@${latLng}`,
-        android: `${scheme}${latLng}(${label})`
+        ios: `${scheme}Client Location@${latLng}`,
+        android: `${scheme}${latLng}(Client Location)`,
       });
-
-      if (url) {
-        Linking.openURL(url).catch(err => console.error('An error occurred', err));
-      }
+      if (url) Linking.openURL(url);
     } else {
       Alert.alert('No Location', 'Latitude and Longitude not available.');
     }
   };
 
-  const handleDeleteRoom = (roomId: string) => {
-    Alert.alert(
-      'Delete Room',
-      'Are you sure you want to delete this room?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase.from('rooms').delete().eq('id', roomId);
-            if (error) {
-              Alert.alert('Error deleting room', error.message);
-            } else {
-              Alert.alert('Success', 'Room deleted successfully.');
-              onRefresh();
-            }
-          },
+  const handleDeleteRoom = async (roomId: string) => {
+    Alert.alert('Delete Room', 'Are you sure you want to delete this room?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase.from('rooms').delete().eq('id', roomId);
+          if (error) Alert.alert('Error deleting room', error.message);
+          else onRefresh(); // Auto refresh after deleting
         },
-      ],
-      { cancelable: true }
-    );
+      },
+    ]);
   };
 
-  const handleDeleteQuotation = (quotationId: string) => {
-    Alert.alert(
-      'Delete Quotation',
-      'Are you sure you want to delete this quotation?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            // Simplified deletion logic for clarity
-            const { error } = await supabase.from('quotations').delete().eq('id', quotationId);
-            if (error) {
-              Alert.alert('Error deleting quotation', error.message);
-            } else {
-              Alert.alert('Success', 'Quotation deleted successfully.');
-              onRefresh();
+  const handleDeleteQuotation = async (quotationId: string) => {
+    Alert.alert('Delete Quotation', 'Are you sure you want to delete this quotation?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          // Fetch associated room IDs
+          const { data: quotationRooms, error: fetchError } = await supabase
+            .from('quotation_rooms')
+            .select('room_id')
+            .eq('quotation_id', quotationId);
+
+          if (fetchError) {
+            Alert.alert('Error fetching quotation rooms', fetchError.message);
+            return;
+          }
+
+          // Update room statuses to 'Active'
+          if (quotationRooms && quotationRooms.length > 0) {
+            const roomIdsToUpdate = quotationRooms.map(qr => qr.room_id);
+            const { error: updateError } = await supabase
+              .from('rooms')
+              .update({ status: QUOTATION_STATUS_TYPES.ACTIVE })
+              .in('id', roomIdsToUpdate);
+
+            if (updateError) {
+              Alert.alert('Error updating room statuses', updateError.message);
+              return;
             }
-          },
+          }
+
+          const { error } = await supabase.from('quotations').delete().eq('id', quotationId);
+          if (error) Alert.alert('Error deleting quotation', error.message);
+          else onRefresh(); // Auto refresh after deleting
         },
-      ],
-      { cancelable: true }
-    );
+      },
+    ]);
   };
 
-  const handleUpdateQuotationStatus = async () => {
-    if (!selectedQuotationForStatus || !newQuotationStatus) return;
-
-    const { error } = await supabase
-      .from('quotations')
-      .update({ status: newQuotationStatus })
-      .eq('id', selectedQuotationForStatus.id);
-
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
-      Alert.alert('Success', 'Status updated.');
-      setIsStatusModalVisible(false);
-      onRefresh();
-    }
+  // Batch operations
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
   };
 
-  const getStatusStyle = (status: string) => {
-    const styles: { [key: string]: any } = {
-      'Not Active': {
-        backgroundColor: isDark ? '#4A5568' : '#E2E8F0',
-        textColor: isDark ? '#E2E8F0' : '#4A5568',
-      },
-      'Active': {
-        backgroundColor: isDark ? '#2F855A' : '#C6F6D5',
-        textColor: isDark ? '#C6F6D5' : '#2F855A',
-      },
-      'Closed': {
-        backgroundColor: isDark ? '#C53030' : '#FED7D7',
-        textColor: isDark ? '#FED7D7' : '#C53030',
-      },
-    };
-    return styles[status] || styles['Not Active'];
+  const clearBatch = () => {
+    setBatchMode(null);
+    setSelectedIds(new Set());
   };
 
-  const renderRoomItem = ({ item }: { item: Room }) => (
-    <TouchableOpacity
-      style={[styles.listItem, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}
-      onPress={() => router.push({ pathname: '/room/[id]', params: { id: item.id } })}
-    >
-      <View>
-        <Text style={[styles.listItemTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.room_type}</Text>
-        <Text style={[styles.listItemSubtitle, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
-          {item.description || 'No description'}
-        </Text>
-      </View>
-      <TouchableOpacity onPress={() => handleDeleteRoom(item.id)} style={styles.deleteButton}>
-        <Text style={{ color: Colors.light.red, fontSize: 18 }}>✕</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
+  const performBatchDelete = async () => {
+    if (!batchMode || selectedIds.size === 0) return;
+    Alert.alert('Delete selected', `Delete ${selectedIds.size} ${batchMode === 'rooms' ? 'room(s)' : 'quotation(s)'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          if (batchMode === 'rooms') {
+            const { error } = await supabase.from('rooms').delete().in('id', Array.from(selectedIds));
+            if (error) Alert.alert('Error', error.message);
+          } else {
+            // Batch delete for quotations
+            const quotationIdsToDelete = Array.from(selectedIds);
+
+            // Fetch associated room IDs for all quotations being deleted
+            const { data: quotationRooms, error: fetchError } = await supabase
+              .from('quotation_rooms')
+              .select('room_id')
+              .in('quotation_id', quotationIdsToDelete);
+
+            if (fetchError) {
+              Alert.alert('Error fetching quotation rooms for batch delete', fetchError.message);
+              return;
+            }
+
+            // Update room statuses to 'Active'
+            if (quotationRooms && quotationRooms.length > 0) {
+              const roomIdsToUpdate = Array.from(new Set(quotationRooms.map(qr => qr.room_id))); // Use Set to avoid duplicate room updates
+              const { error: updateError } = await supabase
+                .from('rooms')
+                .update({ status: QUOTATION_STATUS_TYPES.ACTIVE })
+                .in('id', roomIdsToUpdate);
+
+              if (updateError) {
+                Alert.alert('Error updating room statuses for batch delete', updateError.message);
+                return;
+              }
+            }
+
+            const { error } = await supabase.from('quotations').delete().in('id', quotationIdsToDelete);
+            if (error) Alert.alert('Error', error.message);
+          }
+          clearBatch();
+          onRefresh();
+        },
+      },
+    ]);
+  };
+
+  // Inline status update (no modal)
+  const cycleStatus = (current?: string | null): QuotationStatus => {
+    const statuses = Object.values(QUOTATION_STATUS_TYPES) as QuotationStatus[];
+    const idx = Math.max(0, statuses.indexOf((current as QuotationStatus) || statuses[0]));
+    const next = statuses[(idx + 1) % statuses.length];
+    return next;
+  };
+
+  const updateQuotationStatusInline = async (q: Quotation) => {
+    const next = cycleStatus(q.status as string);
+    const { error } = await supabase.from('quotations').update({ status: next }).eq('id', q.id);
+    if (error) Alert.alert('Error', error.message);
+    else onRefresh();
+  };
+
+  // Derived
+  const totalValue = useMemo(
+    () => quotations.reduce((sum, q) => sum + (q.total_price || 0), 0),
+    [quotations]
   );
+  const activeQuotes = useMemo(() => quotations.filter(q => q.status === 'Active').length, [quotations]);
 
-  const renderQuotationItem = ({ item }: { item: Quotation }) => {
-    const statusStyle = getStatusStyle(item.status || 'Not Active');
+  const roomsInClosedQuotationsIds = useMemo(() => {
+    const ids = new Set<string>();
+    quotations.forEach(q => {
+      if (q.status === 'Closed' && q.quotation_rooms) {
+        q.quotation_rooms.forEach((qr: any) => { // Cast to any for now, will refine type later if needed
+          if (qr.room_id) {
+            ids.add(qr.room_id);
+          }
+        });
+      }
+    });
+    return ids;
+  }, [quotations]);
+
+  const selectedRoomsInClosedQuotations = useMemo(() => {
+    if (batchMode !== 'rooms') return false;
+    for (const roomId of selectedIds) {
+      if (roomsInClosedQuotationsIds.has(roomId)) {
+        return true;
+      }
+    }
+    return false;
+  }, [selectedIds, roomsInClosedQuotationsIds, batchMode]);
+
+  const selectedQuotesAreClosed = useMemo(() => {
+    if (batchMode !== 'quotes') return false;
+    for (const quoteId of selectedIds) {
+      const quote = quotations.find(q => q.id === quoteId);
+      if (quote && quote.status === 'Closed') {
+        return true;
+      }
+    }
+    return false;
+  }, [selectedIds, quotations, batchMode]);
+
+  const statusStyle = (status: string | null | undefined) => {
+    const map: Record<string, { bg: string; text: string; border: string }> = isDark
+      ? {
+          'Not Active': { bg: '#1F2937', text: '#9CA3AF', border: '#374151' },
+          Active: { bg: '#064E3B', text: '#34D399', border: '#065F46' },
+          Closed: { bg: '#3F1D1D', text: '#F87171', border: '#7F1D1D' },
+          Pending: { bg: '#1E3A8A', text: '#93C5FD', border: '#1D4ED8' }, // Added Pending status for dark mode
+        }
+      : {
+          'Not Active': { bg: '#F3F4F6', text: '#6B7280', border: '#E5E7EB' },
+          Active: { bg: '#ECFDF5', text: '#059669', border: '#A7F3D0' },
+          Closed: { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' },
+          Pending: { bg: '#DBEAFE', text: '#2563EB', border: '#93C5FD' }, // Added Pending status for light mode
+        };
+    // Ensure a valid style is always returned, defaulting to 'Not Active' if status is unexpected
+    return map[status || 'Not Active'] || map['Not Active'];
+  };
+
+  // Renderers
+  const RoomRow = ({ item }: { item: Room }) => {
+    const selected = selectedIds.has(item.id);
     return (
       <TouchableOpacity
-        style={[styles.listItem, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}
-        onPress={() => router.push({ pathname: '/quotation/[id]', params: { id: item.id } })}
+        style={[
+          styles.row,
+          { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
+          selected && { borderColor: '#6366F1', borderWidth: 2 },
+        ]}
+        onPress={() => (batchMode === 'rooms' ? toggleSelect(item.id) : router.push({ pathname: '/room/[id]', params: { id: item.id } }))}
+        onLongPress={() => {
+          setBatchMode('rooms');
+          toggleSelect(item.id);
+        }}
+        delayLongPress={220}
       >
-        <View>
-          <Text style={[styles.listItemTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Quotation #{item.id.substring(0, 6)}</Text>
-          <Text style={[styles.listItemPrice, { color: isDark ? Colors.dark.primary : Colors.light.primary }]}>
-            ${item.total_price?.toFixed(2)}
-          </Text>
+        <View style={styles.rowLeft}>
+          <IconSymbol name="building.2" size={20} color={isDark ? '#93C5FD' : '#2563EB'} />
+          <View style={styles.rowInfo}>
+            <Text style={[styles.rowTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.room_type}</Text>
+            <Text style={[styles.rowSub, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]} numberOfLines={1}>
+              {item.description || 'No description'}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity
-          style={[styles.statusBadge, { backgroundColor: statusStyle.backgroundColor }]}
-          onPress={() => {
-            setSelectedQuotationForStatus(item);
-            setNewQuotationStatus(item.status || 'Not Active');
-            setIsStatusModalVisible(true);
-          }}
-        >
-          <Text style={[styles.statusText, { color: statusStyle.textColor }]}>{item.status}</Text>
-        </TouchableOpacity>
+        {batchMode !== 'rooms' ? (
+          <TouchableOpacity
+            onPress={() => handleDeleteRoom(item.id)}
+            disabled={roomsInClosedQuotationsIds.has(item.id)}
+            style={roomsInClosedQuotationsIds.has(item.id) && { opacity: 0.4 }}
+          >
+            <IconSymbol name="trash.fill" size={16} color={isDark ? '#FCA5A5' : '#DC2626'} />
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.checkbox, selected && styles.checkboxChecked]} />
+        )}
       </TouchableOpacity>
     );
   };
-  
+
+  const QuoteRow = ({ item }: { item: Quotation }) => {
+    const selected = selectedIds.has(item.id);
+    const st = statusStyle(item.status);
+    return (
+      <TouchableOpacity
+        style={[
+          styles.row,
+          { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
+          selected && { borderColor: '#6366F1', borderWidth: 2 },
+        ]}
+        onPress={() => (batchMode === 'quotes' ? toggleSelect(item.id) : router.push({ pathname: '/quotation/[id]', params: { id: item.id } }))}
+        onLongPress={() => {
+          setBatchMode('quotes');
+          toggleSelect(item.id);
+        }}
+        delayLongPress={220}
+      >
+        <View style={styles.rowLeft}>
+          <IconSymbol name="doc.text" size={20} color={isDark ? '#86EFAC' : '#059669'} />
+          <View style={styles.rowInfo}>
+            <Text style={[styles.rowTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              Quote #{item.quote_id || 'N/A'}
+            </Text>
+            <Text style={[styles.rowSub, { color: isDark ? Colors.dark.secondaryText : Colors.light.secondaryText }]}>
+              ${(item.total_price || 0).toFixed(2)}
+            </Text>
+          </View>
+        </View>
+
+        {batchMode !== 'quotes' ? (
+          <View style={styles.rowRight}>
+            <TouchableOpacity
+              style={[styles.statusChip, { backgroundColor: st.bg, borderColor: st.border }]}
+              // onPress={() => item.status !== 'Closed' && updateQuotationStatusInline(item)}
+              // disabled={item.status === 'Closed'}
+            >
+              <Text style={[styles.statusChipText, { color: st.text }]}>{item.status || 'Not Active'}</Text>
+            </TouchableOpacity>
+            {item.status !== 'Closed' && (
+              <TouchableOpacity onPress={() => handleDeleteQuotation(item.id)} hitSlop={10}>
+                <IconSymbol name="trash.fill" size={16} color={isDark ? '#FCA5A5' : '#DC2626'} />
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <View style={[styles.checkbox, selected && styles.checkboxChecked]} />
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+      <View style={[styles.center, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
         <ActivityIndicator size="large" color={isDark ? Colors.dark.primary : Colors.light.primary} />
-        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading Client...</Text>
+        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading client…</Text>
       </View>
     );
   }
 
   if (!client) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+      <View style={[styles.center, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
         <Text style={{ color: isDark ? Colors.dark.text : Colors.light.text }}>Client not found.</Text>
       </View>
     );
   }
 
-  const totalValue = quotations.reduce((sum, q) => sum + (q.total_price || 0), 0);
-
   return (
-    <View style={{ flex: 1, backgroundColor: isDark ? Colors.dark.background : Colors.light.background }}>
+    <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+      {/* Sticky Action Bar */}
+      <View style={[styles.actionBar, { backgroundColor: isDark ? '#0B1220' : '#FFFFFF', borderColor: isDark ? '#1F2937' : '#E5E7EB' }]}>
+        <Text style={[styles.clientTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]} numberOfLines={1}>
+          {client.name}
+        </Text>
+        <View style={styles.actionGroup}>
+          <ActionBtn icon="pencil" label="Edit" onPress={handleEditClient} />
+          <ActionBtn icon="plus" label="Room" onPress={handleCreateRoom} />
+          <ActionBtn icon="plus" label="Quote" onPress={handleGenerateQuotation} />
+          <ActionBtn icon="location" label="Map" onPress={handleOpenMap} disabled={client.latitude == null || client.longitude == null} />
+        </View>
+      </View>
+
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: 72, paddingBottom: 24 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <Text style={styles.clientName}>{client.name}</Text>
-            <Text style={styles.clientContact}>{client.email}</Text>
-            <TouchableOpacity onPress={handleEditClient} style={styles.editButton}>
-              <Text style={styles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        <View style={styles.statsContainer}>
-          <View style={[styles.statCard, { backgroundColor: isDark ? '#3E4C59' : '#EBF4FF' }]}>
-            <Text style={[styles.statNumber, { color: isDark ? '#BEE3F8' : '#3182CE' }]}>{rooms.length}</Text>
-            <Text style={[styles.statLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>Rooms</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: isDark ? '#4A5568' : '#F0FFF4' }]}>
-            <Text style={[styles.statNumber, { color: isDark ? '#9AE6B4' : '#38A169' }]}>{quotations.length}</Text>
-            <Text style={[styles.statLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>Quotes</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: isDark ? '#5A6778' : '#FFFAF0' }]}>
-            <Text style={[styles.statNumber, { color: isDark ? '#F6E05E' : '#D69E2E' }]}>${totalValue.toFixed(0)}</Text>
-            <Text style={[styles.statLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>Total Value</Text>
-          </View>
+        {/* Summary */}
+        <View style={styles.summaryRow}>
+          <SummaryCard title="Rooms" value={rooms.length.toString()} color={isDark ? '#93C5FD' : '#2563EB'} />
+          <SummaryCard title="Quotes" value={quotations.length.toString()} color={isDark ? '#86EFAC' : '#059669'} />
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Rooms</Text>
-          {rooms.length > 0 ? (
-            <FlatList data={rooms} renderItem={renderRoomItem} keyExtractor={item => item.id} scrollEnabled={false} />
-          ) : (
-            <Text style={styles.emptyText}>No rooms yet. Add one to get started.</Text>
-          )}
-          <TouchableOpacity style={styles.addButton} onPress={handleCreateRoom}>
-            <Text style={styles.addButtonText}>+ Add Room</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Quotations</Text>
-          {quotations.length > 0 ? (
-            <FlatList data={quotations} renderItem={renderQuotationItem} keyExtractor={item => item.id} scrollEnabled={false} />
-          ) : (
-            <Text style={styles.emptyText}>No quotations available.</Text>
-          )}
-          <TouchableOpacity style={styles.addButton} onPress={handleGenerateQuotation}>
-            <Text style={styles.addButtonText}>+ Generate Quotation</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-
-      {isStatusModalVisible && (
-        <Modal
-          visible={isStatusModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setIsStatusModalVisible(false)}
+        {/* Rooms */}
+        <CollapsibleSection
+          title={`Rooms (${rooms.length})`}
+          open={roomsOpen}
+          onToggle={() => setRoomsOpen(v => !v)}
+          batchActive={batchMode === 'rooms'}
+          onBatchToggle={() => {
+            setSelectedIds(new Set());
+            setBatchMode(batchMode === 'rooms' ? null : 'rooms');
+          }}
         >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
-              <TouchableOpacity onPress={() => setIsStatusModalVisible(false)} style={styles.closeButton}>
-                          <IconSymbol name="xmark" size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
-                        </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Update Status</Text>
-              <View style={styles.statusOptionsContainer}>
-                {QUOTATION_STATUSES.map(status => (
-                  <TouchableOpacity
-                    key={status}
-                    style={[
-                      styles.statusOption,
-                      {
-                        backgroundColor: newQuotationStatus === status ? (isDark ? Colors.dark.primary : Colors.light.primary) : 'transparent',
-                        borderColor: isDark ? Colors.dark.border : Colors.light.border,
-                      },
-                    ]}
-                    onPress={() => setNewQuotationStatus(status)}
-                  >
-                    <Text style={{ color: newQuotationStatus === status ? '#FFF' : (isDark ? Colors.dark.text : Colors.light.text) }}>{status}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TouchableOpacity style={styles.saveButton} onPress={handleUpdateQuotationStatus}>
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      )}
+          {rooms.length ? (
+            <FlatList
+              data={rooms}
+              keyExtractor={i => i.id}
+              renderItem={RoomRow}
+              scrollEnabled={false}
+              ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            />
+          ) : (
+            <Empty label="No rooms yet" hint="Add the first room for this client." />
+          )}
+          {batchMode === 'rooms' && selectedIds.size > 0 && (
+            <BatchBar
+              count={selectedIds.size}
+              onDelete={performBatchDelete}
+              onCancel={clearBatch}
+              disableDelete={selectedRoomsInClosedQuotations}
+            />
+          )}
+        </CollapsibleSection>
+
+        {/* Quotations */}
+        <CollapsibleSection
+          title={`Quotations (${quotations.length})`}
+          open={quotesOpen}
+          onToggle={() => setQuotesOpen(v => !v)}
+          batchActive={batchMode === 'quotes'}
+          onBatchToggle={() => {
+            setSelectedIds(new Set());
+            setBatchMode(batchMode === 'quotes' ? null : 'quotes');
+          }}
+        >
+          {quotations.length ? (
+            <FlatList
+              data={quotations}
+              keyExtractor={i => i.id}
+              renderItem={QuoteRow}
+              scrollEnabled={false}
+              ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            />
+          ) : (
+            <Empty label="No quotations" hint="Generate the first quote to get started." />
+          )}
+          {batchMode === 'quotes' && selectedIds.size > 0 && (
+            <BatchBar
+              count={selectedIds.size}
+              onDelete={performBatchDelete}
+              onCancel={clearBatch}
+              disableDelete={selectedQuotesAreClosed}
+            />
+          )}
+        </CollapsibleSection>
+      </ScrollView>
     </View>
   );
 }
 
+/* ----- Reusable UI components ----- */
+
+function ActionBtn({ icon, label, onPress, disabled }: { icon: IconSymbolName; label: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <TouchableOpacity onPress={onPress} disabled={disabled} style={[styles.actionBtn, disabled && { opacity: 0.4 }]}>
+      <IconSymbol name={icon} size={16} color="#6366F1" />
+      <Text style={styles.actionBtnText}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function SummaryCard({ title, value, color }: { title: string; value: string; color: string }) {
+  return (
+    <View style={[styles.summaryCard, { borderColor: color }]}>
+      <Text style={styles.summaryValue}>{value}</Text>
+      <Text style={styles.summaryLabel}>{title}</Text>
+    </View>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  open,
+  onToggle,
+  children,
+  batchActive,
+  onBatchToggle,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  batchActive?: boolean;
+  onBatchToggle?: () => void;
+}) {
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionBar}>
+        <TouchableOpacity onPress={onToggle} style={styles.sectionTitleWrap}>
+          <IconSymbol name={open ? 'chevron.down' : 'chevron.right'} size={14} color="#6B7280" />
+          <Text style={styles.sectionTitle}>{title}</Text>
+        </TouchableOpacity>
+        {onBatchToggle && (
+          <TouchableOpacity onPress={onBatchToggle} style={styles.batchToggle}>
+            <IconSymbol name="square.stack.3d.down.forward" size={16} color={batchActive ? '#6366F1' : '#6B7280'} />
+            <Text style={[styles.batchToggleText, batchActive && { color: '#6366F1' }]}>
+              {batchActive ? 'Done' : 'Select'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      {open && <View style={{ marginTop: 10 }}>{children}</View>}
+    </View>
+  );
+}
+
+function Empty({ label, hint }: { label: string; hint: string }) {
+  return (
+    <View style={styles.empty}>
+      <Text style={styles.emptyTitle}>{label}</Text>
+      <Text style={styles.emptyHint}>{hint}</Text>
+    </View>
+  );
+}
+
+function BatchBar({ count, onDelete, onCancel, disableDelete }: { count: number; onDelete: () => void; onCancel: () => void; disableDelete?: boolean }) {
+  return (
+    <View style={styles.batchBar}>
+      <Text style={styles.batchText}>{count} selected</Text>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <TouchableOpacity onPress={onDelete} style={[styles.batchBtn, { backgroundColor: '#DC2626' }, disableDelete && { opacity: 0.4 }]} disabled={disableDelete}>
+          <IconSymbol name="trash.fill" size={14} color="#fff" />
+          <Text style={styles.batchBtnText}>Delete</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onCancel} style={[styles.batchBtn, { backgroundColor: '#374151' }]}>
+          <IconSymbol name="xmark" size={14} color="#fff" />
+          <Text style={styles.batchBtnText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+/* ----- Styles ----- */
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-  },
-  header: {
-    backgroundColor: '#3182CE',
-    padding: 20,
-    paddingTop: 50,
-  },
-  headerContent: {
-    alignItems: 'center',
-  },
-  clientName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  clientContact: {
-    fontSize: 16,
-    color: '#EBF4FF',
-    marginTop: 4,
-  },
-  editButton: {
-    margin: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 15,
-    paddingVertical: 5,
-    borderRadius: 15,
-  },
-  editButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 10,
-    marginTop: -30,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 15,
-    borderRadius: 10,
-    marginHorizontal: 5,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  statNumber: {
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  section: {
-    margin: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  listItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-  },
-  listItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  listItemSubtitle: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  listItemPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
-  deleteButton: {
-    padding: 5,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#A0AEC0',
-    marginTop: 20,
-  },
-  addButton: {
-    backgroundColor: '#3182CE',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  addButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  modalContent: {
-    width: '80%',
-    padding: 20,
-    borderRadius: 10,
-  },
-  closeButton: {
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  loadingText: { marginTop: 12, fontSize: 16, fontWeight: '500' },
+
+  actionBar: {
     position: 'absolute',
-    top: 24,
-    right: 24,
-    zIndex: 1,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  statusOptionsContainer: {
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    zIndex: 10,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
+    alignItems: 'center',
+    gap: 8,
   },
-  statusOption: {
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
+  clientTitle: { flex: 1, fontSize: 16, fontWeight: '700' },
+  actionGroup: { flexDirection: 'row', gap: 10 },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(99,102,241,0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
-  saveButton: {
-    backgroundColor: '#3182CE',
-    padding: 15,
-    borderRadius: 8,
+  actionBtnText: { color: '#6366F1', fontWeight: '700', fontSize: 12 },
+
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 12,
+    marginTop: 12,
+  },
+  summaryCard: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  saveButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
+  summaryValue: { fontSize: 18, fontWeight: '800' },
+  summaryLabel: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+
+  section: { paddingHorizontal: 12, marginTop: 18 },
+  sectionBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  batchToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  batchToggleText: { color: '#6B7280', fontWeight: '700', fontSize: 12 },
+
+  row: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  rowInfo: { flex: 1 },
+  rowTitle: { fontSize: 15, fontWeight: '700' },
+  rowSub: { fontSize: 12 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+
+  statusChip: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  statusChipText: { fontSize: 12, fontWeight: '800' },
+
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#6366F1',
+  },
+  checkboxChecked: {
+    backgroundColor: '#6366F1',
+  },
+
+  empty: { paddingVertical: 20, alignItems: 'center' },
+  emptyTitle: { fontSize: 14, fontWeight: '700' },
+  emptyHint: { fontSize: 12, color: '#6B7280', marginTop: 4, textAlign: 'center' },
+
+  batchBar: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(99,102,241,0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  batchText: { fontWeight: '800' },
+  batchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  batchBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
 });

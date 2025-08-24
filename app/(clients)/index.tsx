@@ -5,6 +5,7 @@ import {
   Alert,
   Dimensions,
   FlatList,
+  Image,
   RefreshControl,
   StatusBar,
   StyleSheet,
@@ -156,6 +157,12 @@ export default function HomeScreen() {
     <View style={[styles.headerContainer, { backgroundColor: isDark ? '#000' : '#FFF' }]}>
       {/* Main Header */}
       <View style={styles.mainHeader}>
+        <TouchableOpacity onPress={() => router.replace('/landing')} style={styles.logoButton}>
+          <Image
+            source={require('../../assets/images/jp_logo.png')}
+            style={styles.logo}
+          />
+        </TouchableOpacity>
         <View style={styles.headerLeft}>
           <Text style={[styles.greeting, { color: isDark ? '#CCC' : '#666' }]}>
             {getTimeBasedGreeting()}
@@ -515,5 +522,13 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  logoButton: {
+    marginRight: 10,
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    resizeMode: 'contain',
   },
 });

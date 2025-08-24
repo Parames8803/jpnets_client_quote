@@ -229,7 +229,7 @@ export default function WorkersScreen() {
             <IconSymbol name="doc.text" size={32} color="#FF6B6B" />
           </View>
           <View style={styles.quotationDetails}>
-            <ThemedText style={[styles.quotationId, themedStyles.text]}>#{item.id.slice(0, 8)}</ThemedText>
+            <ThemedText style={[styles.quotationId, themedStyles.text]}>#{item.quote_id}</ThemedText>
             <ThemedText style={[styles.clientName, themedStyles.subtext]}>{item.clients?.name || 'N/A'}</ThemedText>
           </View>
         </View>
@@ -464,7 +464,7 @@ export default function WorkersScreen() {
               {selectedQuotation && (
                 <View style={[styles.quotationSummary, { backgroundColor: isDark ? '#1e40af' : '#F0F8FF' }]}>
                   <ThemedText style={[styles.summaryTitle, { color: isDark ? '#93c5fd' : '#4A90E2' }]}>Quotation Details</ThemedText>
-                  <ThemedText style={[styles.summaryText, themedStyles.text]}>ID: #{selectedQuotation.id.slice(0, 8)}</ThemedText>
+                  <ThemedText style={[styles.summaryText, themedStyles.text]}>ID: #{selectedQuotation.quote_id}</ThemedText>
                   <ThemedText style={[styles.summaryText, themedStyles.text]}>Client: {selectedQuotation.clients?.name || 'N/A'}</ThemedText>
                   <ThemedText style={[styles.summaryText, themedStyles.text]}>Amount: ${selectedQuotation.total_price?.toFixed(2) || '0.00'}</ThemedText>
                 </View>

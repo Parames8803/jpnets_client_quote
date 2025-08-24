@@ -9,6 +9,7 @@ const tintColorDark = '#fff';
 export const Colors = {
   light: {
     text: '#11181C',
+    subtext: '#6B7280', // Added subtext for light mode
     background: '#fff',
     backgroundColor: '#fff',
     tint: tintColorLight,
@@ -37,6 +38,7 @@ export const Colors = {
   },
   dark: {
     text: '#ECEDEE',
+    subtext: '#9CA3AF', // Added subtext for dark mode
     background: '#151718',
     backgroundColor: '#151718',
     tint: tintColorDark,

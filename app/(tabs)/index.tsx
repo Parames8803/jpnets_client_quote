@@ -1,329 +1,256 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Dimensions, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { supabase } from '../../utils/supabaseClient';
+import { Colors } from "@/constants/Colors";
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+  Dimensions,
+  Image,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
-
-import { Client } from '../../types/db';
-
-const { width } = Dimensions.get('window');
-
-// A placeholder for client data statistics.
-// In a real app, these would be fetched from the database.
-const clientStats = [
-  { id: '1', label: 'Total Clients', icon: 'person.fill', color: '#3B82F6', value: 0 },
-  { id: '2', label: 'Active Projects', icon: 'list.clipboard.fill', color: '#10B981', value: 25 },
-  { id: '3', label: 'Pending Quotes', icon: 'pencil.and.outline', color: '#F59E0B', value: 12 },
-  { id: '4', label: 'Completed', icon: 'checkmark.circle.fill', color: '#6366F1', value: 100 },
-];
+const { width } = Dimensions.get("window");
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState<string | undefined>(undefined);
-  const [userId, setUserId] = useState<string | null>(null);
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const [clients, setClients] = useState<Client[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
+  const isDark = colorScheme === "dark";
 
-  // Update the stats with the actual total number of clients
-  const updatedStats = clientStats.map(stat =>
-    stat.id === '1' ? { ...stat, value: clients.length } : stat
-  ) as typeof clientStats;
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    if (userId) {
-      await fetchClients(userId);
-    }
-    setRefreshing(false);
-  }, [userId]);
-
-  const fetchClients = async (currentUserId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('created_by', currentUserId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        Alert.alert('Error', 'Failed to fetch clients: ' + error.message);
-      } else {
-        setClients(data || []);
-      }
-    } catch (error: any) {
-      Alert.alert('Error', 'An unexpected error occurred while fetching clients: ' + error.message);
-    }
-  };
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
 
   useEffect(() => {
-    const checkUserAndFetchClients = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email);
-        setUserId(user.id);
-        fetchClients(user.id);
-      } else {
-        router.replace('/(auth)/login');
-      }
-    };
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
 
-    checkUserAndFetchClients();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        router.replace('/(auth)/login');
-      } else if (session.user) {
-        setUserEmail(session.user.email);
-        setUserId(session.user.id);
-        fetchClients(session.user.id);
-      }
-    });
-
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
+    return () => clearInterval(timer);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (userId) {
-        fetchClients(userId);
-      }
-    }, [userId])
-  );
+  const formattedDate = currentDateTime.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  
+  const formattedTime = currentDateTime.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 
-  if (userEmail === undefined || userId === null) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-        <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>Loading...</Text>
-      </View>
-    );
-  }
+  const getGreeting = () => {
+    const hour = currentDateTime.getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
 
-  const renderClientItem = ({ item }: { item: Client }) => (
-    <TouchableOpacity
-      style={[
-        styles.clientCard,
-        { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground },
-        { borderColor: isDark ? Colors.dark.border : Colors.light.border },
-      ]}
-      onPress={() => router.push(`/client/${item.id}` as any)}
-    >
-      <View style={styles.clientDetails}>
-        <Text style={[styles.clientName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{item.name}</Text>
-        <Text style={[styles.clientEmail, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{item.email}</Text>
-      </View>
-      <IconSymbol size={20} name="chevron.right" color={isDark ? Colors.dark.secondary : Colors.light.secondary} />
-    </TouchableOpacity>
-  );
+  /** ==========================
+   *  UI Helper Components
+   *  ========================== */
 
-  return (
-    <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? Colors.dark.background : Colors.light.background} />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={isDark ? Colors.dark.text : Colors.light.text}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.greeting, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>Good morning</Text>
-            <Text style={[styles.userName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              {userEmail?.split('@')[0] || 'User'}
+  const Header = () => (
+    <View style={styles.header}>
+      <View style={styles.headerContent}>
+        <View style={styles.userSection}>
+          <View style={styles.greetingSection}>
+            <Text style={[styles.greeting, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+              {getGreeting()}
             </Text>
           </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={[styles.profileButton, { backgroundColor: isDark ? Colors.dark.buttonBackground : Colors.light.buttonBackground }]}>
-              <IconSymbol size={24} name="person.circle.fill" color={isDark ? Colors.dark.primary : Colors.light.primary} />
-            </TouchableOpacity>
-          </View>
+        </View>
+      </View>
+      
+      <View style={styles.timeSection}>
+        <Text style={[styles.timeText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+          {formattedTime}
+        </Text>
+        <Text style={[styles.dateText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+          {formattedDate}
+        </Text>
+      </View>
+    </View>
+  );
+
+  const QuickActions = () => (
+    <View style={styles.quickActionsContainer}>
+      <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+        Quick Actions
+      </Text>
+      <View style={styles.actionsGrid}>
+        {[
+          { icon: "document-text-outline", title: "Quotation list", color: "#007BFF", onPress: () => router.push('/quotation/list') },
+          { icon: "images-outline", title: "Gallery update", color: "#8A2BE2", onPress: () => router.push('/gallery') },
+          { icon: "people-outline", title: "Workers", color: "#FF5722", onPress: () => router.push('/workers') },
+          { icon: "hourglass-outline", title: "Pending works", color: "#9C27B0", onPress: () => router.push('/pending-works') },
+          { icon: "play-circle-outline", title: "Ongoing works", color: "#FF9800", onPress: () => router.push('/ongoing-works') },
+          { icon: "wallet-outline", title: "Pending Amount", color: "#FFC107", onPress: () => router.push('/pending-amount') },
+          { icon: "hourglass-outline", title: "Pending Measurement", color: "#4CAF50", onPress: () => router.push('/leads') },
+          { icon: "receipt-outline", title: "Invoices", color: "#00BCD4", onPress: () => router.push('/quotation/list?invoiceGenerated=true') },
+          { icon: "cube-outline", title: "Raw Materials", color: "#607D8B", onPress: () => router.push('/raw-materials') },
+          { icon: "sync-outline", title: "Update Stock", color: "#FF00FF", onPress: () => router.push('/raw-materials/update-stock') },
+          { icon: "cart-outline", title: "Purchased Orders", color: "#28A745", onPress: () => router.push('/orders/list') },
+        ].map((action, index) => (
+          <TouchableOpacity 
+            key={index} 
+            style={[
+              styles.actionCard,
+              { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }
+            ]}
+            onPress={action.onPress}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: `${action.color}20` }]}>
+              <Ionicons name={action.icon as any} size={24} color={action.color} />
+            </View>
+            <Text style={[styles.actionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              {action.title}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+
+  /** ==========================
+   *  Render
+   *  ========================== */
+  return (
+    <View style={[styles.container, { backgroundColor: isDark ? Colors.dark.background : Colors.light.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Header />
+        <View style={styles.content}>
+          <QuickActions />
         </View>
 
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          {updatedStats.map((stat) => (
-            <View key={stat.id} style={[styles.statCard, { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }]}>
-              <View style={[styles.statIconContainer, { backgroundColor: stat.color + '20' }]}>
-                <IconSymbol size={24} name={stat.icon as any} color={stat.color} />
-              </View>
-              <Text style={[styles.statNumber, { color: isDark ? Colors.dark.text : Colors.light.text }]}>{stat.value}</Text>
-              <Text style={[styles.statLabel, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>{stat.label}</Text>
-            </View>
-          ))}
+        {/* Footer Section */}
+        <View style={styles.footerContainer}>
+          <Image
+            source={require('../../assets/images/jp_logo.png')} // Replace with your logo path
+            style={styles.logoPlaceholder}
+            resizeMode="contain"
+          />
+          <Text style={[styles.poweredBy, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+            Powered by Hynox
+          </Text>
         </View>
       </ScrollView>
     </View>
   );
 }
 
+/** ==========================
+ *  Styles
+ *  ========================== */
 const styles = StyleSheet.create({
-  container: {
+  container: { 
+    flex: 1 
+  },
+  header: { 
+    paddingHorizontal: 24, 
+    paddingTop: Platform.OS === "ios" ? 60 : 40, 
+    paddingBottom: 24 
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  userSection: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  greetingSection: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
+  greeting: { 
+    fontSize: 28, 
+    fontWeight: "800", 
+    textAlign: "center"
   },
-  scrollContent: {
-    paddingBottom: 32,
+  timeSection: {
+    alignItems: "center",
+    paddingVertical: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  timeText: { 
+    fontSize: 36, 
+    fontWeight: "300",
+    letterSpacing: -1,
   },
-  loadingText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  greeting: {
-    fontSize: 16,
-    fontWeight: '400',
-  },
-  userName: {
-    fontSize: 28,
-    fontWeight: '700',
+  dateText: { 
+    fontSize: 16, 
+    fontWeight: "500",
     marginTop: 4,
-    letterSpacing: -0.5,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  profileButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 24,
-    marginBottom: 32,
-    gap: 12,
-  },
-  statCard: {
-    width: (width - 60) / 2,
-    padding: 20,
-    borderRadius: 16,
-    // Add shadow for a raised, modern card effect
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'left',
-  },
-  clientListSection: {
+  content: {
     paddingHorizontal: 24,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 16,
   },
-  clientCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+  quickActionsContainer: {
+    marginBottom: 32,
+  },
+  actionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  actionCard: {
+    width: (width - 64) / 2,
+    padding: 16,
     borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    marginBottom: 12,
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
-  clientDetails: {
-    flex: 1,
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
   },
-  clientName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  clientEmail: {
+  actionTitle: {
     fontSize: 14,
-    fontWeight: '400',
-    marginTop: 4,
+    fontWeight: "600",
   },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    marginVertical: 8,
-  },
-  noClientsContainer: {
+  footerContainer: {
     alignItems: 'center',
+    marginTop: 40,
+    paddingBottom: 20,
+  },
+  companyName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  logoPlaceholder: {
+    width: 300,
+    height: 200,
+    borderRadius: 30,
     justifyContent: 'center',
-    marginTop: 50,
+    alignItems: 'center',
   },
-  noClientsText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+  poweredBy: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

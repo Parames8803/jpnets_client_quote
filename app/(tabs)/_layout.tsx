@@ -8,16 +8,15 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors.light.tint,
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
-          borderTopColor: isDark ? Colors.dark.border : Colors.light.border,
+          backgroundColor: Colors.light.background,
+          borderTopColor: Colors.light.border,
         },
       }}
     >
@@ -52,6 +51,17 @@ export default function TabLayout() {
           ),
           headerShown: true,
           header: () => <CustomHeader title="Workers" showLogoutButton={true} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol name={focused ? 'gearshape.fill' : 'gearshape'} color={color} size={24} />
+          ),
+          headerShown: true,
+          header: () => <CustomHeader title="Settings" showLogoutButton={true} />,
         }}
       />
     </Tabs>

@@ -14,13 +14,13 @@ import { IconSymbol } from './ui/IconSymbol';
 interface ProductDimensionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSetQuantity: (quantity: string) => void;
+  onSetDimensions: (dimensions: { length: number; width: number; lengthUnit: string; widthUnit: string; totalSqFt: number }) => void;
 }
 
 export const ProductDimensionModal: React.FC<ProductDimensionModalProps> = ({
   visible,
   onClose,
-  onSetQuantity,
+  onSetDimensions,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -36,11 +36,17 @@ export const ProductDimensionModal: React.FC<ProductDimensionModalProps> = ({
     }
   }, [visible]);
 
-  const handleSetQuantity = () => {
+  const handleSetDimensions = () => {
     const length = parseFloat(productLength);
     const width = parseFloat(productWidth);
     if (!isNaN(length) && !isNaN(width)) {
-      onSetQuantity((length * width).toString());
+      onSetDimensions({
+        length: length,
+        width: width,
+        lengthUnit: 'ft', // Assuming 'ft' as the unit for now based on current implementation
+        widthUnit: 'ft',  // Assuming 'ft' as the unit for now based on current implementation
+        totalSqFt: length * width,
+      });
       onClose();
     } else {
       Alert.alert('Invalid Input', 'Please enter valid numbers for length and width.');
@@ -104,7 +110,7 @@ export const ProductDimensionModal: React.FC<ProductDimensionModalProps> = ({
           </View>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: '#1F2937' }]}
-            onPress={handleSetQuantity}
+            onPress={handleSetDimensions}
           >
             <Text style={styles.addButtonText}>Set Quantity</Text>
           </TouchableOpacity>
