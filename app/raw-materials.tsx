@@ -26,12 +26,44 @@ export default function RawMaterialsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [categories, setCategories] = useState(['Wood', 'Metal', 'Plastic', 'Fabric']); // Define categories here
+  const [editingMaterial, setEditingMaterial] = useState<RawMaterial | null>(null);
   const [unitTypes, setUnitTypes] = useState(['pcs', 'kg', 'm', 'sq.ft']); // Define unit types here
 
   useEffect(() => {
     fetchMaterials();
   }, []);
+
+  const handleEdit = (material: RawMaterial) => {
+    setEditingMaterial(material);
+    setShowAddModal(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    Alert.alert(
+      'Delete Material',
+      'Are you sure you want to delete this raw material?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          onPress: async () => {
+            try {
+              const { error } = await supabase.from('raw_materials').delete().eq('id', id);
+              if (error) throw error;
+              fetchMaterials();
+            } catch (err: any) {
+              Alert.alert('Error', `Failed to delete material: ${err.message}`);
+            }
+          },
+          style: 'destructive',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   const fetchMaterials = async () => {
     setLoading(true);
@@ -61,7 +93,7 @@ export default function RawMaterialsPage() {
       styles.card,
       { backgroundColor: isDark ? Colors.dark.cardBackground : Colors.light.cardBackground }
     ]}>
-      {/* Left Accent by Category */}
+      {/* Left Accent */}
       <View style={[
         styles.categoryAccent,
         { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }
@@ -70,14 +102,22 @@ export default function RawMaterialsPage() {
         <Text style={[styles.cardTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
           {item.name}
         </Text>
-        <Text style={[styles.cardText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
-          {item.category} · {item.quantity} {item.unit_type}
-        </Text>
         {item.subcategories?.length ? (
           <Text style={[styles.cardSub, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
             {item.subcategories.join(', ')}
           </Text>
         ) : null}
+        <Text style={[styles.cardText, { color: isDark ? Colors.dark.secondary : Colors.light.secondary }]}>
+          Unit: {item.unit_type}
+        </Text>
+      </View>
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
+          <Ionicons name="create-outline" size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.actionButton}>
+          <Ionicons name="trash-outline" size={24} color="#D32F2F" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -147,7 +187,10 @@ export default function RawMaterialsPage() {
 
       {/* ➕ Floating Add Button */}
       <TouchableOpacity
-        onPress={() => setShowAddModal(true)}
+        onPress={() => {
+          setEditingMaterial(null); // Clear editing state for new add
+          setShowAddModal(true);
+        }}
         style={[
           styles.fab,
           { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }
@@ -156,17 +199,21 @@ export default function RawMaterialsPage() {
         <Ionicons name="add" size={28} color="#fff"/>
       </TouchableOpacity>
 
-      {/* 📝 Modal Add Form */}
+      {/* 📝 Modal Add/Edit Form */}
       <Modal visible={showAddModal} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalBox, { backgroundColor: isDark ? Colors.dark.cardBackground : '#fff' }]}>
             <AddRawMaterialForm
-              categories={categories} // Use the categories from state
-              unitTypes={unitTypes} // Use the unitTypes from state
-              onClose={() => setShowAddModal(false)}
+              initialData={editingMaterial}
+              unitTypes={unitTypes}
+              onClose={() => {
+                setShowAddModal(false);
+                setEditingMaterial(null);
+              }}
               onAdded={() => {
                 fetchMaterials();
                 setShowAddModal(false);
+                setEditingMaterial(null);
               }}
             />
           </View>
@@ -228,5 +275,14 @@ const styles = StyleSheet.create({
   modalBox: {
     borderRadius: 12,
     padding: 20,
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  actionButton: {
+    marginLeft: 10,
+    padding: 5,
   },
 });

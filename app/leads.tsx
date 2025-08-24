@@ -6,7 +6,7 @@ import { supabase } from '@/utils/supabaseClient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Platform, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function LeadsScreen() {
   const router = useRouter();
@@ -21,6 +21,7 @@ export default function LeadsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<LeadStatus | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,6 +81,36 @@ export default function LeadsScreen() {
     fetchLeads();
   };
 
+  const handleUpdateStatus = async (leadId: string, newStatus: LeadStatus) => {
+    if (!user) return;
+
+    setUpdatingStatus(true);
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ status: newStatus })
+        .eq('id', leadId);
+
+      if (error) {
+        console.error('Error updating lead status:', error);
+        Alert.alert('Error', 'Failed to update lead status. Please try again.');
+      } else {
+        Alert.alert('Success', `Lead status updated to ${newStatus}!`);
+        // Optimistically update the lead status in the local state
+        setLeads((prevLeads) =>
+          prevLeads.map((lead) =>
+            lead.id === leadId ? { ...lead, status: newStatus } : lead
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Unexpected error updating lead status:', error);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const getStatusColor = (status: LeadStatus) => {
     switch (status) {
       case LEAD_STATUS_TYPES.APPROVED:
@@ -101,7 +132,6 @@ export default function LeadsScreen() {
           borderColor: isDark ? Colors.dark.border : Colors.light.border
         }
       ]}
-      onPress={() => router.push(`/leads/${lead.id}` as any)}
     >
       <View style={styles.leadCardContent}>
         <View style={styles.leadCardHeader}>
@@ -126,6 +156,33 @@ export default function LeadsScreen() {
               {lead.comment}
             </Text>
           )}
+        </View>
+        <View style={styles.statusUpdateContainer}>
+          {Object.values(LEAD_STATUS_TYPES).map((s) => (
+            <TouchableOpacity
+              key={s}
+              style={[
+                styles.statusUpdateButton,
+                {
+                  backgroundColor: lead.status === s ? (isDark ? Colors.dark.tint : Colors.light.tint) : (isDark ? Colors.dark.background : Colors.light.background),
+                  borderColor: isDark ? Colors.dark.border : Colors.light.border,
+                },
+              ]}
+              onPress={() => handleUpdateStatus(lead.id, s)}
+              disabled={updatingStatus || lead.status === s}
+            >
+              {updatingStatus && lead.status !== s ? (
+                <ActivityIndicator color={lead.status === s ? Colors.light.background : (isDark ? Colors.dark.text : Colors.light.text)} />
+              ) : (
+                <Text style={[
+                  styles.statusUpdateButtonText,
+                  { color: lead.status === s ? (isDark ? Colors.dark.background : Colors.light.background) : (isDark ? Colors.dark.text : Colors.light.text) },
+                ]}>
+                  {s}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
     </TouchableOpacity>
@@ -343,6 +400,22 @@ const styles = StyleSheet.create({
   leadComment: {
     fontSize: 14,
     fontStyle: 'italic',
+  },
+  statusUpdateContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 10,
+  },
+  statusUpdateButton: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+  },
+  statusUpdateButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   centered: {
     flex: 1,

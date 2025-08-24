@@ -135,7 +135,6 @@ export interface RawMaterial {
   id: string; // uuid
   created_at: string; // timestamp with time zone
   name: string; // text
-  category: string; // text
   subcategories: string[] | null; // text[], nullable
   quantity: number; // numeric
   unit_type: string; // text

@@ -328,7 +328,7 @@ export default function HomeScreen() {
           },
           {
             icon: "sync-outline",
-            title: "Update Stock",
+            title: "Stock Update",
             color: "#FF00FF",
             onPress: () => router.push("/raw-materials/update-stock"),
           },

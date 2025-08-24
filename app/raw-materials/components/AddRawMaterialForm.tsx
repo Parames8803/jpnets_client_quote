@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,16 +12,17 @@ import { Picker } from '@react-native-picker/picker';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { supabase } from '@/utils/supabaseClient';
+import { RawMaterial } from '@/types/db'; // Import RawMaterial type
 
 interface AddRawMaterialFormProps {
-  categories: string[];
+  initialData?: RawMaterial | null;
   unitTypes: string[];
   onClose: () => void;
   onAdded: () => void;
 }
 
 function AddRawMaterialForm({
-  categories,
+  initialData,
   unitTypes,
   onClose,
   onAdded,
@@ -29,59 +30,87 @@ function AddRawMaterialForm({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const [newMaterialName, setNewMaterialName] = useState('');
-  const [newMaterialCategory, setNewMaterialCategory] = useState('');
-  const [newMaterialSubcategories, setNewMaterialSubcategories] = useState<string[]>(['']);
-  const [newMaterialQuantity, setNewMaterialQuantity] = useState('');
-  const [newMaterialUnitType, setNewMaterialUnitType] = useState('');
+  const [materialName, setMaterialName] = useState('');
+  const [subcategories, setSubcategories] = useState<string[]>(['']);
+  const [unitType, setUnitType] = useState('');
 
-  const handleAddRawMaterial = useCallback(async () => {
-    if (!newMaterialName || !newMaterialCategory || !newMaterialQuantity || !newMaterialUnitType) {
-      Alert.alert('Error', 'All fields are required.');
+  useEffect(() => {
+    if (initialData) {
+      setMaterialName(initialData.name);
+      setSubcategories(initialData.subcategories && initialData.subcategories.length > 0 ? initialData.subcategories : ['']);
+      setUnitType(initialData.unit_type);
+    } else {
+      setMaterialName('');
+      setSubcategories(['']);
+      setUnitType('');
+    }
+  }, [initialData]);
+
+  const handleSubmit = useCallback(async () => {
+    if (!materialName || !unitType) {
+      Alert.alert('Error', 'Material Name and Unit Type are required.');
       return;
     }
 
+    const filteredSubcategories = subcategories.filter((sub: string) => sub.trim() !== '');
+
     try {
-      const { data, error } = await supabase
-        .from('raw_materials')
-        .insert({
-          name: newMaterialName,
-          category: newMaterialCategory,
-          subcategories: newMaterialSubcategories.filter((sub: string) => sub.trim() !== ''),
-          quantity: parseFloat(newMaterialQuantity),
-          unit_type: newMaterialUnitType,
-        })
-        .select();
+      if (initialData) {
+        // Update existing material
+        const { error } = await supabase
+          .from('raw_materials')
+          .update({
+            name: materialName,
+            subcategories: filteredSubcategories,
+            unit_type: unitType,
+          })
+          .eq('id', initialData.id);
 
-      if (error) {
-        throw error;
-      }
+        if (error) throw error;
+        Alert.alert('Success', 'Raw material updated!');
+      } else {
+        // Add new material
+        const { error } = await supabase
+          .from('raw_materials')
+          .insert({
+            name: materialName,
+            subcategories: filteredSubcategories,
+            unit_type: unitType,
+          });
 
-      if (data && data.length > 0) {
-        setNewMaterialName('');
-        setNewMaterialCategory('');
-        setNewMaterialSubcategories(['']);
-        setNewMaterialQuantity('');
-        setNewMaterialUnitType('');
+        if (error) throw error;
         Alert.alert('Success', 'Raw material added!');
-        onAdded();
       }
+
+      onAdded();
     } catch (e: any) {
-      Alert.alert('Error', `Failed to add raw material: ${e.message}`);
+      Alert.alert('Error', `Failed to ${initialData ? 'update' : 'add'} raw material: ${e.message}`);
     }
-  }, [newMaterialName, newMaterialCategory, newMaterialSubcategories, newMaterialQuantity, newMaterialUnitType, onAdded]);
+  }, [materialName, subcategories, unitType, initialData, onAdded]);
 
   const handleAddSubcategoryInput = useCallback(() => {
-    setNewMaterialSubcategories(prev => [...prev, '']);
-  }, []);
+    if (subcategories.length < 3) { // Limit to 3 subcategories
+      setSubcategories(prev => [...prev, '']);
+    }
+  }, [subcategories]);
 
   const handleSubcategoryChange = useCallback((text: string, index: number) => {
-    setNewMaterialSubcategories(prev => {
+    setSubcategories(prev => {
       const updatedSubcategories = [...prev];
       updatedSubcategories[index] = text;
       return updatedSubcategories;
     });
   }, []);
+
+  const handleRemoveSubcategoryInput = useCallback((index: number) => {
+    setSubcategories(prev => {
+      const updatedSubcategories = [...prev];
+      updatedSubcategories.splice(index, 1);
+      return updatedSubcategories.length === 0 ? [''] : updatedSubcategories; // Ensure at least one empty input remains
+    });
+  }, []);
+
+  const isEditing = !!initialData;
 
   return (
     <View style={[styles.modalContent, { backgroundColor: isDark ? Colors.dark.cardBackground : '#fff' }]}>
@@ -89,7 +118,7 @@ function AddRawMaterialForm({
         <Ionicons name="close-circle" size={28} color={isDark ? Colors.dark.text : Colors.light.text} />
       </TouchableOpacity>
       <Text style={[styles.sectionTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-        Add New Raw Material
+        {isEditing ? 'Edit Raw Material' : 'Add New Raw Material'}
       </Text>
       <TextInput
         style={[styles.input, {
@@ -99,30 +128,14 @@ function AddRawMaterialForm({
         }]}
         placeholder="Raw Material Name"
         placeholderTextColor={isDark ? Colors.dark.secondary : Colors.light.secondary}
-        value={newMaterialName}
-        onChangeText={setNewMaterialName}
+        value={materialName}
+        onChangeText={setMaterialName}
       />
-
-      <View style={[styles.pickerContainer, {
-        backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
-        borderColor: isDark ? Colors.dark.border : Colors.light.border,
-      }]}>
-        <Picker
-          selectedValue={newMaterialCategory}
-          onValueChange={(itemValue) => setNewMaterialCategory(itemValue)}
-          style={[styles.picker, { color: isDark ? Colors.dark.text : Colors.light.text }]}
-        >
-          <Picker.Item label="Select Category" value="" />
-          {categories.map((cat, index) => (
-            <Picker.Item key={index} label={cat} value={cat} />
-          ))}
-        </Picker>
-      </View>
 
       <Text style={[styles.subTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
         Subcategories
       </Text>
-      {newMaterialSubcategories.map((sub, index) => (
+      {subcategories.map((sub, index) => (
         <View key={index} style={styles.subcategoryInputContainer}>
           <TextInput
             style={[styles.input, styles.subcategoryInput, {
@@ -135,7 +148,12 @@ function AddRawMaterialForm({
             value={sub}
             onChangeText={(text) => handleSubcategoryChange(text, index)}
           />
-          {index === newMaterialSubcategories.length - 1 && (
+          {subcategories.length > 1 && ( // Allow removing if more than one subcategory
+            <TouchableOpacity onPress={() => handleRemoveSubcategoryInput(index)} style={styles.removeSubcategoryButton}>
+              <Ionicons name="remove-circle-outline" size={24} color="#D32F2F" />
+            </TouchableOpacity>
+          )}
+          {index === subcategories.length - 1 && subcategories.length < 3 && ( // Only show add button on last field, up to 3
             <TouchableOpacity onPress={handleAddSubcategoryInput} style={styles.addSubcategoryButton}>
               <Ionicons name="add-circle-outline" size={24} color={isDark ? Colors.dark.tint : Colors.light.tint} />
             </TouchableOpacity>
@@ -143,26 +161,13 @@ function AddRawMaterialForm({
         </View>
       ))}
 
-      <TextInput
-        style={[styles.input, {
-          backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
-          color: isDark ? Colors.dark.text : Colors.light.text,
-          borderColor: isDark ? Colors.dark.border : Colors.light.border,
-        }]}
-        placeholder="Quantity"
-        placeholderTextColor={isDark ? Colors.dark.secondary : Colors.light.secondary}
-        value={newMaterialQuantity}
-        onChangeText={setNewMaterialQuantity}
-        keyboardType="numeric"
-      />
-
       <View style={[styles.pickerContainer, {
         backgroundColor: isDark ? Colors.dark.inputBackground : Colors.light.inputBackground,
         borderColor: isDark ? Colors.dark.border : Colors.light.border,
       }]}>
         <Picker
-          selectedValue={newMaterialUnitType}
-          onValueChange={(itemValue) => setNewMaterialUnitType(itemValue)}
+          selectedValue={unitType}
+          onValueChange={(itemValue) => setUnitType(itemValue)}
           style={[styles.picker, { color: isDark ? Colors.dark.text : Colors.light.text }]}
         >
           <Picker.Item label="Select Unit Type" value="" />
@@ -174,9 +179,9 @@ function AddRawMaterialForm({
 
       <TouchableOpacity
         style={[styles.addButton, { backgroundColor: isDark ? Colors.dark.tint : Colors.light.tint }]}
-        onPress={handleAddRawMaterial}
+        onPress={handleSubmit}
       >
-        <Text style={styles.addButtonText}>Add Raw Material</Text>
+        <Text style={styles.addButtonText}>{isEditing ? 'Save Changes' : 'Add Raw Material'}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -235,6 +240,10 @@ const styles = StyleSheet.create({
   },
   addSubcategoryButton: {
     padding: 8,
+  },
+  removeSubcategoryButton: {
+    padding: 8,
+    marginLeft: -5, // Adjust to align with add button
   },
   addButton: {
     paddingVertical: 12,
