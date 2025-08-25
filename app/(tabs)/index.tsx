@@ -5,8 +5,9 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import LottieView from "lottie-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   Dimensions,
   Image,
   Platform,
@@ -31,6 +32,8 @@ export default function HomeScreen() {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
+  const [showLogoAnimation, setShowLogoAnimation] = useState(true);
+  const fadeAnim = useRef(new Animated.Value(0)).current; // Initial value for opacity: 0
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -43,6 +46,31 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchWeatherData();
   }, []);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>; // Correct type for setTimeout return value
+    if (showLogoAnimation) {
+      // Lottie animation is showing
+      timer = setTimeout(() => {
+        setShowLogoAnimation(false);
+        fadeAnim.setValue(0); // Reset fadeAnim for the next fade-in
+      }, 1500); // Show Lottie for 10 seconds
+    } else {
+      // Static logo is showing, fade it in
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000, // 1 second fade-in
+        useNativeDriver: true,
+      }).start(() => {
+        // After static logo fades in, immediately switch back to Lottie
+        // set some delay before switching back to Lottie
+        timer = setTimeout(() => {
+          setShowLogoAnimation(true);
+        }, 5000); // Show static logo for 10 seconds before switching back
+      });
+    }
+    return () => clearTimeout(timer);
+  }, [showLogoAnimation, fadeAnim]);
 
   const fetchWeatherData = async () => {
     try {
@@ -403,21 +431,34 @@ export default function HomeScreen() {
 
         {/* Footer Section */}
         <View style={styles.footerContainer}>
-          <Image
-            source={require("../../assets/images/jp_logo.png")}
-            style={styles.logoPlaceholder}
-            resizeMode="contain"
-          />
-          <Text
-            style={[
-              styles.poweredBy,
-              {
-                color: isDark ? Colors.dark.secondary : Colors.light.secondary,
-              },
-            ]}
-          >
-            Powered by Hynox
-          </Text>
+          {showLogoAnimation ? (
+            <LottieView
+              source={require("../../assets/animations/logoAnimation.json")}
+              autoPlay
+              loop={true}
+              style={styles.logoAnimation}
+            />
+          ) : (
+            <Animated.View style={{ opacity: fadeAnim, alignItems: "center" }}>
+              <Image
+                source={require("../../assets/images/jp_logo.png")}
+                style={styles.logoPlaceholder}
+                resizeMode="contain"
+              />
+              <Text
+                style={[
+                  styles.poweredBy,
+                  {
+                    color: isDark
+                      ? Colors.dark.secondary
+                      : Colors.light.secondary,
+                  },
+                ]}
+              >
+                Powered by Hynox
+              </Text>
+            </Animated.View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -599,5 +640,9 @@ const styles = StyleSheet.create({
   poweredBy: {
     fontSize: 14,
     fontWeight: "500",
+  },
+  logoAnimation: {
+    width: 300,
+    height: 300,
   },
 });
