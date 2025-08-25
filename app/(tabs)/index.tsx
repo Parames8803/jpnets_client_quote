@@ -22,7 +22,7 @@ import {
 const { width } = Dimensions.get("window");
 
 // Your OpenWeatherMap API key
-const WEATHER_API_KEY = "9173ed6b12c23e057eebedffea359068";
+const WEATHER_API_KEY = process.env.EXPO_PUBLIC_WEATHER_API_KEY || "";
 
 export default function HomeScreen() {
   const router = useRouter();
