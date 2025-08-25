@@ -33,6 +33,10 @@ export default function OrdersScreen() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
+
+  // Vendor editing state
+  const [isVendorEditModalVisible, setIsVendorEditModalVisible] = useState(false);
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   
   // Vendor selection state
   const [vendorSelectionMode, setVendorSelectionMode] = useState<'existing' | 'new'>('existing');
@@ -165,6 +169,101 @@ export default function OrdersScreen() {
       Alert.alert("Error", "Failed to create new vendor.");
       return null;
     }
+  };
+
+  const updateVendor = async (vendorId: string, updatedFields: Partial<Vendor>) => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('vendors')
+        .update(updatedFields)
+        .eq('id', vendorId);
+
+      if (error) throw error;
+
+      Alert.alert("Success", "Vendor updated successfully!");
+      fetchData();
+      setIsVendorEditModalVisible(false);
+      setEditingVendor(null);
+    } catch (error) {
+      console.error("Error updating vendor:", error);
+      Alert.alert("Error", "Failed to update vendor. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteVendor = async (vendorId: string) => {
+    Alert.alert(
+      "Confirm Deletion",
+      "Are you sure you want to delete this vendor? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          onPress: async () => {
+            setIsLoading(true);
+            try {
+              const { error } = await supabase
+                .from('vendors')
+                .delete()
+                .eq('id', vendorId);
+
+              if (error) throw error;
+
+              Alert.alert("Success", "Vendor deleted successfully!");
+              fetchData();
+            } catch (error) {
+              console.error("Error deleting vendor:", error);
+              Alert.alert("Error", "Failed to delete vendor. Please try again.");
+            } finally {
+              setIsLoading(false);
+            }
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
+  // Order management
+  const deleteOrder = async (orderId: string) => {
+    Alert.alert(
+      "Confirm Deletion",
+      "Are you sure you want to delete this order? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          onPress: async () => {
+            setIsLoading(true);
+            try {
+              const { error } = await supabase
+                .from('purchased_orders')
+                .delete()
+                .eq('id', orderId);
+
+              if (error) throw error;
+
+              Alert.alert("Success", "Order deleted successfully!");
+              fetchData();
+            } catch (error) {
+              console.error("Error deleting order:", error);
+              Alert.alert("Error", "Failed to delete order. Please try again.");
+            } finally {
+              setIsLoading(false);
+            }
+          },
+          style: "destructive"
+        }
+      ]
+    );
   };
 
   // Material management
@@ -305,6 +404,25 @@ export default function OrdersScreen() {
           <Text style={styles.infoText} numberOfLines={2}>{item.address}</Text>
         </View>
       </View>
+      <View style={styles.vendorActions}>
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => {
+            setEditingVendor(item);
+            setIsVendorEditModalVisible(true);
+          }}
+        >
+          <MaterialIcons name="edit" size={18} color="#007bff" />
+          <Text style={styles.actionButtonText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.deleteButton]} 
+          onPress={() => deleteVendor(item.id)}
+        >
+          <MaterialIcons name="delete" size={18} color="#ff4757" />
+          <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -319,12 +437,22 @@ export default function OrdersScreen() {
             <Text style={styles.orderIdLabel}>ORDER</Text>
             <Text style={styles.orderId}>#{item.id.slice(-8)}</Text>
           </View>
-          <TouchableOpacity 
-            onPress={() => shareOrderViaWhatsApp(item)} 
-            style={styles.whatsappButton}
-          >
-            <MaterialIcons name="share" size={18} color="#25D366" />
-          </TouchableOpacity>
+          <View style={styles.orderActions}>
+            <TouchableOpacity 
+              onPress={() => shareOrderViaWhatsApp(item)} 
+              style={styles.actionButton}
+            >
+              <MaterialIcons name="share" size={18} color="#25D366" />
+              <Text style={styles.actionButtonText}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.deleteButton]} 
+              onPress={() => deleteOrder(item.id)}
+            >
+              <MaterialIcons name="delete" size={18} color="#ff4757" />
+              <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         
         <View style={styles.orderContent}>
@@ -479,6 +607,81 @@ export default function OrdersScreen() {
       <TouchableOpacity style={styles.fab} onPress={openModal}>
         <MaterialIcons name="add" size={28} color="white" />
       </TouchableOpacity>
+
+      {/* Vendor Edit Modal */}
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={isVendorEditModalVisible}
+        onRequestClose={() => setIsVendorEditModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setIsVendorEditModalVisible(false)} style={styles.modalBackButton}>
+              <AntDesign name="arrowleft" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Edit Vendor</Text>
+            <View style={styles.modalHeaderSpacer} />
+          </View>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {editingVendor && (
+              <View style={styles.newVendorForm}>
+                <View style={styles.inputGroup}>
+                  <MaterialIcons name="business" size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Vendor name"
+                    value={editingVendor.name}
+                    onChangeText={(text) => setEditingVendor(prev => prev ? { ...prev, name: text } : null)}
+                    placeholderTextColor="#999"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <MaterialIcons name="phone" size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Contact (phone/email)"
+                    value={editingVendor.contact ?? undefined}
+                    onChangeText={(text) => setEditingVendor(prev => prev ? { ...prev, contact: text } : null)}
+                    keyboardType="phone-pad"
+                    placeholderTextColor="#999"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <MaterialIcons name="location-on" size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.modalInput, styles.textAreaInput]}
+                    placeholder="Business address"
+                    value={editingVendor.address ?? undefined}
+                    onChangeText={(text) => setEditingVendor(prev => prev ? { ...prev, address: text } : null)}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                    placeholderTextColor="#999"
+                  />
+                </View>
+              </View>
+            )}
+          </ScrollView>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.createOrderButton, isLoading && styles.createOrderButtonDisabled]}
+              onPress={() => editingVendor && updateVendor(editingVendor.id, editingVendor)}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <MaterialIcons name="save" size={20} color="white" />
+                  <Text style={styles.createOrderButtonText}>Save Changes</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Create Order Modal */}
       <Modal
@@ -678,7 +881,6 @@ export default function OrdersScreen() {
               <Text style={styles.dropdownItemName}>{item.name}</Text>
               <Text style={styles.dropdownItemContact}>Unit: {item.unit_type}</Text>
             </View>
-            {isSelected && <MaterialIcons name="check" size={20} color="#007bff" />}
           </View>
         )}
         title="Select Materials"
@@ -887,6 +1089,34 @@ const styles = StyleSheet.create({
     color: '#64748b',
     flex: 1,
   },
+  vendorActions: {
+    flexDirection: 'row',
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 12,
+    justifyContent: 'space-around',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    gap: 6,
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#007bff',
+  },
+  deleteButton: {
+    backgroundColor: '#fef2f2',
+  },
+  deleteButtonText: {
+    color: '#ff4757',
+  },
   ordersList: {
     paddingBottom: 100,
   },
@@ -922,6 +1152,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#1e293b',
+  },
+  orderActions: {
+    flexDirection: 'row',
+    gap: 10,
   },
   whatsappButton: {
     width: 36,
