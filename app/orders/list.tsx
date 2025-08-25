@@ -1,5 +1,5 @@
 import { PurchasedOrder, RawMaterial, Vendor } from '@/types/db';
-import { AntDesign } from '@expo/vector-icons';
+import { AntDesign, Feather, MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
 import {
@@ -9,13 +9,14 @@ import {
   Linking,
   Modal,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from "react-native";
-import { DropdownPicker } from '../../components/ui/DropdownPicker'; // Import the new DropdownPicker
+import { DropdownPicker } from '../../components/ui/DropdownPicker';
 import { supabase } from '../../utils/supabaseClient';
 
 interface ExtendedRawMaterial extends RawMaterial {
@@ -31,11 +32,12 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<PurchasedOrder[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [isConnected, setIsConnected] = useState<boolean | null>(true);
   
   // Vendor selection state
   const [vendorSelectionMode, setVendorSelectionMode] = useState<'existing' | 'new'>('existing');
   const [selectedExistingVendor, setSelectedExistingVendor] = useState<string | null>(null);
-  const [isVendorDropdownVisible, setVendorDropdownVisible] = useState(false); // New state for vendor dropdown
+  const [isVendorDropdownVisible, setVendorDropdownVisible] = useState(false);
   const [newVendorForm, setNewVendorForm] = useState({
     name: "",
     contact: "",
@@ -44,7 +46,7 @@ export default function OrdersScreen() {
   
   // Material selection state
   const [selectedRawMaterials, setSelectedRawMaterials] = useState<ExtendedRawMaterial[]>([]);
-  const [isRawMaterialDropdownVisible, setRawMaterialDropdownVisible] = useState(false); // New state for raw material dropdown
+  const [isRawMaterialDropdownVisible, setRawMaterialDropdownVisible] = useState(false);
   const [isUnitTypePickerVisible, setUnitTypePickerVisible] = useState(false);
   const [currentMaterialForUnitType, setCurrentMaterialForUnitType] = useState<ExtendedRawMaterial | null>(null);
 
@@ -54,11 +56,20 @@ export default function OrdersScreen() {
   const filteredVendors = vendors.filter(vendor =>
     vendor.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
+  const filteredOrders = orders.filter(order => {
+    const vendor = vendors.find(v => v.id === order.vendor_id);
+    return vendor?.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+           order.id.toLowerCase().includes(searchQuery.toLowerCase());
+  });
   const selectedVendor = vendors.find(v => v.id === selectedExistingVendor);
 
   // Data fetching functions
   const fetchData = useCallback(async () => {
+    if (isConnected === false) {
+      Alert.alert("No Internet Connection", "Please check your network and try again.");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const [vendorsResult, ordersResult, materialsResult] = await Promise.all([
@@ -74,13 +85,17 @@ export default function OrdersScreen() {
       setVendors(vendorsResult.data || []);
       setOrders(ordersResult.data || []);
       setRawMaterials(materialsResult.data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching data:", error);
-      Alert.alert("Error", "Failed to load data. Please try again.");
+      if (error.message && error.message.includes("Network request failed")) {
+        Alert.alert("Network Error", "Could not connect to the server. Please check your internet connection.");
+      } else {
+        Alert.alert("Error", "Failed to load data. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isConnected]);
 
   useFocusEffect(
     useCallback(() => {
@@ -114,15 +129,13 @@ export default function OrdersScreen() {
   const createNewVendor = async (): Promise<string | null> => {
     const { name, contact, address } = newVendorForm;
 
-    // Basic validation for name
     if (!name.trim()) {
       Alert.alert("Validation Error", "Vendor Name cannot be empty.");
       return null;
     }
 
-    // Basic validation for contact (email or phone number)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^\+?[0-9]{7,10}$/; // Simple regex for 7-15 digit phone numbers, optional +
+    const phoneRegex = /^\+?[0-9]{7,10}$/;
     if (!contact.trim()) {
       Alert.alert("Validation Error", "Contact information cannot be empty.");
       return null;
@@ -132,7 +145,6 @@ export default function OrdersScreen() {
       return null;
     }
 
-    // Basic validation for address
     if (!address.trim()) {
       Alert.alert("Validation Error", "Address cannot be empty.");
       return null;
@@ -220,11 +232,9 @@ export default function OrdersScreen() {
         if (!newVendorId) return;
         vendorIdToUse = newVendorId;
       } else {
-        // validateOrderForm ensures selectedExistingVendor is not null here
         vendorIdToUse = selectedExistingVendor!;
       }
 
-      // Create order
       const { data: order, error: orderError } = await supabase
         .from('purchased_orders')
         .insert([{
@@ -235,11 +245,10 @@ export default function OrdersScreen() {
 
       if (orderError) throw orderError;
 
-      // The newly created order is in order[0]
       await shareOrderViaWhatsApp(order[0]);
       
       Alert.alert("Success", "Order created successfully!");
-      fetchData(); // Refresh data
+      fetchData();
       closeModal();
       
     } catch (error) {
@@ -278,64 +287,107 @@ export default function OrdersScreen() {
   };
 
   // Render functions
-  const renderOrderItem = ({ item }: { item: PurchasedOrder }) => {
+  const renderVendorCard = ({ item }: { item: Vendor }) => (
+    <View style={styles.vendorCard}>
+      <View style={styles.vendorHeader}>
+        <View style={styles.vendorIcon}>
+          <MaterialIcons name="business" size={20} color="#007bff" />
+        </View>
+        <Text style={styles.vendorName} numberOfLines={1}>{item.name}</Text>
+      </View>
+      <View style={styles.vendorInfo}>
+        <View style={styles.infoRow}>
+          <Feather name="phone" size={14} color="#666" />
+          <Text style={styles.infoText}>{item.contact}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Feather name="map-pin" size={14} color="#666" />
+          <Text style={styles.infoText} numberOfLines={2}>{item.address}</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderOrderCard = ({ item }: { item: PurchasedOrder }) => {
     const vendor = vendors.find(v => v.id === item.vendor_id);
     const materialCount = item.raw_materials?.length || 0;
     
     return (
-      <View style={styles.itemCard}>
-        <View style={styles.orderCardHeader}>
-          <Text style={styles.itemTitle}>Order #{item.id.slice(-8)}</Text>
-          <View style={styles.orderActions}>
-            <Text style={styles.badge}>{materialCount} items</Text>
-            <TouchableOpacity onPress={() => shareOrderViaWhatsApp(item)} style={styles.shareButton}>
-              <AntDesign name="sharealt" size={20} color="#007bff" />
-            </TouchableOpacity>
+      <View style={styles.orderCard}>
+        <View style={styles.orderHeader}>
+          <View style={styles.orderIdContainer}>
+            <Text style={styles.orderIdLabel}>ORDER</Text>
+            <Text style={styles.orderId}>#{item.id.slice(-8)}</Text>
+          </View>
+          <TouchableOpacity 
+            onPress={() => shareOrderViaWhatsApp(item)} 
+            style={styles.whatsappButton}
+          >
+            <MaterialIcons name="share" size={18} color="#25D366" />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.orderContent}>
+          <View style={styles.orderInfoRow}>
+            <MaterialIcons name="business" size={16} color="#666" />
+            <Text style={styles.orderVendor}>{vendor?.name || 'Unknown Vendor'}</Text>
+          </View>
+          
+          <View style={styles.orderInfoRow}>
+            <MaterialIcons name="inventory" size={16} color="#666" />
+            <Text style={styles.orderMaterials}>{materialCount} items</Text>
+          </View>
+          
+          <View style={styles.orderInfoRow}>
+            <MaterialIcons name="schedule" size={16} color="#666" />
+            <Text style={styles.orderDate}>
+              {new Date(item.created_at).toLocaleDateString()}
+            </Text>
           </View>
         </View>
-        <Text style={styles.itemSubtext}>🏢 {vendor?.name || 'Unknown Vendor'}</Text>
-        <Text style={styles.itemSubtext}>
-          📅 {new Date(item.created_at).toLocaleDateString()}
-        </Text>
+
         {item.raw_materials && item.raw_materials.length > 0 && (
-          <Text style={styles.itemSubtext} numberOfLines={2}>
-            📦 {item.raw_materials.map(m => `${m.name} (${m.order_quantity} ${m.order_unit_type})`).join(', ')}
-          </Text>
+          <View style={styles.materialsPreview}>
+            <Text style={styles.materialsPreviewText} numberOfLines={2}>
+              {item.raw_materials.map(m => `${m.name} (${m.order_quantity} ${m.order_unit_type})`).join(', ')}
+            </Text>
+          </View>
         )}
       </View>
     );
   };
 
   const renderSelectedMaterial = (material: ExtendedRawMaterial) => (
-    <View key={material.id} style={styles.selectedMaterialTag}>
-      <Text style={styles.selectedMaterialName}>{material.name}</Text>
-      
-      <View style={styles.quantityContainer}>
-        <TextInput
-          style={styles.quantityInput}
-          value={String(material.order_quantity)}
-          onChangeText={(text) => updateMaterialProperty(material.id, 'order_quantity', text)}
-          keyboardType="numeric"
-          selectTextOnFocus
-        />
-        
-        <TouchableOpacity
-          style={styles.unitTypeButton}
-          onPress={() => {
-            setCurrentMaterialForUnitType(material);
-            setUnitTypePickerVisible(true);
-          }}
-        >
-          <Text style={styles.unitTypeText}>{material.order_unit_type}</Text>
-          <AntDesign name="caretdown" size={10} color="#666" />
-        </TouchableOpacity>
+    <View key={material.id} style={styles.selectedMaterialChip}>
+      <View style={styles.materialInfo}>
+        <Text style={styles.materialName}>{material.name}</Text>
+        <View style={styles.quantityControls}>
+          <TextInput
+            style={styles.quantityInput}
+            value={String(material.order_quantity)}
+            onChangeText={(text) => updateMaterialProperty(material.id, 'order_quantity', text)}
+            keyboardType="numeric"
+            selectTextOnFocus
+          />
+          
+          <TouchableOpacity
+            style={styles.unitSelector}
+            onPress={() => {
+              setCurrentMaterialForUnitType(material);
+              setUnitTypePickerVisible(true);
+            }}
+          >
+            <Text style={styles.unitText}>{material.order_unit_type}</Text>
+            <AntDesign name="caretdown" size={10} color="#666" />
+          </TouchableOpacity>
+        </View>
       </View>
       
       <TouchableOpacity
         onPress={() => removeMaterialFromSelection(material.id)}
-        style={styles.removeButton}
+        style={styles.removeChipButton}
       >
-        <AntDesign name="close" size={16} color="#ff4444" />
+        <AntDesign name="close" size={14} color="#ff4757" />
       </TouchableOpacity>
     </View>
   );
@@ -344,62 +396,88 @@ export default function OrdersScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007bff" />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>Loading data...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Search Bar */}
-      <TextInput
-        style={styles.searchBar}
-        placeholder="Search vendors..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerStats}>
+          <Text style={styles.statText}>{orders.length} orders</Text>
+          <Text style={styles.statDivider}>•</Text>
+          <Text style={styles.statText}>{vendors.length} vendors</Text>
+        </View>
+      </View>
 
-      {/* Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Vendors Section */}
-        <Text style={styles.sectionTitle}>Vendors ({filteredVendors.length})</Text>
-        <FlatList
-          data={filteredVendors}
-          renderItem={({ item }) => (
-            <View style={styles.itemCard}>
-              <View style={styles.itemHeader}>
-                <Text style={styles.itemTitle}>{item.name}</Text>
-              </View>
-              <Text style={styles.itemSubtext}>📞 {item.contact}</Text>
-              <Text style={styles.itemSubtext} numberOfLines={2}>📍 {item.address}</Text>
-            </View>
-          )}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalList}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No vendors found</Text>
-          }
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Feather name="search" size={20} color="#666" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search orders, vendors..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#999"
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.clearButton}>
+            <AntDesign name="close" size={16} color="#666" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={true}>
+        {/* Vendors Section */}
+        {filteredVendors.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Active Vendors</Text>
+              <Text style={styles.sectionCount}>{filteredVendors.length}</Text>
+            </View>
+            <FlatList
+              data={filteredVendors.slice(0, 5)}
+              renderItem={renderVendorCard}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.vendorsList}
+            />
+          </>
+        )}
 
         {/* Orders Section */}
-        <Text style={styles.sectionTitle}>Recent Orders ({orders.length})</Text>
-        <FlatList
-          data={orders}
-          renderItem={renderOrderItem}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          contentContainerStyle={styles.verticalList}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No orders found</Text>
-          }
-        />
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Orders</Text>
+          <Text style={styles.sectionCount}>{filteredOrders.length}</Text>
+        </View>
+        
+        {filteredOrders.length > 0 ? (
+          <FlatList
+            data={filteredOrders}
+            renderItem={renderOrderCard}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            contentContainerStyle={styles.ordersList}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <MaterialIcons name="receipt-long" size={64} color="#ddd" />
+            <Text style={styles.emptyStateTitle}>No Orders Found</Text>
+            <Text style={styles.emptyStateText}>
+              {searchQuery ? "Try adjusting your search terms" : "Create your first order to get started"}
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
-      {/* FAB */}
+      {/* Floating Action Button */}
       <TouchableOpacity style={styles.fab} onPress={openModal}>
-        <AntDesign name="plus" size={24} color="white" />
+        <MaterialIcons name="add" size={28} color="white" />
       </TouchableOpacity>
 
       {/* Create Order Modal */}
@@ -410,122 +488,160 @@ export default function OrdersScreen() {
         onRequestClose={closeModal}
       >
         <View style={styles.modalContainer}>
+          <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+          
           {/* Modal Header */}
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={closeModal} style={styles.backButton}>
+            <TouchableOpacity onPress={closeModal} style={styles.modalBackButton}>
               <AntDesign name="arrowleft" size={24} color="#333" />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Create New Order</Text>
-            <View style={styles.placeholder} />
+            <Text style={styles.modalTitle}>New Order</Text>
+            <View style={styles.modalHeaderSpacer} />
           </View>
 
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            {/* Vendor Selection Toggle */}
-            <View style={styles.toggleContainer}>
-              <TouchableOpacity
-                style={[styles.toggleButton, vendorSelectionMode === 'existing' && styles.toggleButtonActive]}
-                onPress={() => setVendorSelectionMode('existing')}
-              >
-                <Text style={[styles.toggleButtonText, vendorSelectionMode === 'existing' && styles.toggleButtonTextActive]}>
-                  Select Existing
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggleButton, vendorSelectionMode === 'new' && styles.toggleButtonActive]}
-                onPress={() => setVendorSelectionMode('new')}
-              >
-                <Text style={[styles.toggleButtonText, vendorSelectionMode === 'new' && styles.toggleButtonTextActive]}>
-                  Create New
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Vendor Selection Content */}
-            {vendorSelectionMode === 'existing' ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Select Vendor</Text>
-                <TouchableOpacity style={styles.dropdownButton} onPress={() => setVendorDropdownVisible(true)}>
-                  <Text style={styles.dropdownButtonText}>
-                    {selectedVendor ? selectedVendor.name : "Choose a vendor"}
+            {/* Vendor Selection */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>Select Vendor</Text>
+              
+              {/* Toggle Buttons */}
+              <View style={styles.toggleRow}>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, vendorSelectionMode === 'existing' && styles.toggleBtnActive]}
+                  onPress={() => setVendorSelectionMode('existing')}
+                >
+                  <MaterialIcons name="business" size={20} color={vendorSelectionMode === 'existing' ? '#fff' : '#007bff'} />
+                  <Text style={[styles.toggleBtnText, vendorSelectionMode === 'existing' && styles.toggleBtnTextActive]}>
+                    Existing
                   </Text>
-                  <AntDesign name="caretdown" size={12} color="#666" />
                 </TouchableOpacity>
-                
-                {selectedVendor && (
-                  <View style={styles.selectedVendorPreview}>
-                    <Text style={styles.previewTitle}>Selected Vendor:</Text>
-                    <Text style={styles.previewText}>{selectedVendor.name}</Text>
-                    <Text style={styles.previewSubtext}>{selectedVendor.contact}</Text>
-                  </View>
-                )}
+                <TouchableOpacity
+                  style={[styles.toggleBtn, vendorSelectionMode === 'new' && styles.toggleBtnActive]}
+                  onPress={() => setVendorSelectionMode('new')}
+                >
+                  <MaterialIcons name="add-business" size={20} color={vendorSelectionMode === 'new' ? '#fff' : '#007bff'} />
+                  <Text style={[styles.toggleBtnText, vendorSelectionMode === 'new' && styles.toggleBtnTextActive]}>
+                    New
+                  </Text>
+                </TouchableOpacity>
               </View>
-            ) : (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>New Vendor Details</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Vendor Name"
-                  value={newVendorForm.name}
-                  onChangeText={(text) => updateNewVendorForm('name', text)}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Contact (Phone/Email)"
-                  value={newVendorForm.contact}
-                  onChangeText={(text) => updateNewVendorForm('contact', text)}
-                  keyboardType="phone-pad"
-                />
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Address"
-                  value={newVendorForm.address}
-                  onChangeText={(text) => updateNewVendorForm('address', text)}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-            )}
 
-            {/* Raw Materials Selection */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Select Materials</Text>
-              <TouchableOpacity style={styles.dropdownButton} onPress={() => setRawMaterialDropdownVisible(true)}>
-                <Text style={styles.dropdownButtonText}>
-                  {selectedRawMaterials.length > 0 ? `${selectedRawMaterials.length} materials selected` : "Choose raw materials"}
-                </Text>
-                <AntDesign name="caretdown" size={12} color="#666" />
-              </TouchableOpacity>
+              {vendorSelectionMode === 'existing' ? (
+                <View style={styles.vendorSelection}>
+                  <TouchableOpacity 
+                    style={styles.selectorButton} 
+                    onPress={() => setVendorDropdownVisible(true)}
+                  >
+                    <MaterialIcons name="business" size={20} color="#666" />
+                    <Text style={[styles.selectorText, selectedVendor && styles.selectorTextSelected]}>
+                      {selectedVendor ? selectedVendor.name : "Choose vendor"}
+                    </Text>
+                    <AntDesign name="down" size={16} color="#666" />
+                  </TouchableOpacity>
+                  
+                  {selectedVendor && (
+                    <View style={styles.selectedVendorCard}>
+                      <View style={styles.selectedVendorInfo}>
+                        <Text style={styles.selectedVendorName}>{selectedVendor.name}</Text>
+                        <Text style={styles.selectedVendorContact}>{selectedVendor.contact}</Text>
+                      </View>
+                      <MaterialIcons name="check-circle" size={24} color="#28a745" />
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.newVendorForm}>
+                  <View style={styles.inputGroup}>
+                    <MaterialIcons name="business" size={20} color="#666" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Vendor name"
+                      value={newVendorForm.name}
+                      onChangeText={(text) => updateNewVendorForm('name', text)}
+                      placeholderTextColor="#999"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputGroup}>
+                    <MaterialIcons name="phone" size={20} color="#666" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Contact (phone/email)"
+                      value={newVendorForm.contact}
+                      onChangeText={(text) => updateNewVendorForm('contact', text)}
+                      keyboardType="phone-pad"
+                      placeholderTextColor="#999"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputGroup}>
+                    <MaterialIcons name="location-on" size={20} color="#666" style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.modalInput, styles.textAreaInput]}
+                      placeholder="Business address"
+                      value={newVendorForm.address}
+                      onChangeText={(text) => updateNewVendorForm('address', text)}
+                      multiline
+                      numberOfLines={3}
+                      textAlignVertical="top"
+                      placeholderTextColor="#999"
+                    />
+                  </View>
+                </View>
+              )}
             </View>
 
-            {/* Selected Materials */}
-            {selectedRawMaterials.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Selected Materials ({selectedRawMaterials.length})</Text>
-                <View style={styles.selectedMaterialsContainer}>
-                  {selectedRawMaterials.map(renderSelectedMaterial)}
+            {/* Materials Selection */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>Select Materials</Text>
+              
+              <TouchableOpacity 
+                style={styles.selectorButton} 
+                onPress={() => setRawMaterialDropdownVisible(true)}
+              >
+                <MaterialIcons name="inventory" size={20} color="#666" />
+                <Text style={[styles.selectorText, selectedRawMaterials.length > 0 && styles.selectorTextSelected]}>
+                  {selectedRawMaterials.length > 0 
+                    ? `${selectedRawMaterials.length} materials selected` 
+                    : "Choose materials"}
+                </Text>
+                <AntDesign name="down" size={16} color="#666" />
+              </TouchableOpacity>
+
+              {selectedRawMaterials.length > 0 && (
+                <View style={styles.selectedMaterialsSection}>
+                  <Text style={styles.selectedMaterialsTitle}>
+                    Selected Materials ({selectedRawMaterials.length})
+                  </Text>
+                  <View style={styles.selectedMaterialsGrid}>
+                    {selectedRawMaterials.map(renderSelectedMaterial)}
+                  </View>
                 </View>
-              </View>
-            )}
+              )}
+            </View>
           </ScrollView>
 
-          {/* Submit Button */}
+          {/* Modal Footer */}
           <View style={styles.modalFooter}>
             <TouchableOpacity 
-              style={[styles.submitButton, isLoading && styles.submitButtonDisabled]} 
+              style={[styles.createOrderButton, isLoading && styles.createOrderButtonDisabled]} 
               onPress={handleSubmitOrder}
               disabled={isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color="white" />
               ) : (
-                <Text style={styles.submitButtonText}>Create Order & Send WhatsApp</Text>
+                <>
+                  <MaterialIcons name="send" size={20} color="white" />
+                  <Text style={styles.createOrderButtonText}>Create & Send Order</Text>
+                </>
               )}
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Vendor Dropdown Picker */}
+      {/* Dropdowns and Pickers */}
       <DropdownPicker
         isVisible={isVendorDropdownVisible}
         onClose={() => setVendorDropdownVisible(false)}
@@ -537,16 +653,18 @@ export default function OrdersScreen() {
         }}
         keyExtractor={(item) => item.id}
         renderItem={(item, isSelected) => (
-          <View style={styles.dropdownItemContent}>
-            <Text style={styles.pickerItemText}>{item.name}</Text>
-            {isSelected && <AntDesign name="checkcircle" size={20} color="#007bff" />}
+          <View style={styles.dropdownItem}>
+            <View style={styles.dropdownItemInfo}>
+              <Text style={styles.dropdownItemName}>{item.name}</Text>
+              <Text style={styles.dropdownItemContact}>{item.contact}</Text>
+            </View>
+            {isSelected && <MaterialIcons name="check" size={20} color="#007bff" />}
           </View>
         )}
         title="Select Vendor"
         multiSelect={false}
       />
 
-      {/* Raw Material Dropdown Picker */}
       <DropdownPicker
         isVisible={isRawMaterialDropdownVisible}
         onClose={() => setRawMaterialDropdownVisible(false)}
@@ -555,12 +673,15 @@ export default function OrdersScreen() {
         onSelect={(material) => toggleRawMaterialSelection(material)}
         keyExtractor={(item) => item.id}
         renderItem={(item, isSelected) => (
-          <View style={styles.dropdownItemContent}>
-            <Text style={styles.pickerItemText}>{item.name} ({item.unit_type})</Text>
-            {isSelected && <AntDesign name="checkcircle" size={20} color="#007bff" />}
+          <View style={styles.dropdownItem}>
+            <View style={styles.dropdownItemInfo}>
+              <Text style={styles.dropdownItemName}>{item.name}</Text>
+              <Text style={styles.dropdownItemContact}>Unit: {item.unit_type}</Text>
+            </View>
+            {isSelected && <MaterialIcons name="check" size={20} color="#007bff" />}
           </View>
         )}
-        title="Select Raw Materials"
+        title="Select Materials"
         multiSelect={true}
       />
 
@@ -572,14 +693,14 @@ export default function OrdersScreen() {
         onRequestClose={() => setUnitTypePickerVisible(false)}
       >
         <View style={styles.pickerOverlay}>
-          <View style={styles.pickerContent}>
-            <Text style={styles.pickerTitle}>Select Unit Type</Text>
+          <View style={styles.pickerModal}>
+            <Text style={styles.pickerModalTitle}>Select Unit Type</Text>
             <FlatList
               data={predefinedUnitTypes}
               keyExtractor={(item) => item}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.pickerItem}
+                  style={styles.pickerModalItem}
                   onPress={() => {
                     if (currentMaterialForUnitType) {
                       updateMaterialProperty(currentMaterialForUnitType.id, 'order_unit_type', item);
@@ -587,15 +708,15 @@ export default function OrdersScreen() {
                     setUnitTypePickerVisible(false);
                   }}
                 >
-                  <Text style={styles.pickerItemText}>{item}</Text>
+                  <Text style={styles.pickerModalItemText}>{item}</Text>
                 </TouchableOpacity>
               )}
             />
             <TouchableOpacity
-              style={styles.pickerCancelButton}
+              style={styles.pickerModalCancel}
               onPress={() => setUnitTypePickerVisible(false)}
             >
-              <Text style={styles.pickerCancelText}>Cancel</Text>
+              <Text style={styles.pickerModalCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -607,129 +728,275 @@ export default function OrdersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#f8fafc",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#f8fafc",
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 16,
-    color: "#666",
+    color: "#64748b",
+    fontWeight: '500',
   },
-  searchBar: {
-    margin: 16,
-    marginBottom: 8,
-    height: 44,
-    borderColor: "#e1e5e9",
-    borderWidth: 1,
-    borderRadius: 22,
+  header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  headerStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  statDivider: {
+    marginHorizontal: 8,
+    color: '#cbd5e1',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    marginVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: "#fff",
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 16,
+    color: '#1e293b',
+  },
+  clearButton: {
+    padding: 4,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    marginBottom: 24,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginTop: 16,
-    marginBottom: 12,
-    color: "#2c3e50",
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
   },
-  horizontalList: {
+  sectionCount: {
+    fontSize: 14,
+    color: '#64748b',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    fontWeight: '500',
+  },
+  vendorsList: {
     paddingBottom: 8,
+    marginBottom: 32,
   },
-  verticalList: {
-    paddingBottom: 16,
+  vendorCard: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginRight: 12,
+    width: 240,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
-  itemCard: {
-    backgroundColor: "#fff",
+  vendorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  vendorIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  vendorName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    flex: 1,
+  },
+  vendorInfo: {
+    gap: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#64748b',
+    flex: 1,
+  },
+  ordersList: {
+    paddingBottom: 100,
+  },
+  orderCard: {
+    backgroundColor: '#fff',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    marginRight: 12,
-    minWidth: 280,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
+    borderColor: '#f1f5f9',
   },
-  selectedItem: {
-    borderColor: "#007bff",
-    borderWidth: 2,
-    backgroundColor: "#f8f9ff",
-  },
-  itemHeader: {
+  orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  orderCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  orderActions: {
+  orderIdContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  shareButton: {
-    marginLeft: 10,
-    padding: 5,
+  orderIdLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: 8,
+    fontWeight: '600',
   },
-  itemTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#2c3e50",
+  orderId: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  whatsappButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#f0fdf4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  orderContent: {
+    gap: 8,
+  },
+  orderInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  orderVendor: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1e293b',
     flex: 1,
   },
-  itemSubtext: {
+  orderMaterials: {
     fontSize: 14,
-    color: "#7f8c8d",
-    marginBottom: 4,
-    lineHeight: 20,
+    color: '#64748b',
+    flex: 1,
   },
-  badge: {
-    backgroundColor: "#e9ecef",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#495057",
+  orderDate: {
+    fontSize: 14,
+    color: '#64748b',
+    flex: 1,
   },
-  emptyText: {
+  materialsPreview: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+  },
+  materialsPreviewText: {
+    fontSize: 13,
+    color: '#475569',
+    lineHeight: 18,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#64748b',
+    marginTop: 16,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#94a3b8',
     textAlign: 'center',
-    color: "#95a5a6",
-    fontSize: 16,
-    fontStyle: 'italic',
-    paddingVertical: 32,
+    marginTop: 8,
+    lineHeight: 20,
   },
   fab: {
     position: 'absolute',
     bottom: 24,
     right: 24,
-    backgroundColor: '#007bff',
     width: 56,
     height: 56,
     borderRadius: 28,
+    backgroundColor: '#3b82f6',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 16,
     elevation: 8,
   },
   modalContainer: {
@@ -740,210 +1007,253 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: '#f1f5f9',
     backgroundColor: '#fff',
   },
-  backButton: {
-    padding: 8,
+  modalBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#2c3e50',
+    color: '#1e293b',
   },
-  placeholder: {
+  modalHeaderSpacer: {
     width: 40,
   },
   modalContent: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
-  toggleContainer: {
+  modalSection: {
+    marginBottom: 32,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 16,
+  },
+  toggleRow: {
     flexDirection: 'row',
-    marginVertical: 16,
+    backgroundColor: '#f8fafc',
     borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#007bff',
+    padding: 4,
+    marginBottom: 16,
   },
-  toggleButton: {
+  toggleBtn: {
     flex: 1,
-    paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 6,
+    gap: 8,
   },
-  toggleButtonActive: {
-    backgroundColor: '#007bff',
+  toggleBtnActive: {
+    backgroundColor: '#3b82f6',
   },
-  toggleButtonText: {
-    color: '#007bff',
-    fontWeight: '600',
-    fontSize: 16,
+  toggleBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#3b82f6',
   },
-  toggleButtonTextActive: {
-    color: 'white',
+  toggleBtnTextActive: {
+    color: '#fff',
   },
-  section: {
-    marginBottom: 24,
+  vendorSelection: {
+    gap: 16,
   },
-  sectionLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#2c3e50',
-  },
-  input: {
-    height: 48,
-    borderColor: '#e1e5e9',
-    borderWidth: 1,
-    borderRadius: 8,
+  selectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
     paddingHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: '#fff',
-    fontSize: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 12,
   },
-  textArea: {
-    height: 80,
+  selectorText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#94a3b8',
+  },
+  selectorTextSelected: {
+    color: '#1e293b',
+    fontWeight: '500',
+  },
+  selectedVendorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  selectedVendorInfo: {
+    flex: 1,
+  },
+  selectedVendorName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#166534',
+  },
+  selectedVendorContact: {
+    fontSize: 14,
+    color: '#16a34a',
+    marginTop: 2,
+  },
+  newVendorForm: {
+    gap: 16,
+  },
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  modalInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1e293b',
+    paddingVertical: 12,
+  },
+  textAreaInput: {
+    minHeight: 80,
     textAlignVertical: 'top',
     paddingTop: 12,
   },
-  vendorList: {
-    paddingBottom: 8,
-  },
-  selectedVendorPreview: {
+  selectedMaterialsSection: {
     marginTop: 16,
-    padding: 16,
-    backgroundColor: '#e8f5e8',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#28a745',
   },
-  previewTitle: {
+  selectedMaterialsTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#155724',
-    marginBottom: 4,
-  },
-  previewText: {
-    fontSize: 16,
     fontWeight: '500',
-    color: '#155724',
+    color: '#64748b',
+    marginBottom: 12,
   },
-  previewSubtext: {
-    fontSize: 14,
-    color: '#155724',
-    opacity: 0.8,
+  selectedMaterialsGrid: {
+    gap: 12,
   },
-  materialsList: {
-    maxHeight: 200,
-    borderWidth: 1,
-    borderColor: '#e1e5e9',
-    borderRadius: 8,
-    paddingVertical: 8,
-  },
-  materialItem: {
+  selectedMaterialChip: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f8f9fa',
-  },
-  selectedMaterialItem: {
-    backgroundColor: '#e8f4fd',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   materialInfo: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   materialName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#2c3e50',
-    marginRight: 8,
-  },
-  materialUnit: {
     fontSize: 14,
-    color: '#7f8c8d',
-  },
-  selectedMaterialsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  selectedMaterialTag: {
-    backgroundColor: '#007bff',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    fontWeight: '500',
+    color: '#1e293b',
     marginBottom: 8,
   },
-  selectedMaterialName: {
-    color: 'white',
-    fontWeight: '500',
-    marginRight: 8,
-  },
-  quantityContainer: {
+  quantityControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+    gap: 8,
   },
   quantityInput: {
-    backgroundColor: 'white',
-    color: 'black',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    width: 50,
+    paddingVertical: 6,
+    width: 60,
     textAlign: 'center',
-    marginRight: 4,
     fontSize: 14,
+    color: '#1e293b',
   },
-  unitTypeButton: {
-    backgroundColor: 'white',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+  unitSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 60,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 4,
   },
-  unitTypeText: {
-    color: 'black',
+  unitText: {
     fontSize: 12,
-    marginRight: 4,
+    color: '#64748b',
+    fontWeight: '500',
   },
-  removeButton: {
-    padding: 4,
+  removeChipButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fef2f2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   modalFooter: {
-    padding: 16,
+    padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#e1e5e9',
+    borderTopColor: '#f1f5f9',
     backgroundColor: '#fff',
   },
-  submitButton: {
-    backgroundColor: '#28a745',
-    paddingVertical: 16,
-    borderRadius: 8,
+  createOrderButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50,
+    backgroundColor: '#3b82f6',
+    paddingVertical: 16,
+    borderRadius: 8,
+    gap: 8,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#95a5a6',
+  createOrderButtonDisabled: {
+    backgroundColor: '#94a3b8',
   },
-  submitButtonText: {
-    color: 'white',
-    fontWeight: '600',
+  createOrderButtonText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  dropdownItemInfo: {
+    flex: 1,
+  },
+  dropdownItemName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1e293b',
+  },
+  dropdownItemContact: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 2,
   },
   pickerOverlay: {
     flex: 1,
@@ -951,63 +1261,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pickerContent: {
-    backgroundColor: 'white',
+  pickerModal: {
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 20,
     width: '80%',
-    maxHeight: '70%',
+    maxHeight: '60%',
   },
-  pickerTitle: {
+  pickerModalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
+    color: '#1e293b',
     textAlign: 'center',
-    color: '#2c3e50',
+    marginBottom: 20,
   },
-  pickerItem: {
+  pickerModalItem: {
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f8f9fa',
+    borderBottomColor: '#f1f5f9',
   },
-  pickerItemText: {
-    fontSize: 16,
+  pickerModalItemText: {
+    fontSize: 15,
+    color: '#1e293b',
     textAlign: 'center',
-    color: '#2c3e50',
   },
-  pickerCancelButton: {
+  pickerModalCancel: {
     marginTop: 16,
-    backgroundColor: '#dc3545',
+    backgroundColor: '#ef4444',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
-  pickerCancelText: {
-    color: 'white',
+  pickerModalCancelText: {
+    color: '#fff',
     fontWeight: '600',
-    fontSize: 16,
-  },
-  dropdownButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    height: 48,
-    borderColor: '#e1e5e9',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: '#fff',
-  },
-  dropdownButtonText: {
-    fontSize: 16,
-    color: '#2c3e50',
-  },
-  dropdownItemContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    fontSize: 15,
   },
 });
